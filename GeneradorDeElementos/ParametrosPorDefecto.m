@@ -43,6 +43,10 @@ Parametros.RollObjetivoLoop = 0;      % [rad] 0 = loop vertical estandar
 % Modo de curvatura del arco:
 %   'AceleracionNormalConstante' | 'Clotoide' | 'FuerzaGConstante' | 'GMaximas'
 Parametros.ModoCurvatura              = 'Clotoide';
+
+% Metodo de acoplamiento geometria-dinamica: 'A' marcha acoplada, 'B' punto fijo.
+Parametros.MetodoDeAcoplamiento = 'A';
+Parametros.CalcularVelocidadMinima = true;
 Parametros.AceleracionNormalObjetivo  = 20;    % [m/s^2] modo 1
 Parametros.FuerzaGObjetivo            = 3.0;   % [G] modo 3, G neta incluida la gravedad
 Parametros.CurvaLimiteGMaximas        = 'MasGzTodas';   % modo 4
@@ -77,6 +81,7 @@ Parametros.AlturaMinimaSuelo     = 0.05;   % [m] z minimo admisible
 Parametros.PasoGeneracion = 0.002;   % [m]
 Parametros.PasoSimulacion = 0.005;   % [m]
 Parametros.PasosEntreOrtonormalizaciones = 25;
+Parametros.PasoBusquedaVelocidad = 0.010;   % [m] paso grueso para la biseccion de v0
 
 %% ------------------------- Tolerancias --------------------------------
 Parametros.TolNorma            = 1e-12;
@@ -84,6 +89,8 @@ Parametros.TolCierrePitch      = 1e-4;    % [rad]
 Parametros.TolPuntoFijo        = 1e-8;    % [m/s] cambio maximo de v entre iteraciones
 Parametros.MaxIteracionesPuntoFijo = 60;
 Parametros.MaxIteracionesCierre    = 6;
+Parametros.MaxIteracionesOnset     = 4;
+Parametros.ToleranciaOnset         = 0.0;    % margen relativo aceptado sobre el presupuesto
 Parametros.ToleranciaVelocidadDeDiseno = 0.10;   % [m/s] dispara aviso al re-simular
 
 %% ------------------ Interferencia geometrica --------------------------

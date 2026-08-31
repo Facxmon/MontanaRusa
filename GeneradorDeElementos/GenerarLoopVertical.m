@@ -56,28 +56,47 @@ function [Track, Diagnostico] = GenerarLoopVertical(EstadoEntrada, Parametros, P
     RollObjetivo = Beta + Parametros.RollObjetivoLoop;
     DeltaRoll    = AjustarAngulo(RollObjetivo - EstadoEntrada.AnguloRoll);
 
-    Plan.LongitudAcondicionamiento = LongitudTransicionDeRoll(DeltaRoll, EstadoEntrada.Velocidad, ...
-                                                              Plan.Onset(2), Parametros);
-    if abs(Plan.CurvaturaFueraPlano) > 1e-9
-        LongitudPorCurvatura = LongitudDeClotoide(EstadoEntrada.Velocidad, Plan.CurvaturaFueraPlano, ...
-                                                  Plan.Onset(2), Parametros);
-        Plan.LongitudAcondicionamiento = max(Plan.LongitudAcondicionamiento, LongitudPorCurvatura);
-    end
-
-    Plan.FuncionRoll = @(Arco) PerfilRollQuintico(EstadoEntrada.AnguloRoll, RollObjetivo, ...
-                                                  Plan.LongitudAcondicionamiento, ...
-                                                  Arco - EstadoEntrada.LongitudAcumulada);
-
-    %% ---------------- Generacion con correccion de cierre -----------------
-    AjusteCierre   = 0;
+    %% ---------------- Generacion ------------------------------------------
+    % Dos lazos anidados, los dos chicos:
+    %   externo  ajusta la longitud de las transiciones hasta respetar el
+    %            presupuesto de onset. La formula L = DeltaG*v/Onset supone v
+    %            constante dentro de la transicion, asi que el onset que sale
+    %            se pasa un poco; el lazo lo corrige y despues se reporta el
+    %            margen que quedo.
+    %   interno  corrige por secante el residual de cierre del loop.
+    FactorLongitud = 1;
     ResidualCierre = NaN;
-    for IteracionCierre = 1:Parametros.MaxIteracionesCierre
-        Recorrido = RecorrerElemento(Plan, AjusteCierre);
-        ResidualCierre = Recorrido.PuntoFinal.AnguloGirado - 2*pi;
-        if abs(ResidualCierre) < Parametros.TolCierrePitch || ~isempty(Recorrido.Aviso)
+    for IteracionOnset = 1:Parametros.MaxIteracionesOnset
+        Plan.Onset = Escala.OnsetMaximo / FactorLongitud;
+
+        Plan.LongitudAcondicionamiento = LongitudTransicionDeRoll(DeltaRoll, EstadoEntrada.Velocidad, ...
+                                                                  Plan.Onset(2), Parametros);
+        if abs(Plan.CurvaturaFueraPlano) > 1e-9
+            LongitudPorCurvatura = LongitudDeClotoide(EstadoEntrada.Velocidad, Plan.CurvaturaFueraPlano, ...
+                                                      Plan.Onset(2), Parametros);
+            Plan.LongitudAcondicionamiento = max(Plan.LongitudAcondicionamiento, LongitudPorCurvatura);
+        end
+        Plan.FuncionRoll = @(Arco) PerfilRollQuintico(EstadoEntrada.AnguloRoll, RollObjetivo, ...
+                                                      Plan.LongitudAcondicionamiento, ...
+                                                      Arco - EstadoEntrada.LongitudAcumulada);
+
+        AjusteCierre = 0;
+        for IteracionCierre = 1:Parametros.MaxIteracionesCierre
+            Recorrido = RecorrerElemento(Plan, AjusteCierre);
+            ResidualCierre = Recorrido.PuntoFinal.AnguloGirado - 2*pi;
+            if abs(ResidualCierre) < Parametros.TolCierrePitch || ~isempty(Recorrido.Aviso)
+                break
+            end
+            AjusteCierre = AjusteCierre + ResidualCierre;
+        end
+
+        OnsetMedido = OnsetVerticalDelRecorrido(Recorrido.Registro);
+        if ~isempty(Recorrido.Aviso) || OnsetMedido <= Escala.OnsetMaximo(3)*(1 + Parametros.ToleranciaOnset)
             break
         end
-        AjusteCierre = AjusteCierre + ResidualCierre;
+        % El 1.002 hace que el lazo se acerque desde arriba y termine debajo del
+        % presupuesto en vez de quedar oscilando justo sobre el borde.
+        FactorLongitud = 1.002 * FactorLongitud * OnsetMedido / Escala.OnsetMaximo(3);
     end
 
     %% ---------------- Armado del Track ------------------------------------
@@ -117,11 +136,16 @@ function [Track, Diagnostico] = GenerarLoopVertical(EstadoEntrada, Parametros, P
     Diagnostico.LongitudClotoideSalida     = Recorrido.LongitudClotoideSalida;
     Diagnostico.DeltaRoll                  = DeltaRoll;
     Diagnostico.Escala                     = Escala;
+    Diagnostico.IteracionesOnset           = IteracionOnset;
+    Diagnostico.FactorLongitudTransicion   = FactorLongitud;
+    Diagnostico.OnsetVerticalGenerado      = OnsetMedido;
 
     % Perfil de velocidad que salio de la marcha acoplada. Es lo que el
     % metodo B realimenta en la iteracion siguiente.
     Diagnostico.PerfilVelocidad = struct('Arco', Registro.Arco, 'Velocidad', Registro.Velocidad);
     Diagnostico.TiempoDeRecorrido = Registro.Tiempo;
+    Diagnostico.GArribaRiel       = Registro.GArribaRiel;
+    Diagnostico.GLateralRiel      = Registro.GLateralRiel;
 end
 
 %% ========================= recorrido del elemento =========================
@@ -297,6 +321,20 @@ end
 
 function Angulo = AjustarAngulo(Angulo)
     Angulo = mod(Angulo + pi, 2*pi) - pi;
+end
+
+function Onset = OnsetVerticalDelRecorrido(Registro)
+%ONSETVERTICALDELRECORRIDO Tasa de aparicion de la G vertical sobre el riel,
+%   medida sobre el recorrido recien generado. Se usa para realimentar la
+%   longitud de las transiciones. Es la G del riel, no la de la heartline: el
+%   aporte de heartline depende de phi'' y lo dimensiona el onset lateral.
+    n = Registro.NumeroDeNodos;
+    if n < 3
+        Onset = 0;
+        return
+    end
+    Arco = Registro.Arco(1:n);
+    Onset = max(abs(gradient(Registro.GArribaRiel(1:n), Arco) .* Registro.Velocidad(1:n)));
 end
 
 function Longitud = LongitudDeClotoide(Velocidad, DeltaCurvatura, Onset, Parametros)
