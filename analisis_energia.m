@@ -58,6 +58,23 @@ YFino = 2*cos(TFino);
 ZFino = 10 - TFino + 20*cos(TFino/10);
 TrayectoriaFina = [XFino, YFino, ZFino];
 
+% Por que esta curva sale como una helice de varias vueltas y no como un loop:
+% X e Y son periodicas en t con periodo 2*pi, y TMax = 10*pi son 5 periodos,
+% asi que la proyeccion sobre el plano XY recorre 5 veces la misma elipse.
+% Mientras tanto dZ/dt = -1 - 2*sin(t/10) es negativa en todo el intervalo, o
+% sea que Z baja siempre y nunca vuelve. Curva cerrada en horizontal + avance
+% monotono en vertical = helice, por definicion. No es un error: es una curva
+% de prueba elegida para ejercitar la discretizacion por longitud de arco y el
+% calculo de curvatura sobre algo que no es funcion de x. La geometria de vía
+% de verdad la genera el constructor de elementos, no este script.
+%
+% Para un solo loop vertical hay que poner la circunferencia en un plano
+% VERTICAL y recorrer un solo periodo:
+%   TMax  = 2*pi;
+%   XFino = 0.30*sin(TFino);
+%   YFino = zeros(size(TFino));
+%   ZFino = 0.30*(1 - cos(TFino));
+
 %% ============ DISCRETIZACIÓN POR LONGITUD DE ARCO ====================
 DeltaSegmentos    = vecnorm(diff(TrayectoriaFina), 2, 2);
 LongitudAcumulada = [0; cumsum(DeltaSegmentos)];
@@ -263,18 +280,23 @@ title('Trayectoria 3D: dirección (flechas) y magnitud (color) del radio de giro
 axis equal; grid on; view(45, 30)
 
 % --- Energía vs longitud recorrida ---
+% La cinética es la distancia vertical entre la energía total y la potencial:
+% graficarla explícita hace visible dónde el carrito se queda sin margen.
 figure
 plot(LongitudRecorrida, EnergiaPotencial, 'LineWidth', 2)
 hold on
+plot(LongitudRecorrida, EnergiaCinetica, 'LineWidth', 2)
 plot(LongitudRecorrida, EnergiaInicial, '--', 'LineWidth', 2)
 plot(LongitudRecorrida, EnergiaTotal, 'LineWidth', 2)
 if ~isempty(PuntoDeParada)
     plot(LongitudRecorrida(PuntoDeParada), EnergiaTotal(PuntoDeParada), 'rx', ...
          'MarkerSize', 12, 'LineWidth', 2, 'HandleVisibility', 'off')
 end
+yline(0, 'k:', 'HandleVisibility', 'off')
 hold off
 xlabel('Longitud Recorrida [m]'); ylabel('Energía [J]')
-legend('Energía Potencial Gravitatoria', 'Energía Inicial (E_0)', 'Energía Total (con pérdidas)', 'Location', 'best')
+legend('Energía Potencial Gravitatoria', 'Energía Cinética', ...
+       'Energía Inicial (E_0)', 'Energía Total (con pérdidas)', 'Location', 'best')
 title('Energía sobre la trayectoria'); grid on
 
 % --- Reparto de pérdidas: rodadura vs arrastre ---
@@ -332,7 +354,7 @@ axis equal; grid on; view(45, 30)
 clear TFino XFino YFino ZFino TrayectoriaFina DeltaSegmentos LongitudAcumulada ...
       PuntoAnterior PuntoActual PuntoSiguiente LadoA LadoB LadoC AreaTriangulo ...
       PesoAnterior PesoActual PesoSiguiente SumaPesos CentroDeCurvatura ...
-      IndicesFlechas EnergiaCinetica VectorGravedad AceleracionCentripeta ...
+      IndicesFlechas VectorGravedad AceleracionCentripeta ...
       DistanciaSegmento NumPuntos FuerzaNormal FuerzaRodadura FuerzaArrastre ...
       CargaPortantes CargaGuia CargaRetencion j k ...
       VelocidadInterior SignoRadioDeGiro AceleracionTangencialEscalar ...

@@ -38,6 +38,8 @@ Se muestrea finamente (`NumPuntosFinos`) para aproximar la curva continua como u
 Trayectoria de prueba actual (debug):
 $$X(t) = \sin(t), \qquad Y(t) = 2\cos(t), \qquad Z(t) = 10 - t + 20\cos(t/10)$$
 
+> **Por qué sale una hélice de varias vueltas y no un loop.** $X$ e $Y$ son periódicas en $t$ con período $2\pi$, y $T_{max} = 10\pi$ son cinco períodos: la proyección sobre el plano $XY$ recorre cinco veces la misma elipse. Mientras tanto $dZ/dt = -1 - 2\sin(t/10)$ es negativa en todo el intervalo, o sea que $Z$ baja siempre y nunca vuelve. Curva cerrada en horizontal más avance monótono en vertical es, por definición, una hélice. No es un error: es una curva de prueba elegida para ejercitar la discretización por longitud de arco y el cálculo de curvatura sobre algo que no es función de $x$. La geometría de vía de verdad la genera el constructor de elementos, documentado en [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md). Para un solo loop vertical hay que poner la circunferencia en un plano **vertical** y recorrer un solo período; el script tiene las tres líneas comentadas al lado.
+
 ## 3. Discretización por longitud de arco
 
 El objetivo es obtener puntos separados por `DistanciaDeDiscretizacion` **medido sobre la curva**, no sobre ningún eje.
@@ -233,7 +235,7 @@ Positivo: la fuerza empuja en el sentido del radio de giro (hacia el centro de c
 ## 12. Gráficos generados
 
 1. **Trayectoria 3D — radio de giro**: vía en gris, puntos coloreados por curvatura ($1/R$), flechas con la dirección del radio de giro.
-2. **Energía vs Longitud Recorrida**: energía potencial, recta de energía inicial ($E_0$) y energía total real (decreciente por pérdidas), con marca en el punto donde el carrito se queda sin energía (si aplica).
+2. **Energía vs Longitud Recorrida**: energía potencial, **energía cinética**, recta de energía inicial ($E_0$) y energía total real (decreciente por pérdidas), con marca en el punto donde el carrito se queda sin energía (si aplica). La cinética es la distancia vertical entre la total y la potencial; graficarla explícita hace visible dónde se acaba el margen.
 3. **Reparto de pérdidas** *(nuevo)*: energía disipada acumulada por rodadura y por arrastre, por separado.
 4. **Trayectoria 3D — velocidades**: vía en gris, puntos coloreados por velocidad, flechas con la dirección de avance (tangente).
 5. **Fuerza G por radio de giro** (con signo) vs Longitud Recorrida.
