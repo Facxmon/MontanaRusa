@@ -67,12 +67,18 @@ function [EstadoSalida, Elemento, Reporte] = ElementoLoopVertical(EstadoEntrada,
 
     % Residual del endpoint. El punto de entrada NO es el endpoint esperado:
     % un loop con clotoides de entrada y salida de distinta longitud no vuelve
-    % a su propio punto de arranque. Lo que si tiene que cerrar es la
-    % direccion de la tangente tras 2*pi de giro, y la deriva fuera del plano.
-    Resumen.ResidualCierreTangente = norm(Track.VersorTangente(end,:) - Track.VersorTangente(1,:));
+    % a su propio punto de arranque. Lo que si tiene que cerrar es la rotacion
+    % de la tangente dentro del plano del loop tras 2*pi.
     Resumen.ResidualCierrePitch    = Diagnostico.ResidualCierrePitch;
-    Resumen.DerivaFueraDelPlano    = abs(dot(Track.Puntos(end,:) - Track.Puntos(1,:), Binormal));
+    Resumen.ResidualCierreTangente = norm(Track.VersorTangente(end,:) - Track.VersorTangente(1,:));
     Resumen.PosicionFinal          = Track.Puntos(end,:);
+
+    % Desplazamiento lateral entre la pata de entrada y la de salida. Es lo que
+    % evita que el loop se choque consigo mismo, y es un objetivo de diseno, no
+    % un residual: se lo impone la torsion del elemento.
+    Resumen.DesplazamientoLateral    = abs(dot(Track.Puntos(end,:) - Track.Puntos(1,:), Binormal));
+    Resumen.DesplazamientoLateralObjetivo = Parametros.DesplazamientoLateralLoop;
+    Resumen.InclinacionHelicoidal    = Diagnostico.InclinacionHelicoidal;
 
     % Continuidad en el empalme con el estado de entrada.
     Resumen.SaltoDeTangente  = norm(Track.VersorTangente(1,:) - EstadoEntrada.VersorTangente);

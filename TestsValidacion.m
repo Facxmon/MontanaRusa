@@ -70,8 +70,9 @@ Resultados = Anotar(Resultados, 'Curvatura impuesta contra recuperada', ErrorCur
 %% --- Test 3: residual del endpoint ------------------------------------
 % El punto de entrada NO es el endpoint esperado: con clotoides de entrada y
 % salida de distinta longitud el loop no vuelve a su propio arranque. Lo que
-% si tiene que cerrar es la direccion de la tangente tras 2*pi y la deriva
-% fuera del plano del loop.
+% si tiene que cerrar es la direccion de la tangente tras la vuelta completa.
+% El desplazamiento lateral tampoco es un residual: es el objetivo de diseno
+% que evita que el loop se choque consigo mismo.
 Parametros = ParametrosBase;
 Parametros.ModoCurvatura = 'Clotoide';
 Estado = EstadoDeEnsayo(Parametros);
@@ -79,12 +80,15 @@ Estado = EstadoDeEnsayo(Parametros);
 
 Binormal = cross(Track.VersorTangente(1,:), Track.NormalDelPlano);
 ResidualTangente = norm(Track.VersorTangente(end,:) - Track.VersorTangente(1,:));
-DerivaFueraDelPlano = abs(dot(Track.Puntos(end,:) - Track.Puntos(1,:), Binormal));
+DesplazamientoLateral = abs(dot(Track.Puntos(end,:) - Track.Puntos(1,:), Binormal));
+ErrorDesplazamiento = abs(DesplazamientoLateral - Parametros.DesplazamientoLateralLoop) ...
+                      / Parametros.DesplazamientoLateralLoop;
 
 Resultados = Anotar(Resultados, 'Residual del endpoint', ...
-    ResidualTangente < 1e-3 && DerivaFueraDelPlano < 1e-9, ...
-    sprintf('tangente %.3e, deriva fuera del plano %.3e m, posicion final [%.5f %.5f %.5f]', ...
-            ResidualTangente, DerivaFueraDelPlano, Track.Puntos(end,:)));
+    ResidualTangente < 1e-3 && ErrorDesplazamiento < 0.05, ...
+    sprintf('tangente %.3e, desplazamiento lateral %.4f m contra objetivo %.4f m (%.2f %%), posicion final [%.5f %.5f %.5f]', ...
+            ResidualTangente, DesplazamientoLateral, Parametros.DesplazamientoLateralLoop, ...
+            100*ErrorDesplazamiento, Track.Puntos(end,:)));
 
 %% --- Test 4: continuidad en el empalme ---------------------------------
 SaltoPosicion  = norm(Track.Puntos(1,:)          - Estado.Posicion);
@@ -139,10 +143,16 @@ PitchInicial = asin(TrackFino.VersorTangente(1,3));
 PitchFinal   = asin(TrackFino.VersorTangente(end,3));
 AnguloTotal  = TrackFino.AnguloGirado(end);
 
+% Con el loop helicoidal la tangente no gira 2*pi sino 2*pi*cos(alfa): recorre
+% un circulo de radio cos(alfa) sobre la esfera unitaria, porque mantiene un
+% angulo constante con el eje de la helice. Que ese numero salga sirve de
+% verificacion independiente de la construccion helicoidal.
+AnguloEsperado = 2*pi*cos(atan(TrackFino.InclinacionHelicoidal));
+
 Resultados = Anotar(Resultados, 'Cierre del loop de 360 grados', ...
-    abs(PitchFinal - PitchInicial) < 1e-4 && abs(AnguloTotal - 2*pi) < 1e-4, ...
-    sprintf('pitch inicial %.3e rad, final %.3e rad, angulo total %.9f rad (2*pi = %.9f)', ...
-            PitchInicial, PitchFinal, AnguloTotal, 2*pi));
+    abs(PitchFinal - PitchInicial) < 1e-4 && abs(AnguloTotal - AnguloEsperado) < 1e-3, ...
+    sprintf('pitch inicial %.3e rad, final %.3e rad, angulo girado %.6f rad contra 2*pi*cos(alfa) = %.6f', ...
+            PitchInicial, PitchFinal, AnguloTotal, AnguloEsperado));
 
 %% --- Resumen ----------------------------------------------------------
 fprintf('\n');

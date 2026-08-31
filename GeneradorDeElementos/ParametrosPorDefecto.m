@@ -40,6 +40,14 @@ Parametros.RadioLoop        = 0.21;   % [m] radio de cuspide objetivo
 Parametros.AlturaMaximaLoop = 1.00;   % [m] restriccion dura del proyecto
 Parametros.RollObjetivoLoop = 0;      % [rad] 0 = loop vertical estandar
 
+% Desplazamiento lateral entre la pata de entrada y la de salida. NO es
+% opcional: un giro de 2*pi contenido en un plano vuelve a pasar por donde
+% entro, asi que un loop plano se choca consigo mismo siempre. El generador
+% impone la torsion necesaria para llegar a este valor. Poner 0 fuerza el loop
+% plano, que sirve de referencia pero no es fabricable.
+% El valor por defecto se calcula al final del archivo a partir de la
+% envolvente, para que quede siempre por encima de la separacion exigida.
+
 % Modo de curvatura del arco:
 %   'AceleracionNormalConstante' | 'Clotoide' | 'FuerzaGConstante' | 'GMaximas'
 Parametros.ModoCurvatura              = 'Clotoide';
@@ -89,11 +97,21 @@ Parametros.TolCierrePitch      = 1e-4;    % [rad]
 Parametros.TolPuntoFijo        = 1e-8;    % [m/s] cambio maximo de v entre iteraciones
 Parametros.MaxIteracionesPuntoFijo = 60;
 Parametros.MaxIteracionesCierre    = 6;
-Parametros.MaxIteracionesOnset     = 6;
+Parametros.MaxIteracionesAjuste     = 8;
 Parametros.MargenDeOnset           = 0.002;  % las transiciones se alargan este margen sobre lo justo
 Parametros.ToleranciaVelocidadDeDiseno = 0.10;   % [m/s] dispara aviso al re-simular
 
 %% ------------------ Interferencia geometrica --------------------------
 Parametros.ArcoMinimoAutointerferencia = 0.30;   % [m] ignora vecinos por construccion
 Parametros.DistanciaMinimaEntreVias    = 0.02;   % [m] separacion libre exigida
+
+%% ------------- Derivados de la envolvente -----------------------------
+% Diametro del cilindro que circunscribe la seccion de via mas la holgura.
+DiametroEnvolvente = hypot(Parametros.AnchoVia  + 2*Parametros.Holgura, ...
+                           Parametros.AltoCarro + 2*Parametros.Holgura);
+Parametros.DesplazamientoLateralLoop = 1.2*(DiametroEnvolvente + Parametros.DistanciaMinimaEntreVias);
+
+% Alternativa: imponer la inclinacion helicoidal (tan del angulo entre la
+% tangente y el plano del loop) en vez de pedir un desplazamiento.
+Parametros.InclinacionHelicoidalImpuesta = [];
 end

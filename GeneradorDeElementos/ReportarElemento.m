@@ -38,11 +38,16 @@ function ReportarElemento(Reporte, Elemento)
     fprintf('\n--- Cierre y empalme (nunca se asumen cero) ---\n');
     fprintf('  Residual de pitch tras 2*pi   : %10.3e rad\n', Resumen.ResidualCierrePitch);
     fprintf('  Residual de tangente          : %10.3e\n',     Resumen.ResidualCierreTangente);
-    fprintf('  Deriva fuera del plano        : %10.3e m\n',   Resumen.DerivaFueraDelPlano);
     fprintf('  Salto de posicion en empalme  : %10.3e m\n',   Resumen.SaltoDePosicion);
     fprintf('  Salto de tangente en empalme  : %10.3e\n',     Resumen.SaltoDeTangente);
     fprintf('  Salto de curvatura en empalme : %10.3e 1/m\n', Resumen.SaltoDeCurvatura);
     fprintf('  Posicion final                : [%.5f %.5f %.5f] m\n', Resumen.PosicionFinal);
+
+    fprintf('\n--- Salida del plano (es lo que evita que el loop se choque consigo mismo) ---\n');
+    fprintf('  Inclinacion helicoidal        : %8.4f   (%.2f grados)\n', ...
+            Resumen.InclinacionHelicoidal, rad2deg(atan(Resumen.InclinacionHelicoidal)));
+    fprintf('  Desplazamiento lateral        : %8.4f m   (objetivo %.4f m)\n', ...
+            Resumen.DesplazamientoLateral, Resumen.DesplazamientoLateralObjetivo);
 
     fprintf('\n--- Escalado (modelo distorsionado) ---\n');
     fprintf('  lambda del loop               : %8.3f\n', Resumen.LambdaLoop);

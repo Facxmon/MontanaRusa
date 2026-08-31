@@ -69,6 +69,24 @@ Quedan demarcados por índice de nodo en `Track.SubTramos(k).IndiceInicio/Indice
 
 La clotoide de entrada arranca en la curvatura que traiga el estado de entrada (**clotoide desplazada**), no en cero. Se implementa como una mezcla lineal entre $\kappa_0$ y la curvatura del modo; con el modo `Clotoide` la curvatura objetivo es constante y la mezcla es exactamente una clotoide ($d\kappa/ds$ constante).
 
+### El loop no es plano
+
+**Un giro de $2\pi$ contenido en un plano vuelve a pasar por donde entró.** No hay forma de evitarlo: la vía se choca consigo misma siempre. Por eso el elemento tiene una **inclinación helicoidal** y `DesplazamientoLateralLoop` no es opcional.
+
+La construcción es una hélice de eje horizontal $\mathbf{B}$: se pide que la tangente mantenga $\mathbf{T}\cdot\mathbf{B} = \sin\alpha$ constante. Eso obliga a que el vector curvatura no tenga componente sobre $\mathbf{B}$, y de esa condición sale
+
+$$\tau = \kappa\,\tan\alpha$$
+
+o sea que la dirección de la curvatura tiene que girar dentro del marco de transporte **proporcionalmente al ángulo ya girado**, no al arco recorrido. La diferencia importa: con torsión constante el desplazamiento lateral deja de ser monótono en cuanto $\kappa$ varía —el loop se va para un lado y vuelve— y se sigue chocando. Con $\tau = \kappa\tan\alpha$ el desplazamiento vale exactamente $\sin\alpha \cdot L$ y es monótono por construcción.
+
+Tres consecuencias que sirven de verificación:
+
+1. **La tangente de salida es idéntica a la de entrada.** El elemento no cambia el rumbo: sólo desplaza la vía lateralmente.
+2. **El carro sale derecho.** El número del roll no termina en cero (avanza con $\tan\alpha$ veces el giro), pero eso no es un peralte agregado: el roll se mide contra el marco de transporte, que gira respecto de la normal de la curva justamente a razón de la torsión. Seguir esa razón es mantener el eje "arriba" del carro alineado con el vector curvatura.
+3. **La tangente gira $2\pi\cos\alpha$, no $2\pi$.** Recorre un círculo de radio $\cos\alpha$ sobre la esfera unitaria. El test 7 lo verifica.
+
+$\alpha$ no se pide directamente: se pide el desplazamiento lateral y el generador lo resuelve con un paso de Newton, usando la longitud del loop como pendiente. El valor por defecto sale de la envolvente de la vía, de modo que siempre supere la separación exigida por el chequeo de interferencia.
+
 ### Cierre del loop
 
 El arco se corta cuando el ángulo ya girado más lo que va a girar la clotoide de salida llega a $2\pi$. Dos detalles importantes:
@@ -157,23 +175,25 @@ Los siete son ejecutables y `TestsValidacion.m` termina con error si alguno fall
 |---|---|---|
 | 1 | Conservación de energía sin pérdidas contra $v^2 = v_0^2 - 2gh$ | error relativo $6\times10^{-9}$ |
 | 2 | Curvatura impuesta contra recuperada de la polilínea | error relativo $2\times10^{-5}$ |
-| 3 | Residual del endpoint | tangente $1.6\times10^{-5}$, deriva fuera del plano exactamente 0 |
+| 3 | Residual del endpoint y desplazamiento lateral | tangente $8.8\times10^{-5}$, desplazamiento lateral dentro del 0.01 % del objetivo |
 | 4 | Continuidad en el empalme | los tres saltos exactamente 0 |
 | 5 | Equivalencia de métodos A y B en modo clotoide | diferencia exactamente 0 |
-| 6 | Ortonormalidad del marco | desvío $8\times10^{-14}$ |
-| 7 | Cierre del loop de 360° | pitch final $-5.7\times10^{-5}$ rad |
+| 6 | Ortonormalidad del marco | desvío $8\times10^{-13}$ |
+| 7 | Cierre del loop de 360° | pitch final $-6\times10^{-5}$ rad; ángulo girado dentro de $6\times10^{-5}$ rad de $2\pi\cos\alpha$ |
 
 **Test 2 excluye los nodos cuyo esquema de tres puntos cruza una frontera de sub-tramo.** Ahí $d\kappa/ds$ salta y la circunferencia por tres puntos devuelve un promedio de dos curvaturas distintas: el error sube a $4.6\times10^{-3}$. Es una limitación del estimador discreto, no de la geometría generada — y es exactamente la fragilidad que ya documenta `documentacion_analisis_energia.md` en su sección 4.
 
-**Test 3 no compara contra el punto de entrada.** Un loop con clotoides de entrada y salida de distinta longitud no vuelve a su propio arranque. Lo que sí tiene que cerrar es la dirección de la tangente tras $2\pi$ y la deriva fuera del plano del loop.
+**Test 3 no compara contra el punto de entrada.** Un loop con clotoides de entrada y salida de distinta longitud no vuelve a su propio arranque. Lo que sí tiene que cerrar es la dirección de la tangente tras la vuelta completa; el desplazamiento lateral tampoco es un residual sino el objetivo de diseño que evita la autointerferencia, así que se verifica contra el valor pedido.
 
 ## 12. Hallazgos de ingeniería
 
-### 12.1 Un loop plano de 360° se cruza consigo mismo
+### 12.1 Un loop plano de 360° se cruza consigo mismo — resuelto
 
-El chequeo de autointerferencia falla en **todos** los casos generados, con distancia mínima del orden de $10^{-19}$ m: la pata de salida cruza la de entrada. No es un error del chequeo — está validado contra casos de distancia conocida — ni de la geometría. Es intrínseco: un giro de $2\pi$ en un plano vertical vuelve a pasar por donde entró.
+Antes de introducir la inclinación helicoidal, el chequeo de autointerferencia fallaba en **todos** los casos, con distancia mínima del orden de $10^{-19}$ m: la pata de salida cruzaba la de entrada. No era un error del chequeo —está validado contra casos de distancia conocida— ni de la geometría: es intrínseco a un giro de $2\pi$ dentro de un plano.
 
-Las soluciones son de diseño, no de código: darle al loop una componente helicoidal chica, o entrar y salir a alturas distintas. Cualquiera de las dos saca el elemento del plano y hay que decidirla antes de fabricar.
+Está resuelto con la construcción helicoidal de la sección 4. Con el desplazamiento lateral por defecto (16 cm, derivado de la envolvente) el caso de la demo pasa el chequeo con 0.142 m de separación libre contra 0.133 m exigidos, y **ningún criterio queda en falla**.
+
+El costo es un ángulo de hélice de unos 7–8°, que es del mismo orden que el de un loop comercial. La inclinación es un parámetro reportado, no un número escondido.
 
 ### 12.2 Un loop circular no puede cumplir las dos puntas a la vez
 

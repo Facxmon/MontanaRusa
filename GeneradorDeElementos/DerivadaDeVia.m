@@ -38,6 +38,7 @@ function [Derivada, Punto] = DerivadaDeVia(Arco, y, Contexto)
     Punto.CurvaturaLateral      = CurvaturaLateral;
     Punto.VectorCurvatura       = VectorCurvatura;
     Punto.Curvatura             = hypot(CurvaturaArriba, CurvaturaLateral);
+    Punto.VelocidadRoll         = Punto.VelocidadRoll + Contexto.InclinacionHelicoidal*Punto.Curvatura;
     Punto.GArribaRiel           = GArribaRiel;
     Punto.GLateralRiel          = GLateralRiel;
     Punto.AceleracionTangencial = AceleracionTangencial;

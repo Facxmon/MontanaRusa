@@ -13,7 +13,12 @@ function Punto = PuntoCinematico(Arco, y, Contexto)
     Punto.AnguloGirado            = y(14);
     Punto.Tiempo                  = y(15);
 
-    [Punto.AnguloRoll, Punto.VelocidadRoll, Punto.AceleracionRoll] = Contexto.FuncionRoll(Arco);
+    % El roll depende del angulo ya girado, no solo del arco: la parte
+    % helicoidal del loop exige dphi/ds = kappa*tan(alfa), o sea phi
+    % proporcional al giro acumulado. Su derivada la completa DerivadaDeVia,
+    % que es donde recien se conoce la curvatura.
+    [Punto.AnguloRoll, Punto.VelocidadRoll, Punto.AceleracionRoll] = ...
+        Contexto.FuncionRoll(Arco, Punto.AnguloGirado);
     [Punto.VersorArribaCarro, Punto.VersorLateral] = MarcoCarroDesdeTransporte( ...
         Punto.VersorArribaTransporte, Punto.VersorLateralTransporte, Punto.AnguloRoll);
 
