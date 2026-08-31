@@ -1,13 +1,20 @@
 function [VelocidadMinima, Busqueda] = VelocidadInicialMinima(EstadoEntrada, Parametros)
 %VELOCIDADINICIALMINIMA Menor v_0 que permite recorrer el elemento completo
-%   manteniendo la G minima pedida sobre el eje vertical del carro.
+%   respetando la G minima sobre el eje vertical del carro y el radio minimo
+%   fabricable.
 %
 %   El criterio NO es N = 0. Con ruedas de retencion el carro no se cae, pero
 %   un margen nulo no tolera variacion de friccion ni de temperatura: por eso
 %   GMinimaCuspide es un parametro de entrada.
 %
+%   El radio minimo entra al criterio porque en los modos que fijan la G
+%   objetivo la geometria se adapta a la velocidad: bajar v achica el loop y
+%   la G en la cuspide no cambia, asi que la restriccion que termina mordiendo
+%   no es energetica sino de fabricacion.
+%
 %   Se resuelve por biseccion, con paso de generacion grueso: lo que interesa
-%   es el valor de la velocidad, no la geometria fina.
+%   es el valor de la velocidad, no la geometria fina. Las dos condiciones son
+%   crecientes en v, asi que la biseccion esta bien planteada.
 
     ParametrosBusqueda = Parametros;
     ParametrosBusqueda.PasoGeneracion = Parametros.PasoBusquedaVelocidad;
@@ -57,7 +64,8 @@ function [VelocidadMinima, Busqueda] = VelocidadInicialMinima(EstadoEntrada, Par
 end
 
 function Holgura = HolguraDeCuspide(EstadoEntrada, Parametros, Velocidad)
-%HOLGURADECUSPIDE Margen de G sobre el minimo pedido. Negativo = no sirve.
+%HOLGURADECUSPIDE Margen combinado de G en la cuspide y de radio fabricable,
+%   normalizado para poder tomar el mas chico de los dos. Negativo = no sirve.
 
     Estado = EstadoEntrada;
     Estado.Velocidad    = Velocidad;
@@ -66,7 +74,7 @@ function Holgura = HolguraDeCuspide(EstadoEntrada, Parametros, Velocidad)
 
     Advertencia = warning('off', 'all');
     try
-        [~, Diagnostico] = GenerarLoopVertical(Estado, Parametros, []);
+        [Track, Diagnostico] = GenerarLoopVertical(Estado, Parametros, []);
     catch
         warning(Advertencia);
         Holgura = -Inf;
@@ -79,5 +87,9 @@ function Holgura = HolguraDeCuspide(EstadoEntrada, Parametros, Velocidad)
         return
     end
 
-    Holgura = min(Diagnostico.GArribaRiel) - Parametros.GMinimaCuspide;
+    HolguraDeG      = min(Diagnostico.GArribaRiel) - Parametros.GMinimaCuspide;
+    RadioAlcanzado  = 1/max(max(Track.Curvatura), eps);
+    HolguraDeRadio  = (RadioAlcanzado - Parametros.RadioMinimoFabricable) / Parametros.RadioMinimoFabricable;
+
+    Holgura = min(HolguraDeG, HolguraDeRadio);
 end

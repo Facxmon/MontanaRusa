@@ -143,30 +143,43 @@ function GraficarGConBanda(Arco, G, Tiempo, FactorTiempo, CurvaPositiva, CurvaNe
     LimiteSuperior = LimitePorPunto(G, Tiempo, CurvaPositiva, FactorTiempo, +1);
     LimiteInferior = LimitePorPunto(G, Tiempo, CurvaNegativa, FactorTiempo, -1);
 
-    LimiteSuperior = RellenarHuecos(LimiteSuperior);
-    LimiteInferior = RellenarHuecos(LimiteInferior);
+    % Donde la G nunca cruza ese signo el limite punto a punto no esta
+    % definido. Se rellena con el limite evaluado en la duracion total del
+    % elemento, que es el extremo mas restrictivo de la curva en ese rango.
+    TiempoValido = Tiempo(~isnan(Tiempo));
+    DuracionTotalReal = (TiempoValido(end) - TiempoValido(1)) * FactorTiempo;
+    LimiteSuperior = RellenarHuecos(LimiteSuperior,  abs(LimiteNormativo(CurvaPositiva, DuracionTotalReal)));
+    LimiteInferior = RellenarHuecos(LimiteInferior, -abs(LimiteNormativo(CurvaNegativa, DuracionTotalReal)));
 
     Valido = ~isnan(LimiteSuperior) & ~isnan(LimiteInferior) & ~isnan(Arco);
     hold on; grid on
+
+    Trazos = gobjects(0);
+    Etiquetas = {};
     if any(Valido)
         fill([Arco(Valido); flipud(Arco(Valido))], ...
              [LimiteSuperior(Valido); flipud(LimiteInferior(Valido))], ...
              [0.85 0.92 0.85], 'EdgeColor', 'none', 'HandleVisibility', 'off')
-        plot(Arco, LimiteSuperior, 'r--', 'LineWidth', 1.2)
+        Trazos(end+1) = plot(Arco, LimiteSuperior, 'r--', 'LineWidth', 1.2);
+        Etiquetas{end+1} = 'Limite normativo aplicable';
         plot(Arco, LimiteInferior, 'r--', 'LineWidth', 1.2, 'HandleVisibility', 'off')
     end
-    plot(Arco, G, 'LineWidth', 2)
+    Trazos(end+1) = plot(Arco, G, 'LineWidth', 2);
+    Etiquetas{end+1} = 'Valor calculado';
+
     yline(0, 'k:', 'HandleVisibility', 'off');
     MarcarSubTramos(Track);
-    legend('Limite normativo aplicable', 'Valor calculado', 'Location', 'best')
+    legend(Trazos, Etiquetas, 'Location', 'best')
 end
 
-function Valores = RellenarHuecos(Valores)
+function Valores = RellenarHuecos(Valores, ValorPorDefecto)
 %RELLENARHUECOS Extiende el limite a los nodos donde el signo no aplica, para
 %   que la banda se dibuje continua.
     Indices = find(~isnan(Valores));
     if isempty(Indices)
+        Valores(:) = ValorPorDefecto;
         return
     end
     Valores = interp1(Indices, Valores(Indices), (1:numel(Valores)).', 'nearest', 'extrap');
+    Valores(isnan(Valores)) = ValorPorDefecto;
 end

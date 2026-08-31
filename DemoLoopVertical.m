@@ -14,10 +14,16 @@ addpath(fullfile(fileparts(mfilename('fullpath')), 'GeneradorDeElementos'));
 % ParametrosPorDefecto. Aca solo se sobrescribe lo propio de este caso.
 Parametros = ParametrosPorDefecto();
 
-Parametros.ModoCurvatura          = 'Clotoide';   % 'Clotoide' | 'FuerzaGConstante' | 'AceleracionNormalConstante' | 'GMaximas'
+Parametros.ModoCurvatura          = 'FuerzaGConstante';   % 'Clotoide' | 'FuerzaGConstante' | 'AceleracionNormalConstante' | 'GMaximas'
 Parametros.MetodoDeAcoplamiento   = 'A';          % 'A' marcha acoplada | 'B' punto fijo
-Parametros.RadioLoop              = 0.30;         % [m]
+Parametros.FuerzaGObjetivo        = 3.00;         % [G] G neta incluida la gravedad, constante en el arco
 Parametros.GMinimaCuspide         = 0.50;         % [G]
+
+% RadioLoop es la longitud caracteristica de Froude: fija lambda_loop, el
+% presupuesto de onset y la conversion de duraciones contra las curvas de la
+% norma. En los modos que dependen de v el radio de cuspide es una SALIDA, asi
+% que hay que ponerlo cerca del que va a salir; el reporte avisa si se aparta.
+Parametros.RadioLoop              = 0.11;         % [m]
 
 % Estado de entrada del elemento: via a nivel, carro derecho.
 PosicionInicial   = [0, 0, 0.20];   % [m]

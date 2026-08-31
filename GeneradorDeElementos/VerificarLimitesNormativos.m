@@ -42,15 +42,19 @@ function Normativo = VerificarLimitesNormativos(Sim, Escala, Parametros)
     Normativo.MenosGx = PeorEventoSostenido(Gx, Tiempo, 'MenosGxBase',   FactorTiempo, -1);
 
     %% --- 7.1.5.1: combinacion de dos ejes dentro de una elipse ------------
-    % Semiejes iguales a los limites de 200 ms multiplicados por 1.1.
-    SemiejeGx = 1.1*LimiteNormativo('MasGxBase',  0.2);
-    SemiejeGy = 1.1*LimiteNormativo('GyBase',     0.2);
-    SemiejeGz = 1.1*LimiteNormativo(CurvaMasGz,   0.2);
+    % Semiejes iguales a los limites de 200 ms multiplicados por 1.1. Cada eje
+    % tiene semiejes distintos hacia cada lado -- +Gz admite 6 G y -Gz solo
+    % 2 G -- asi que el semieje se elige segun el signo del valor.
+    SemiejeGx = SemiejePorSigno(Gx, 'MasGxBase', 'MenosGxBase');
+    SemiejeGy = SemiejePorSigno(Gy, 'GyBase',    'GyBase');
+    SemiejeGz = SemiejePorSigno(Gz, CurvaMasGz,  'MenosGzBase');
 
-    Normativo.Elipse.ValorMaximoGyGz = max((Gy/SemiejeGy).^2 + (Gz/SemiejeGz).^2);
-    Normativo.Elipse.ValorMaximoGxGz = max((Gx/SemiejeGx).^2 + (Gz/SemiejeGz).^2);
-    Normativo.Elipse.ValorMaximoGxGy = max((Gx/SemiejeGx).^2 + (Gy/SemiejeGy).^2);
-    Normativo.Elipse.Semiejes = [SemiejeGx, SemiejeGy, SemiejeGz];
+    Normativo.Elipse.ValorMaximoGyGz = max((Gy./SemiejeGy).^2 + (Gz./SemiejeGz).^2);
+    Normativo.Elipse.ValorMaximoGxGz = max((Gx./SemiejeGx).^2 + (Gz./SemiejeGz).^2);
+    Normativo.Elipse.ValorMaximoGxGy = max((Gx./SemiejeGx).^2 + (Gy./SemiejeGy).^2);
+    Normativo.Elipse.Semiejes = [1.1*LimiteNormativo('MasGxBase', 0.2), ...
+                                 1.1*LimiteNormativo('GyBase',    0.2), ...
+                                 1.1*LimiteNormativo(CurvaMasGz,  0.2)];
 
     %% --- 7.1.7.2: tasa de aparicion de 0 G o menos hacia 2 G o mas --------
     Normativo.OnsetDeCarga = OnsetDeTransicionCritica(Gz, Sim.JerkGz(Valido));
@@ -63,6 +67,12 @@ function Normativo = VerificarLimitesNormativos(Sim, Escala, Parametros)
 end
 
 %% ========================= auxiliares =====================================
+function Semieje = SemiejePorSigno(G, CurvaPositiva, CurvaNegativa)
+    SemiejePositivo = 1.1*abs(LimiteNormativo(CurvaPositiva, 0.2));
+    SemiejeNegativo = 1.1*abs(LimiteNormativo(CurvaNegativa, 0.2));
+    Semieje = SemiejePositivo*(G >= 0) + SemiejeNegativo*(G < 0);
+end
+
 function Evento = PeorEventoSostenido(G, Tiempo, Curva, FactorTiempo, Signo)
 %PEOREVENTOSOSTENIDO Barre niveles y busca el evento sostenido peor parado
 %   contra la curva limite. Trabaja siempre con H = Signo*G, de modo que el
