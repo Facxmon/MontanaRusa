@@ -72,15 +72,22 @@ function [Criterios, Normativo] = ChequeosPosteriores(Track, Sim, Parametros, La
     Criterios = AgregarCriterio(Criterios, 'Autointerferencia del loop', 'MayorOIgual', ...
         DistanciaPropia, SeparacionExigida, 'm', DetalleOrientado);
 
+    % La longitud de arco es global al layout, asi que la misma exclusion por
+    % arco sirve para saltear la junta: el elemento nuevo arranca exactamente
+    % donde termina la via anterior y ahi la distancia es cero por
+    % construccion, no por interferencia.
     if ~isempty(Layout) && ~isempty(Layout.Puntos)
         DistanciaLayout = DistanciaMinimaEntrePolilineas(Track.Puntos, Layout.Puntos, ...
-                                                         Track.LongitudArco, Layout.LongitudArco, []);
+                                                         Track.LongitudArco, Layout.LongitudArco, ...
+                                                         Parametros.ArcoMinimoAutointerferencia);
     else
         DistanciaLayout = Inf;
     end
     Criterios = AgregarCriterio(Criterios, 'Interferencia con la via preexistente', 'MayorOIgual', ...
         DistanciaLayout, SeparacionExigida, 'm', ...
-        'Distancia segmento a segmento contra toda la polilinea ya construida.');
+        sprintf(['Distancia segmento a segmento contra toda la polilinea ya construida, ' ...
+                 'salteando la junta (pares a menos de %.2f m de arco).'], ...
+                Parametros.ArcoMinimoAutointerferencia));
 
     %% --- Presupuesto de onset por eje --------------------------------------
     Normativo = VerificarLimitesNormativos(Sim, Escala, Parametros);
