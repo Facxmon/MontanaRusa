@@ -89,8 +89,8 @@ Parametros.TolCierrePitch      = 1e-4;    % [rad]
 Parametros.TolPuntoFijo        = 1e-8;    % [m/s] cambio maximo de v entre iteraciones
 Parametros.MaxIteracionesPuntoFijo = 60;
 Parametros.MaxIteracionesCierre    = 6;
-Parametros.MaxIteracionesOnset     = 4;
-Parametros.ToleranciaOnset         = 0.0;    % margen relativo aceptado sobre el presupuesto
+Parametros.MaxIteracionesOnset     = 6;
+Parametros.MargenDeOnset           = 0.002;  % las transiciones se alargan este margen sobre lo justo
 Parametros.ToleranciaVelocidadDeDiseno = 0.10;   % [m/s] dispara aviso al re-simular
 
 %% ------------------ Interferencia geometrica --------------------------

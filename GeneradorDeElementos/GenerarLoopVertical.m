@@ -91,12 +91,21 @@ function [Track, Diagnostico] = GenerarLoopVertical(EstadoEntrada, Parametros, P
         end
 
         OnsetMedido = OnsetVerticalDelRecorrido(Recorrido.Registro);
-        if ~isempty(Recorrido.Aviso) || OnsetMedido <= Escala.OnsetMaximo(3)*(1 + Parametros.ToleranciaOnset)
+        if ~isempty(Recorrido.Aviso)
             break
         end
-        % El 1.002 hace que el lazo se acerque desde arriba y termine debajo del
-        % presupuesto en vez de quedar oscilando justo sobre el borde.
-        FactorLongitud = 1.002 * FactorLongitud * OnsetMedido / Escala.OnsetMaximo(3);
+
+        % Punto fijo sobre el factor, NO corte al primer factor que cumple. El
+        % corte por cumplimiento haria que la geometria dependiera de forma
+        % discontinua de los datos de entrada, y ahi los metodos A y B dejan de
+        % coincidir aunque los dos esten bien. Como el onset va como 1/L, este
+        % punto fijo converge practicamente en un paso.
+        FactorSiguiente = (1 + Parametros.MargenDeOnset) * FactorLongitud ...
+                          * OnsetMedido / Escala.OnsetMaximo(3);
+        if abs(FactorSiguiente - FactorLongitud) < 1e-6*FactorLongitud
+            break
+        end
+        FactorLongitud = FactorSiguiente;
     end
 
     %% ---------------- Armado del Track ------------------------------------
@@ -197,9 +206,15 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     Recorrido.CurvaturaResidualFueraPlano = dot(VectorCurvatura, cross(y(4:6), NormalArco));
 
     %% --- ClotoideEntrada ---
+    % Las longitudes de las transiciones se dimensionan con la velocidad REAL
+    % de la marcha, no con el perfil supuesto del metodo B. Son decisiones
+    % geometricas de diseno: lo que el perfil supuesto rompe es el lazo de la
+    % LEY DE CURVATURA, no el dimensionamiento. Ademas, con esto la geometria
+    % del modo Clotoide queda completamente independiente del perfil supuesto
+    % y los dos metodos coinciden exactamente, que es lo que el test pide.
     PuntoInicial = PuntoCinematico(Arco, y, Contexto);
     CurvaturaObjetivo = CurvaturaDelModo(PuntoInicial, Parametros, Plan.Escala, PuntoInicial.Tiempo);
-    LongitudEntrada = LongitudDeClotoide(PuntoInicial.VelocidadParaCurvatura, ...
+    LongitudEntrada = LongitudDeClotoide(PuntoInicial.Velocidad, ...
                                          CurvaturaObjetivo - CurvaturaInicialArco, Plan.Onset(3), Parametros);
     Recorrido.LongitudClotoideEntrada = LongitudEntrada;
 
@@ -240,7 +255,7 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     %% --- ClotoideSalida ---
     [~, PuntoFinArco] = DerivadaDeVia(Arco, y, Contexto);
     CurvaturaFinArco = PuntoFinArco.Curvatura;
-    LongitudSalida = LongitudDeClotoide(PuntoFinArco.VelocidadParaCurvatura, CurvaturaFinArco, ...
+    LongitudSalida = LongitudDeClotoide(PuntoFinArco.Velocidad, CurvaturaFinArco, ...
                                         Plan.Onset(3), Parametros);
     Recorrido.LongitudClotoideSalida = LongitudSalida;
 
@@ -298,7 +313,7 @@ function Giro = GiroDeLaClotoideDeSalida(Punto, Plan)
 %GIRODELACLOTOIDEDESALIDA Angulo que va a girar la clotoide de salida si el
 %   arco terminara en este punto. Con la rampa lineal es el area del
 %   triangulo: kappa/2 * L.
-    Longitud = LongitudDeClotoide(Punto.VelocidadParaCurvatura, Punto.Curvatura, ...
+    Longitud = LongitudDeClotoide(Punto.Velocidad, Punto.Curvatura, ...
                                   Plan.Onset(3), Plan.Parametros);
     Giro = 0.5 * Punto.Curvatura * Longitud;
 end

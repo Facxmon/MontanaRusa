@@ -11,13 +11,25 @@ function Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros)
     Arco = Track.LongitudArco;
     NumeroDeNodos = numel(Arco);
 
-    % Geometria condensada en los escalares que necesita la dinamica.
-    Geometria.Arco             = Arco;
-    Geometria.TangenteVertical = Track.VersorTangente(:,3);
-    Geometria.ArribaVertical   = Track.VersorArribaCarro(:,3);
-    Geometria.LateralVertical  = Track.VersorLateral(:,3);
-    Geometria.CurvaturaSobreArriba  = sum(Track.VectorCurvatura .* Track.VersorArribaCarro, 2);
-    Geometria.CurvaturaSobreLateral = sum(Track.VectorCurvatura .* Track.VersorLateral,     2);
+    % Geometria condensada en los escalares que necesita la dinamica. Se
+    % interpola con pchip y no lineal: los estadios intermedios de RK4 caen
+    % entre nodos y el error de orden ds^2 de la interpolacion lineal se veia
+    % directamente en el balance de energia.
+    CurvaturaSobreArriba  = sum(Track.VectorCurvatura .* Track.VersorArribaCarro, 2);
+    CurvaturaSobreLateral = sum(Track.VectorCurvatura .* Track.VersorLateral,     2);
+
+    Geometria.Arco = Arco;
+    Geometria.TangenteVertical = Interpolante(Arco, Track.VersorTangente(:,3));
+    Geometria.ArribaVertical   = Interpolante(Arco, Track.VersorArribaCarro(:,3));
+    Geometria.LateralVertical  = Interpolante(Arco, Track.VersorLateral(:,3));
+    Geometria.CurvaturaSobreArriba  = Interpolante(Arco, CurvaturaSobreArriba);
+    Geometria.CurvaturaSobreLateral = Interpolante(Arco, CurvaturaSobreLateral);
+
+    GeometriaNodos.TangenteVertical = Track.VersorTangente(:,3);
+    GeometriaNodos.CurvaturaSobreArriba  = CurvaturaSobreArriba;
+    GeometriaNodos.CurvaturaSobreLateral = CurvaturaSobreLateral;
+    GeometriaNodos.ArribaVertical  = Track.VersorArribaCarro(:,3);
+    GeometriaNodos.LateralVertical = Track.VersorLateral(:,3);
 
     Sim.Velocidad       = nan(NumeroDeNodos, 1);
     Sim.Tiempo          = nan(NumeroDeNodos, 1);
@@ -62,11 +74,11 @@ function Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros)
     PasoEntreNodos = [diff(Arco); 0];
     Sim.EnergiaDisipadaRodadura = cumsum(Sim.FuerzaRodadura .* PasoEntreNodos);
     Sim.EnergiaDisipadaArrastre = cumsum(Sim.FuerzaArrastre .* PasoEntreNodos);
-    Sim.AceleracionTangencial = -g*Geometria.TangenteVertical - FuerzaResistencia/Parametros.Masa;
+    Sim.AceleracionTangencial = -g*GeometriaNodos.TangenteVertical - FuerzaResistencia/Parametros.Masa;
     Sim.AceleracionTangencial(isnan(Velocidad)) = NaN;
 
-    Sim.GArribaRiel  = VelocidadCuadradoNodos.*Geometria.CurvaturaSobreArriba/g  + Geometria.ArribaVertical;
-    Sim.GLateralRiel = VelocidadCuadradoNodos.*Geometria.CurvaturaSobreLateral/g + Geometria.LateralVertical;
+    Sim.GArribaRiel  = VelocidadCuadradoNodos.*GeometriaNodos.CurvaturaSobreArriba/g  + GeometriaNodos.ArribaVertical;
+    Sim.GLateralRiel = VelocidadCuadradoNodos.*GeometriaNodos.CurvaturaSobreLateral/g + GeometriaNodos.LateralVertical;
 
     % Aporte de la rotacion de roll sobre la heartline (memoria de calculo,
     % seccion 3.5). Es la razon por la que el perfil de roll tiene que ser C2:
@@ -76,7 +88,7 @@ function Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros)
                               + VelocidadCuadradoNodos.*Track.AceleracionRoll) / g;
     AporteVertical = -Distancia*VelocidadCuadradoNodos.*Track.VelocidadRoll.^2 / g;
 
-    Sim.Gx = Sim.AceleracionTangencial/g + Geometria.TangenteVertical;
+    Sim.Gx = Sim.AceleracionTangencial/g + GeometriaNodos.TangenteVertical;
     Sim.Gy = Sim.GLateralRiel + AporteLateral;
     Sim.Gz = Sim.GArribaRiel  + AporteVertical;
 
@@ -116,9 +128,8 @@ end
 function Derivada = DerivadaDeEnergia(Arco, VelocidadCuadrado, Geometria, Parametros)
     VelocidadCuadrado = max(VelocidadCuadrado, 0);
     Velocidad = sqrt(VelocidadCuadrado);
-    TangenteVertical = interp1(Geometria.Arco, Geometria.TangenteVertical, Arco, 'linear', 'extrap');
     FuerzaResistencia = ResistenciaEnArco(Arco, VelocidadCuadrado, Geometria, Parametros);
-    Derivada = [-2*Parametros.Gravedad*TangenteVertical - 2*FuerzaResistencia/Parametros.Masa, ...
+    Derivada = [-2*Parametros.Gravedad*Geometria.TangenteVertical(Arco) - 2*FuerzaResistencia/Parametros.Masa, ...
                  1/max(Velocidad, 1e-6)];
 end
 
@@ -126,13 +137,19 @@ function [FuerzaResistencia, Rodadura, Arrastre] = ResistenciaEnArco(Arco, Veloc
     VelocidadCuadrado = max(VelocidadCuadrado, 0);
     Velocidad = sqrt(VelocidadCuadrado);
 
-    ArribaVertical  = interp1(Geometria.Arco, Geometria.ArribaVertical,  Arco, 'linear', 'extrap');
-    LateralVertical = interp1(Geometria.Arco, Geometria.LateralVertical, Arco, 'linear', 'extrap');
-    CurvaturaArriba = interp1(Geometria.Arco, Geometria.CurvaturaSobreArriba,  Arco, 'linear', 'extrap');
-    CurvaturaLateral= interp1(Geometria.Arco, Geometria.CurvaturaSobreLateral, Arco, 'linear', 'extrap');
-
-    GArribaRiel  = VelocidadCuadrado*CurvaturaArriba /Parametros.Gravedad + ArribaVertical;
-    GLateralRiel = VelocidadCuadrado*CurvaturaLateral/Parametros.Gravedad + LateralVertical;
+    GArribaRiel  = VelocidadCuadrado*Geometria.CurvaturaSobreArriba(Arco) /Parametros.Gravedad ...
+                 + Geometria.ArribaVertical(Arco);
+    GLateralRiel = VelocidadCuadrado*Geometria.CurvaturaSobreLateral(Arco)/Parametros.Gravedad ...
+                 + Geometria.LateralVertical(Arco);
 
     [FuerzaResistencia, Rodadura, Arrastre] = ResistenciaAlAvance(Velocidad, GArribaRiel, GLateralRiel, Parametros);
+end
+
+function Objeto = Interpolante(Arco, Valores)
+%INTERPOLANTE Interpolante pchip precompilado. Se evalua decenas de miles de
+%   veces dentro de RK4, asi que rehacer el ajuste en cada llamada -- que es
+%   lo que hace interp1 -- seria carisimo. Se filtran los nodos demasiado
+%   juntos, que aparecen cuando un sub-tramo termina con un paso acortado.
+    Conservar = [true; diff(Arco(:)) > 1e-9];
+    Objeto = griddedInterpolant(Arco(Conservar), Valores(Conservar), 'pchip', 'linear');
 end
