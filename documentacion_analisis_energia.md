@@ -26,21 +26,21 @@ Ver la tabla completa en [`NOMENCLATURA.md`](NOMENCLATURA.md), en particular el 
 
 ## Índice
 
-1. [Parámetros del modelo](#1-parametros-del-modelo)
-2. [Trayectoria paramétrica](#2-trayectoria-parametrica)
-3. [Discretización por longitud de arco](#3-discretizacion-por-longitud-de-arco)
+1. [Parámetros del modelo](#1-parámetros-del-modelo)
+2. [Trayectoria paramétrica](#2-trayectoria-paramétrica)
+3. [Discretización por longitud de arco](#3-discretización-por-longitud-de-arco)
 4. [Radio de giro (curvatura local)](#4-radio-de-giro-curvatura-local)
-5. [Notación `[X Y Z Magnitud]` y protección contra NaN](#5-notacion-x-y-z-magnitud-y-proteccion-contra-nan)
-6. [Energía inicial y potencial](#6-energia-inicial-y-potencial)
+5. [Notación `[X Y Z Magnitud]` y protección contra NaN](#5-notación-x-y-z-magnitud-y-protección-contra-nan)
+6. [Energía inicial y potencial](#6-energía-inicial-y-potencial)
 7. [Plano perpendicular a la trayectoria](#7-plano-perpendicular-a-la-trayectoria)
 8. [Modelo de resistencia al avance](#8-modelo-de-resistencia-al-avance)
-9. [Proceso iterativo: velocidad, normales y pérdidas](#9-proceso-iterativo-velocidad-normales-y-perdidas)
+9. [Proceso iterativo: velocidad, normales y pérdidas](#9-proceso-iterativo-velocidad-normales-y-pérdidas)
 10. [Unidades en G's](#10-unidades-en-gs)
-11. [Signo de la fuerza centrípeta sentida](#11-signo-de-la-fuerza-centripeta-sentida)
-12. [Gráficos generados](#12-graficos-generados)
+11. [Signo de la fuerza centrípeta sentida](#11-signo-de-la-fuerza-centrípeta-sentida)
+12. [Gráficos generados](#12-gráficos-generados)
 13. [Changelog](#13-changelog)
-14. [Hipótesis vigentes](#14-hipotesis-vigentes)
-15. [Limitaciones actuales / próximos pasos](#15-limitaciones-actuales--proximos-pasos)
+14. [Hipótesis vigentes](#14-hipótesis-vigentes)
+15. [Limitaciones actuales / próximos pasos](#15-limitaciones-actuales--próximos-pasos)
 
 ---
 
@@ -61,7 +61,7 @@ Ver la tabla completa en [`NOMENCLATURA.md`](NOMENCLATURA.md), en particular el 
 | `VelocidadInicial` | velocidad en el primer punto de la trayectoria | m/s |
 | `NumeroDeCarros` | carros del tren | adimensional (entero) |
 
-Todos estos valores son **provisorios** (marcados en el código con comentarios "CALIBRAR EXPERIMENTALMENTE" salvo `Masa`, `VelocidadInicial` y `NumeroDeCarros`, que son datos del caso, no coeficientes físicos). Ver la fila correspondiente en la tabla de [`memoria_de_calculo.md` §11](memoria_de_calculo.md#11-datos-pendientes-de-verificacion).
+Todos estos valores son **provisorios** (marcados en el código con comentarios "CALIBRAR EXPERIMENTALMENTE" salvo `Masa`, `VelocidadInicial` y `NumeroDeCarros`, que son datos del caso, no coeficientes físicos). Ver la fila correspondiente en la tabla de [`memoria_de_calculo.md` §11](memoria_de_calculo.md#11-datos-pendientes-de-verificación).
 
 ---
 
@@ -128,7 +128,7 @@ $\varepsilon_{maq}$ (épsilon de máquina) es el menor número tal que, en aritm
 
 Mitigación implementada: si Área $<$ `TolArea`, se declara el tramo recto ($R = \infty$) en vez de devolver un número inventado.
 
-**Mitigación definitiva (pendiente):** cuando la geometría se genera imponiendo $\kappa(s)$ (loops, clotoides), llevar la curvatura analíticamente desde la generación y usar esta fórmula discreta **sólo como test de validación** contra la curvatura impuesta. Esto ya está implementado en el generador de elementos: `TestsValidacion.m` reutiliza exactamente esta misma fórmula ($R=abc/4\text{Área}$) para comparar la curvatura recuperada de la polilínea contra la impuesta al generar — ver [`documentacion_generador_elementos.md` §11, test 2](documentacion_generador_elementos.md#11-tests-de-validacion).
+**Mitigación definitiva (pendiente):** cuando la geometría se genera imponiendo $\kappa(s)$ (loops, clotoides), llevar la curvatura analíticamente desde la generación y usar esta fórmula discreta **sólo como test de validación** contra la curvatura impuesta. Esto ya está implementado en el generador de elementos: `TestsValidacion.m` reutiliza exactamente esta misma fórmula ($R=abc/4\text{Área}$) para comparar la curvatura recuperada de la polilínea contra la impuesta al generar — ver [`documentacion_generador_elementos.md` §11, test 2](documentacion_generador_elementos.md#11-tests-de-validación).
 
 ### 4.2 Dirección (centro de curvatura)
 
@@ -207,7 +207,7 @@ $$F_{rodadura} = C_{rr,port}\,F_{N,port} + C_{rr,guia}\,F_{N,guia} + C_{rr,ret}\
 
 **Estado actual del reparto, específico de `analisis_energia.m`.** Hasta que este script incorpore el modelo de ángulo de roll $\phi(s)$ no se puede determinar el marco del carro y, por lo tanto, tampoco cómo se reparte la normal entre los tres juegos. El código de **este script** asume provisoriamente **peralte perfecto** (G lateral nula), con lo cual toda la carga va a las ruedas portantes (verificado contra `analisis_energia.m`, líneas 195–203: `CargaPortantes = FuerzaNormal; CargaGuia = 0; CargaRetencion = 0;`).
 
-Esto **no es una contradicción** con lo que dice [`documentacion_generador_elementos.md` §15](documentacion_generador_elementos.md#15-otras-limitaciones-y-proximos-pasos), que afirma que el generador de elementos **sí** reparte correctamente la normal proyectando sobre $\mathbf{U}$ y $\mathbf{L}$: son dos scripts distintos, con distinto grado de madurez. El generador de elementos (`GeneradorDeElementos/Fisica/CargasEnLaVia.m` y `ResistenciaAlAvance.m`) ya tiene el marco del carro con roll explícito y por eso puede repartir la carga; `analisis_energia.m` es el modelo preliminar y todavía no lo tiene. El reparto real en este script requeriría proyectar `NormalVia` sobre los ejes $\mathbf{U}$ (arriba del carro) y $\mathbf{L}$ (lateral) del marco del carro, igual que ya hace el generador.
+Esto **no es una contradicción** con lo que dice [`documentacion_generador_elementos.md` §15](documentacion_generador_elementos.md#15-otras-limitaciones-y-próximos-pasos), que afirma que el generador de elementos **sí** reparte correctamente la normal proyectando sobre $\mathbf{U}$ y $\mathbf{L}$: son dos scripts distintos, con distinto grado de madurez. El generador de elementos (`GeneradorDeElementos/Fisica/CargasEnLaVia.m` y `ResistenciaAlAvance.m`) ya tiene el marco del carro con roll explícito y por eso puede repartir la carga; `analisis_energia.m` es el modelo preliminar y todavía no lo tiene. El reparto real en este script requeriría proyectar `NormalVia` sobre los ejes $\mathbf{U}$ (arriba del carro) y $\mathbf{L}$ (lateral) del marco del carro, igual que ya hace el generador.
 
 ### 8.2 Arrastre aerodinámico
 
@@ -285,7 +285,7 @@ Ni `Gravedad` ni $v^2/R$ están multiplicados por `Masa`, así que toda la ecuac
 
 > **Consistencia con ASTM F2291 §7.1.4.5:** la norma define sus límites como *aceleración neta total, incluida la gravedad terrestre* — un cuerpo en reposo mide 1 G en el eje perpendicular a la superficie de la Tierra. `NormalVia` ya es exactamente esa magnitud (gravedad + centrípeta combinadas), así que es directamente comparable contra los límites de la norma. `NormalRadioDeGiro` **no** lo es, porque excluye la gravedad.
 
-Las curvas límite por eje (Figs. 6 a 10 de F2291-06a) están tabuladas en [`memoria_de_calculo.md` §5](memoria_de_calculo.md#5-criterios-de-aceptacion-astm-f2291-06a-7). Son **dependientes de la duración**: no alcanza con comparar el pico contra un escalar, hay que medir cuánto dura el evento sostenido y evaluar la curva en esa duración (fórmula de conversión de duración modelo→real: [`memoria_de_calculo.md` §5.1](memoria_de_calculo.md#51-definiciones-normativas-aplicables)).
+Las curvas límite por eje (Figs. 6 a 10 de F2291-06a) están tabuladas en [`memoria_de_calculo.md` §5](memoria_de_calculo.md#5-criterios-de-aceptación--astm-f2291-06a-7). Son **dependientes de la duración**: no alcanza con comparar el pico contra un escalar, hay que medir cuánto dura el evento sostenido y evaluar la curva en esa duración (fórmula de conversión de duración modelo→real: [`memoria_de_calculo.md` §5.1](memoria_de_calculo.md#51-definiciones-normativas-aplicables)).
 
 **Limitación actual del script:** las G se calculan como magnitud en el marco global. Para comparar contra la norma hacen falta las componentes en los ejes del pasajero ($G_x$, $G_y$, $G_z$), lo cual requiere el marco del carro — pendiente junto con el modelo de roll. El generador de elementos ya lo tiene resuelto, ver [`documentacion_generador_elementos.md` §3](documentacion_generador_elementos.md#3-marco-de-referencia).
 
@@ -324,8 +324,8 @@ Esta sección documenta cambios ya integrados en el código de `analisis_energia
 |---|---|---|
 | **C1** | Resistencia al avance: rodadura con tres coeficientes + arrastre aerodinámico, en lugar de un único $\mu$ de deslizamiento | $\mu = 0.18$ era un coeficiente de deslizamiento aplicado a un sistema con ruedas y rodamientos; el arrastre es comparable a la rodadura a las velocidades del modelo. Ver [§8](#8-modelo-de-resistencia-al-avance) |
 | **C2** | `VersorSeguro` / `ConVersorYMagnitud` protegen contra $0/0$ | Un tramo recto generaba `NaN` que se propagaba silenciosamente. Ver [§5.1](#51-el-problema-del-nan) |
-| **C3** | Guarda numérica en el radio de giro para triángulos degenerados | Con paso chico y vía casi recta, el área se pierde en el error de redondeo. Ver [§4.1](#41-fragilidad-numerica-de-esta-formula) |
-| **C4** | Fórmula del circuncentro corregida en la documentación | El `.md` de una versión anterior usaba el lado adyacente en vez del opuesto en la fórmula de pesos baricéntricos; el código nunca tuvo ese error, sólo la documentación estaba mal etiquetada. Ver [§4.2](#42-direccion-centro-de-curvatura) |
+| **C3** | Guarda numérica en el radio de giro para triángulos degenerados | Con paso chico y vía casi recta, el área se pierde en el error de redondeo. Ver [§4.1](#41-fragilidad-numérica-de-esta-fórmula) |
+| **C4** | Fórmula del circuncentro corregida en la documentación | El `.md` de una versión anterior usaba el lado adyacente en vez del opuesto en la fórmula de pesos baricéntricos; el código nunca tuvo ese error, sólo la documentación estaba mal etiquetada. Ver [§4.2](#42-dirección-centro-de-curvatura) |
 
 ---
 
@@ -333,7 +333,7 @@ Esta sección documenta cambios ya integrados en el código de `analisis_energia
 
 - **Modelo de partícula.** El tren se trata como un punto. Con $n_{carros}$ carros, la velocidad es común a todo el tren y la altura relevante es la del conjunto, no la de un punto — pendiente de implementar.
 - **Peralte perfecto.** Se asume G lateral nula, con lo cual toda la normal la toman las ruedas portantes. Válido sólo hasta que exista el modelo de roll $\phi(s)$ en este script — ver la aclaración de alcance en [§8.1](#81-los-tres-juegos-de-ruedas).
-- **$C_d$ constante.** El número de Reynolds del modelo ($\sim$2–4×10⁴) está en el rango donde $C_d$ de un cuerpo romo varía poco, pero no es el mismo Re que el de una atracción real (ver [`memoria_de_calculo.md` §4.5](memoria_de_calculo.md#45-que-no-escala)).
+- **$C_d$ constante.** El número de Reynolds del modelo ($\sim$2–4×10⁴) está en el rango donde $C_d$ de un cuerpo romo varía poco, pero no es el mismo Re que el de una atracción real (ver [`memoria_de_calculo.md` §4.5](memoria_de_calculo.md#45-qué-no-escala)).
 - **Aire quieto.** Sin viento ni efectos de aire en movimiento.
 - **Vía rígida.** Sin deformación de la estructura ni de las ruedas.
 - **Sin pérdidas en juntas.** No se modelan impactos ni discontinuidades de fabricación entre tramos de vía.
@@ -343,6 +343,6 @@ Esta sección documenta cambios ya integrados en el código de `analisis_energia
 ## 15. Limitaciones actuales / próximos pasos
 
 - La trayectoria hoy se genera en el propio script (debug, ver [§2.1](#21-trayectoria-actualmente-activa)); falta la importación de una lista real de puntos.
-- El esquema de integración es Euler explícito (orden 1): usa la normal al **principio** de cada segmento para estimar la pérdida de todo el tramo. Para la generación de geometría de elementos (loops, clotoides) esto acumula deriva y hay que pasar a RK4 — ya implementado en el generador, ver [`documentacion_generador_elementos.md` §4.1.1](documentacion_generador_elementos.md#411-capa-3-la-marcha-un-paso-a-la-vez).
+- El esquema de integración es Euler explícito (orden 1): usa la normal al **principio** de cada segmento para estimar la pérdida de todo el tramo. Para la generación de geometría de elementos (loops, clotoides) esto acumula deriva y hay que pasar a RK4 — ya implementado en el generador, ver [`documentacion_generador_elementos.md` §4.1.1](documentacion_generador_elementos.md#411-capa-3--la-marcha-un-paso-a-la-vez).
 - Falta el marco del carro (ángulo de roll $\phi(s)$), sin el cual no se puede repartir la normal entre los tres juegos de ruedas ni descomponer las G en los ejes del pasajero.
-- Los tres coeficientes de rodadura y el $C_d$ son valores provisorios: **requieren calibración experimental** (ver [`memoria_de_calculo.md` §11](memoria_de_calculo.md#11-datos-pendientes-de-verificacion)).
+- Los tres coeficientes de rodadura y el $C_d$ son valores provisorios: **requieren calibración experimental** (ver [`memoria_de_calculo.md` §11](memoria_de_calculo.md#11-datos-pendientes-de-verificación)).

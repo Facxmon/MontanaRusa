@@ -13,20 +13,20 @@ que las dos piezas de código tienen que respetar.
 
 | ¿Qué buscás? | Documento | Sección |
 |---|---|---|
-| Por qué se usa transporte paralelo y no Frenet-Serret | [`memoria_de_calculo.md`](memoria_de_calculo.md) | [§2](memoria_de_calculo.md#2-marco-de-referencia-de-la-via) |
-| Cinemática de heartline, por qué el roll tiene que ser $C^2$ | [`memoria_de_calculo.md`](memoria_de_calculo.md) | [§3](memoria_de_calculo.md#3-cinematica-de-heartline) |
+| Por qué se usa transporte paralelo y no Frenet-Serret | [`memoria_de_calculo.md`](memoria_de_calculo.md) | [§2](memoria_de_calculo.md#2-marco-de-referencia-de-la-vía) |
+| Cinemática de heartline, por qué el roll tiene que ser $C^2$ | [`memoria_de_calculo.md`](memoria_de_calculo.md) | [§3](memoria_de_calculo.md#3-cinemática-de-heartline) |
 | Semejanza de Froude, factores de escala, $\lambda=22$ | [`memoria_de_calculo.md`](memoria_de_calculo.md) | [§4](memoria_de_calculo.md#4-semejanza-de-froude) |
-| Límites de la norma ASTM F2291-06a §7 (tablas de las Figs. 6–10) | [`memoria_de_calculo.md`](memoria_de_calculo.md) | [§5](memoria_de_calculo.md#5-criterios-de-aceptacion-astm-f2291-06a-7) |
-| Por qué se admite discontinuidad acotada en vez de continuidad estricta | [`memoria_de_calculo.md`](memoria_de_calculo.md) | [§6](memoria_de_calculo.md#6-politica-de-continuidad-por-eje) |
-| Cómo se dimensiona la longitud de una clotoide | [`memoria_de_calculo.md`](memoria_de_calculo.md) | [§7](memoria_de_calculo.md#7-longitudes-de-transicion-derivacion-y-escalado) |
+| Límites de la norma ASTM F2291-06a §7 (tablas de las Figs. 6–10) | [`memoria_de_calculo.md`](memoria_de_calculo.md) | [§5](memoria_de_calculo.md#5-criterios-de-aceptación--astm-f2291-06a-7) |
+| Por qué se admite discontinuidad acotada en vez de continuidad estricta | [`memoria_de_calculo.md`](memoria_de_calculo.md) | [§6](memoria_de_calculo.md#6-política-de-continuidad-por-eje) |
+| Cómo se dimensiona la longitud de una clotoide | [`memoria_de_calculo.md`](memoria_de_calculo.md) | [§7](memoria_de_calculo.md#7-longitudes-de-transición-derivación-y-escalado) |
 | Dimensionamiento del carro, modelo distorsionado vs. semejante | [`memoria_de_calculo.md`](memoria_de_calculo.md) | [§9](memoria_de_calculo.md#9-dimensionamiento-del-carro) |
-| Cómo el generador construye la geometría paso a paso (las tres capas) | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§4.1](documentacion_generador_elementos.md#41-como-se-construye-la-geometria-paso-a-paso) |
+| Cómo el generador construye la geometría paso a paso (las tres capas) | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§4.1](documentacion_generador_elementos.md#41-cómo-se-construye-la-geometría-paso-a-paso) |
 | Los cuatro modos de curvatura (Clotoide, FuerzaGConstante, etc.) | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§5](documentacion_generador_elementos.md#5-los-cuatro-modos-de-curvatura) |
-| Método A vs. Método B de acoplamiento geometría-dinámica | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§6](documentacion_generador_elementos.md#6-los-dos-metodos-de-acoplamiento) |
+| Método A vs. Método B de acoplamiento geometría-dinámica | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§6](documentacion_generador_elementos.md#6-los-dos-métodos-de-acoplamiento) |
 | Chequeos de factibilidad e interferencia | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§8](documentacion_generador_elementos.md#8-chequeos-de-factibilidad) |
-| Qué tests corren y qué verifican | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§11](documentacion_generador_elementos.md#11-tests-de-validacion) |
-| Hallazgos de ingeniería (loop que se cruza, loop circular imposible, etc.) | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§12](documentacion_generador_elementos.md#12-hallazgos-de-ingenieria) |
-| Cómo se calcula energía, velocidad y pérdidas sobre una trayectoria dada | [`documentacion_analisis_energia.md`](documentacion_analisis_energia.md) | [§9](documentacion_analisis_energia.md#9-proceso-iterativo-velocidad-normales-y-perdidas) |
+| Qué tests corren y qué verifican | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§11](documentacion_generador_elementos.md#11-tests-de-validación) |
+| Hallazgos de ingeniería (loop que se cruza, loop circular imposible, etc.) | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§12](documentacion_generador_elementos.md#12-hallazgos-de-ingeniería) |
+| Cómo se calcula energía, velocidad y pérdidas sobre una trayectoria dada | [`documentacion_analisis_energia.md`](documentacion_analisis_energia.md) | [§9](documentacion_analisis_energia.md#9-proceso-iterativo-velocidad-normales-y-pérdidas) |
 | Modelo de resistencia al avance (rodadura + arrastre) | [`documentacion_analisis_energia.md`](documentacion_analisis_energia.md) | [§8](documentacion_analisis_energia.md#8-modelo-de-resistencia-al-avance) |
 | Qué significa cada símbolo o variable, con su unidad | [`NOMENCLATURA.md`](NOMENCLATURA.md) | tabla completa |
 
@@ -51,7 +51,7 @@ Detalle completo en [`documentacion_generador_elementos.md` §2](documentacion_g
 run('analisis_energia.m')     % modelo preliminar sobre una trayectoria de prueba (no es geometría de diseño)
 run('DemoElemento.m')         % un elemento del generador en detalle: reporte y gráficos
 run('DemoLayout.m')           % los cuatro elementos encadenados en un circuito
-run('TestsValidacion.m')      % ocho tests del generador, termina con error si alguno falla
+run('TestsValidacion.m')      % diez tests del generador, termina con error si alguno falla
 ```
 
 Los parámetros del generador de elementos se configuran en un único lugar:
@@ -62,11 +62,12 @@ Los parámetros del generador de elementos se configuran en un único lugar:
 
 | Área | Estado |
 |---|---|
-| Generador de geometría (loop, hélice, over-banked turn, dive loop) | Implementado y con 8 tests pasando (ver [`documentacion_generador_elementos.md` §11](documentacion_generador_elementos.md#11-tests-de-validacion)) |
-| Verificación normativa contra ASTM F2291 | Implementada; valores de la norma sin verificar contra el texto original (ver [`memoria_de_calculo.md` §11](memoria_de_calculo.md#11-datos-pendientes-de-verificacion)) |
-| Análisis energético (`analisis_energia.m`) | Modelo preliminar, corre sobre trayectoria de prueba; falta importar geometría real y pasar a RK4 (ver [`documentacion_analisis_energia.md` §15](documentacion_analisis_energia.md#15-limitaciones-actuales--proximos-pasos)) |
+| Generador de geometría (loop, hélice, over-banked turn, dive loop) | Implementado y con 10 tests pasando (ver [`documentacion_generador_elementos.md` §11](documentacion_generador_elementos.md#11-tests-de-validación)) |
+| Modelo de heartline (tres curvas: heartline, punto de evaluación, riel) | Implementado; el radio se dimensiona para el pasajero y el riel se deriva (ver [`documentacion_generador_elementos.md` §14](documentacion_generador_elementos.md#14-el-modelo-de-heartline-tres-curvas)) |
+| Verificación normativa contra ASTM F2291 | Implementada; valores de la norma sin verificar contra el texto original (ver [`memoria_de_calculo.md` §11](memoria_de_calculo.md#11-datos-pendientes-de-verificación)) |
+| Análisis energético (`analisis_energia.m`) | Modelo preliminar, corre sobre trayectoria de prueba; falta importar geometría real y pasar a RK4 (ver [`documentacion_analisis_energia.md` §15](documentacion_analisis_energia.md#15-limitaciones-actuales--próximos-pasos)) |
 | Dimensionamiento del carro y del loop | Decisión de similitud tomada (modelo distorsionado); dimensiones definitivas sin cerrar (ver [`memoria_de_calculo.md` §10](memoria_de_calculo.md#10-pendientes-que-bloquean-el-dimensionamiento)) |
-| Modelo de N carros, elemento conector, modo inverso, backend web | Fuera de alcance actual (ver [`documentacion_generador_elementos.md` §15](documentacion_generador_elementos.md#15-otras-limitaciones-y-proximos-pasos)) |
+| Modelo de N carros, elemento conector, modo inverso, backend web | Fuera de alcance actual (ver [`documentacion_generador_elementos.md` §15](documentacion_generador_elementos.md#15-otras-limitaciones-y-próximos-pasos)) |
 
 ## Nomenclatura
 
