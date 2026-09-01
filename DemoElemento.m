@@ -16,10 +16,10 @@ addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'GeneradorDeElementos
 Parametros = ParametrosPorDefecto();
 
 % Cual de los cuatro elementos se genera.
-Elegido = @ElementoLoopVertical;   % @ElementoLoopVertical | @ElementoHelice
+Elegido = @ElementoDiveLoop;   % @ElementoLoopVertical | @ElementoHelice
                                    % @ElementoOverBankedTurn | @ElementoDiveLoop
 
-Parametros.ModoCurvatura          = 'FuerzaGConstante';   % 'Clotoide' | 'FuerzaGConstante' | 'AceleracionNormalConstante' | 'GMaximas'
+Parametros.ModoCurvatura          = 'GMaximas';   % 'Clotoide' | 'FuerzaGConstante' | 'AceleracionNormalConstante' | 'GMaximas'
 % 'A' marcha acoplada (rapido) | 'B' punto fijo (~3 veces mas lento) |
 % 'Ambos' corre los dos y reporta la comparacion, para el reporte del proyecto.
 Parametros.MetodoDeAcoplamiento   = 'A';

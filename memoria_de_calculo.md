@@ -270,7 +270,7 @@ $$\frac{v_m}{\sqrt{gL_m}} = \frac{v_r}{\sqrt{gL_r}} \implies \frac{v_m}{v_r} = \
 
 De ahí, con $t = L/v$ y $a = v^2/L$:
 
-| Magnitud | Factor modelo/real | $\lambda = 22$ |
+| Magnitud | Factor modelo/real (adimensional) | Valor con $\lambda = 22$ (adimensional) |
 |---|---|---|
 | Longitud | $1/\lambda$ | 0.0455 |
 | Velocidad | $1/\sqrt\lambda$ | 0.213 |
@@ -282,7 +282,7 @@ De ahí, con $t = L/v$ y $a = v^2/L$:
 
 ### 4.3 Estimación de $\lambda$
 
-| Anclaje | Real (aproximado) | Modelo | $\lambda$ |
+| Anclaje | Real (aproximado) [m] | Modelo [m] | $\lambda$ [—] |
 |---|---|---|---|
 | Largo de carro | 2.2 m **[SIN VERIFICAR]** | 0.10 m | 22.0 |
 | Alto de carro | 1.5 m **[SIN VERIFICAR]** | 0.06 m | 25.0 |
@@ -312,7 +312,7 @@ $$J_{real,equiv} = \frac{J_{modelo}}{\sqrt\lambda} \leq J_{lim} \qquad\Longleftr
 
 Ésta es la consecuencia con más impacto sobre el proyecto físico. Un loop real escalado a $\lambda = 22$:
 
-| $R$ cúspide real | $R$ cúspide modelo | Altura del loop modelo | $v$ cúspide modelo ($G=2$) |
+| $R$ cúspide real [m] | $R$ cúspide modelo [cm] | Altura del loop modelo [cm] | $v$ cúspide modelo ($G=2$) [m/s] |
 |---|---|---|---|
 | 8 m | 36 cm | 80–95 cm | 3.3 m/s |
 | 10 m | 46 cm | 100–118 cm | 3.7 m/s |
@@ -325,7 +325,7 @@ $$J_{real,equiv} = \frac{J_{modelo}}{\sqrt\lambda} \leq J_{lim} \qquad\Longleftr
 
 Chequeo inverso, si se impone la altura disponible:
 
-| Altura disponible | $R$ modelo | $R$ real equivalente | $v$ cúspide modelo |
+| Altura disponible [cm] | $R$ modelo [cm] | $R$ real equivalente [m] | $v$ cúspide modelo [m/s] |
 |---|---|---|---|
 | 30 cm | 12.5 cm | 2.8 m | 1.9 m/s |
 | 50 cm | 21 cm | 4.6 m | 2.5 m/s |
@@ -388,7 +388,7 @@ Caso base con apoyacabezas — valores **[SIN VERIFICAR]** contra el texto norma
 
 Valores **[SIN VERIFICAR]**:
 
-| Duración [s] | Base Case | Over-The-Shoulder | Prone |
+| Duración [s] | Base Case [G] | Over-The-Shoulder [G] | Prone [G] |
 |---|---|---|---|
 | 0.2 | −2.0 | −2.0 | −3.5 |
 | 0.5 | −1.5 | −2.0 | −3.5 |
@@ -417,7 +417,7 @@ Caso base, valores **[SIN VERIFICAR]**:
 
 Valores **[SIN VERIFICAR]**:
 
-| Duración [s] | Base Case | Extended $-G_z$ |
+| Duración [s] | Base Case [G] | Extended $-G_z$ [G] |
 |---|---|---|
 | 0.2 | −2.0 | −2.8 |
 | 0.5 | −1.5 | ≈ −2.5 |
@@ -437,7 +437,7 @@ La curva Extended converge con la Base alrededor de los 3 s; a partir de ahí so
 
 Valores **[SIN VERIFICAR]**:
 
-| Duración [s] | Todas las sujeciones | Reducido (precedido por ≥3 s de $-G_z$) |
+| Duración [s] | Todas las sujeciones [G] | Reducido (precedido por ≥3 s de $-G_z$) [G] |
 |---|---|---|
 | 0.2 | 6.0 | 5.0 |
 | 1.0 | 6.0 | 5.0 |
@@ -471,7 +471,7 @@ En la práctica, para cada tramo del recorrido en que la G supera un umbral, se 
 
 La norma **no exige continuidad de la aceleración en ningún lado**. Exige **tasa de aparición acotada** en transiciones específicas identificadas como peligrosas:
 
-| Situación | Límite de onset | Fuente |
+| Situación | Límite de onset [G/s] | Fuente |
 |---|---|---|
 | De 0 G o menos hacia 2 G o más | < 15 G/s | §7.1.7.2 |
 | $+G_x$ por encima de 1.5 g sin apoyacabezas | < 5 g/s (permite 2.0 g) | Fig. 6, nota 1 |
@@ -510,7 +510,7 @@ Las Figs. 19 y 20 de la norma especifican **datos filtrados a 5 Hz**, y §7.1.8 
 
 Consecuencia: la verificación de cumplimiento no se hace sobre la señal cruda sino sobre la señal filtrada. Un pasabajos de primer orden a 5 Hz tiene $\tau_{filtro} = 1/(2\pi f_c) = 31.8$ ms y tiempo de subida 10–90 % de ≈ 70 ms. (Este $\tau_{filtro}$ es la constante de tiempo del filtro, no la torsión de la vía; se usa el subíndice para no chocar con $\tau$ del bloque 1 de [`NOMENCLATURA.md`](NOMENCLATURA.md).) Un escalón matemático medido a través de ese filtro aparece como una rampa:
 
-| Escalón | Onset medido tras el filtro |
+| Escalón [G] | Onset medido tras el filtro [G/s] |
 |---|---|
 | 1 G | ≈ 11 G/s |
 | 2 G | ≈ 23 G/s |
@@ -662,7 +662,7 @@ Comprobación numérica con $\Delta G = 3$ G:
 
 $$J_{modelo,lim} = \sqrt\lambda\;J_{real,lim}$$
 
-| Criterio | Límite real | Límite del modelo ($\lambda=22$) |
+| Criterio | Límite real [G/s] | Límite del modelo ($\lambda=22$) [G/s] |
 |---|---|---|
 | §7.1.7.2 (0 G → 2 G+) | 15 G/s | 70.4 G/s |
 | Fig. 6 nota 1 ($+G_x$ sin apoyacabezas) | 5 g/s | 23.5 G/s |

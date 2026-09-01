@@ -331,7 +331,7 @@ Esta sección documenta cambios ya integrados en el código de `analisis_energia
 
 ## 14. Hipótesis vigentes
 
-- **Modelo de partícula.** El tren se trata como un punto. Con $N$ carros, la velocidad es común a todo el tren y la altura relevante es la del conjunto, no la de un punto — pendiente de implementar.
+- **Modelo de partícula.** El tren se trata como un punto. Con $n_{carros}$ carros, la velocidad es común a todo el tren y la altura relevante es la del conjunto, no la de un punto — pendiente de implementar.
 - **Peralte perfecto.** Se asume G lateral nula, con lo cual toda la normal la toman las ruedas portantes. Válido sólo hasta que exista el modelo de roll $\phi(s)$ en este script — ver la aclaración de alcance en [§8.1](#81-los-tres-juegos-de-ruedas).
 - **$C_d$ constante.** El número de Reynolds del modelo ($\sim$2–4×10⁴) está en el rango donde $C_d$ de un cuerpo romo varía poco, pero no es el mismo Re que el de una atracción real (ver [`memoria_de_calculo.md` §4.5](memoria_de_calculo.md#45-que-no-escala)).
 - **Aire quieto.** Sin viento ni efectos de aire en movimiento.

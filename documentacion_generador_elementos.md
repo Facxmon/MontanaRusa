@@ -344,7 +344,7 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 
 ## 10. Escalado
 
-`RadioLoop` y `LargoCarro` son parámetros **independientes** y cada uno tiene su propio $\lambda$ (definiciones completas en [`memoria_de_calculo.md` §9.4](memoria_de_calculo.md#94-no-es-una-propiedad-del-modelo)). No hay ningún $\lambda$ único cableado. Se reporta la distorsión $\lambda_{carro}/\lambda_{loop}$ y el equivalente en carros reales — fórmulas explícitas en [`memoria_de_calculo.md` §9.6](memoria_de_calculo.md#96-que-conserva-y-que-pierde-el-modelo-distorsionado) y en [`NOMENCLATURA.md` bloque 6](NOMENCLATURA.md#6-escalado-y-semejanza).
+`RadioDelLoop` y `LargoCarro` son parámetros **independientes** y cada uno tiene su propio $\lambda$ (definiciones completas en [`memoria_de_calculo.md` §9.4](memoria_de_calculo.md#94-no-es-una-propiedad-del-modelo)). No hay ningún $\lambda$ único cableado. Se reporta la distorsión $\lambda_{carro}/\lambda_{loop}$ y el equivalente en carros reales — fórmulas explícitas en [`memoria_de_calculo.md` §9.6](memoria_de_calculo.md#96-que-conserva-y-que-pierde-el-modelo-distorsionado) y en [`NOMENCLATURA.md` bloque 6](NOMENCLATURA.md#6-escalado-y-semejanza).
 
 ---
 
@@ -407,7 +407,7 @@ $$G_x = \frac{a_t}{g} + T_z, \qquad a_t = -g\,T_z - \frac{F_{res}}{m} \quad\Long
 
 ### 12.5 `RadioDeReferencia` es una entrada que en tres de los cuatro modos describe una salida
 
-`RadioLoop` es la longitud característica de Froude: fija $\lambda_{loop}$ y con él el presupuesto de onset y la conversión de duraciones contra las curvas normativas. Pero en los modos que dependen de $v$ el radio de cúspide **sale** de la integración. Si el nominal y el alcanzado se apartan, esos dos números se calcularon con la longitud de referencia equivocada. Hay un chequeo posterior que lo detecta y avisa.
+`RadioDeReferencia` (pisado por `RadioDelLoop` en el caso del loop vertical) es la longitud característica de Froude: fija $\lambda_{loop}$ y con él el presupuesto de onset y la conversión de duraciones contra las curvas normativas. Pero en los modos que dependen de $v$ el radio de cúspide **sale** de la integración. Si el nominal y el alcanzado se apartan, esos dos números se calcularon con la longitud de referencia equivocada. Hay un chequeo posterior que lo detecta y avisa.
 
 ---
 
@@ -442,7 +442,7 @@ que es simplemente decir que el pasajero gira a radio $R - d$ y no a radio $R$.
 ## 15. Otras limitaciones y próximos pasos
 
 - **§7.1.7.1 simplificada.** Si aparece un evento de $-G_z$ de más de 3 s, se aplica la columna reducida de $+G_z$ a todo el elemento en vez de arrastrar el reloj de los 6 s. Es conservador y evita que el reloj cruce entre elementos.
-- **Modelo de partícula.** El tren se trata como un punto. Con $N$ carros la velocidad es común y la altura relevante es la del conjunto; la arquitectura está preparada para $N$ pero el reparto no está.
+- **Modelo de partícula.** El tren se trata como un punto. Con $n_{carros}$ carros la velocidad es común y la altura relevante es la del conjunto; la arquitectura está preparada para $n_{carros}>1$ pero el reparto no está.
 - **Reparto entre juegos de ruedas — específico de este script.** En el generador de elementos (`Fisica/CargasEnLaVia.m` y `Fisica/ResistenciaAlAvance.m`) el reparto **ya se hace correctamente**, proyectando la normal sobre $\mathbf{U}$ y $\mathbf{L}$ del marco del carro: la componente sobre $\mathbf{U}$ va a las portantes si es positiva y a las de retención si es negativa, y la componente sobre $\mathbf{L}$ va a las de guía (código verificado: `ResistenciaAlAvance.m` líneas 10–12). Esto es distinto de lo que hace el script `analisis_energia.m` de la raíz del repo, que todavía asume peralte perfecto (ver [`documentacion_analisis_energia.md` §8](documentacion_analisis_energia.md#8-modelo-de-resistencia-al-avance)) — son dos scripts separados y esta sección se refiere únicamente al generador. Los tres $C_{rr}$ y el $C_d$ siguen siendo provisorios y **requieren calibración experimental**.
-- **Modo inverso**, elemento conector y tren de $N$ carros quedan fuera de alcance, igual que el backend web.
+- **Modo inverso**, elemento conector y tren de $n_{carros}>1$ quedan fuera de alcance, igual que el backend web.
 - **Modo `GMaximas`**: la interfaz está completa pero el seguimiento de duración de exposición trata el arco como un único evento sostenido.
