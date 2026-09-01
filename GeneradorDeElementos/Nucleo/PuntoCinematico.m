@@ -18,7 +18,7 @@ function Punto = PuntoCinematico(Arco, y, Contexto)
     % proporcional al giro acumulado. Su derivada la completa DerivadaDeVia,
     % que es donde recien se conoce la curvatura.
     [Punto.AnguloRoll, Punto.VelocidadRoll, Punto.AceleracionRoll] = ...
-        Contexto.FuncionRoll(Arco, Punto.AnguloGirado);
+        Contexto.FuncionRoll(Arco, Punto.AnguloGirado - Contexto.AnguloGiradoDeReferencia);
     [Punto.VersorArribaCarro, Punto.VersorLateral] = MarcoCarroDesdeTransporte( ...
         Punto.VersorArribaTransporte, Punto.VersorLateralTransporte, Punto.AnguloRoll);
 

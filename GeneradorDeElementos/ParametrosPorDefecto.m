@@ -35,18 +35,53 @@ Parametros.DistanciaHeartline = 0.030;   % [m] parametro virtual de evaluacion, 
 Parametros.AreaFrontal        = 0.0036;  % [m^2] proyeccion frontal de un carro
 
 %% -------------------- Geometria del loop ------------------------------
-% SIN CERRAR: la altura definitiva depende de la huella total disponible.
-Parametros.RadioLoop        = 0.21;   % [m] radio de cuspide objetivo
-Parametros.AlturaMaximaLoop = 1.00;   % [m] restriccion dura del proyecto
-Parametros.RollObjetivoLoop = 0;      % [rad] 0 = loop vertical estandar
+% SIN CERRAR: las dimensiones definitivas dependen de la huella disponible.
+Parametros.AlturaMaximaDelElemento = 1.00;   % [m] restriccion dura del proyecto
 
-% Desplazamiento lateral entre la pata de entrada y la de salida. NO es
-% opcional: un giro de 2*pi contenido en un plano vuelve a pasar por donde
-% entro, asi que un loop plano se choca consigo mismo siempre. El generador
-% impone la torsion necesaria para llegar a este valor. Poner 0 fuerza el loop
-% plano, que sirve de referencia pero no es fabricable.
-% El valor por defecto se calcula al final del archivo a partir de la
-% envolvente, para que quede siempre por encima de la separacion exigida.
+% RadioDeReferencia es la longitud caracteristica de Froude: fija lambda, el
+% presupuesto de onset y la conversion de duraciones contra las curvas de la
+% norma. Cada elemento lo pisa con su propio radio antes de generar, asi que
+% este valor es solo el que queda si se llama al motor a mano.
+Parametros.RadioDeReferencia = 0.21;   % [m]
+
+%% ------------------- Geometria de cada elemento -----------------------
+% --- Loop vertical ---
+Parametros.RadioDelLoop     = 0.11;   % [m] radio de cuspide objetivo
+Parametros.RollExtraDelLoop = 0;      % [rad] 0 = loop vertical estandar
+% La separacion entre patas NO es opcional: un giro de 2*pi contenido en un
+% plano vuelve a pasar por donde entro, asi que un loop plano se choca consigo
+% mismo siempre. El generador impone la inclinacion helicoidal necesaria para
+% llegar a este valor. Poner 0 fuerza el loop plano, que sirve de referencia
+% pero no es fabricable. El valor por defecto se calcula al final del archivo
+% a partir de la envolvente, para que supere la separacion exigida.
+
+% Los radios de abajo son grandes comparados con el loop, y no por capricho:
+% la G centripeta vale v^2/(g*R), asi que a 4.5 m/s un radio de 0.3 m ya da
+% 6.9 G. El loop se salva porque el carro sube y frena; un giro horizontal
+% mantiene la velocidad todo el recorrido. A la escala del modelo los giros
+% necesitan radios del orden del metro. SIN CERRAR: dependen de la huella.
+
+% --- Dive loop: media vuelta hacia abajo, entrando invertido ---
+% Gira pi y no llega a cruzarse consigo mismo, asi que no necesita separacion.
+Parametros.RadioDelDiveLoop       = 0.45;   % [m]
+Parametros.SeparacionDelDiveLoop  = 0;      % [m]
+
+% --- Helice: giro sostenido subiendo o bajando ---
+Parametros.RadioDeLaHelice   = 0.70;          % [m]
+Parametros.VueltasDeLaHelice = 1.0;           % [-] puede no ser entero
+Parametros.AvanceDeLaHelice  = -0.30;         % [m] sobre el eje de la helice;
+                                              % con entrada a nivel es la altura.
+                                              % Negativo = baja.
+Parametros.PeralteDeLaHelice = deg2rad(55);   % [rad]
+
+% --- Over-banked turn: giro peraltado mas de 90 grados ---
+Parametros.RadioDelGiro   = 0.80;          % [m]
+Parametros.AnguloDelGiro  = deg2rad(120);  % [rad] cambio de rumbo
+Parametros.PeralteDelGiro = deg2rad(110);  % [rad] mas de 90 = over-banked
+Parametros.AvanceDelGiro  = 0;             % [m] 0 = giro a nivel
+
+% Sentido comun a helice, over-banked turn y cualquier giro futuro.
+Parametros.SentidoDelGiro = 'Derecha';   % 'Derecha' | 'Izquierda'
 
 % Modo de curvatura del arco:
 %   'AceleracionNormalConstante' | 'Clotoide' | 'FuerzaGConstante' | 'GMaximas'
@@ -77,9 +112,9 @@ Parametros.OnsetMaximoModelo    = [];           % [G/s] override directo; vacio 
 
 %% ------------------------ Escalado (Froude) ---------------------------
 % lambda NO es una propiedad del modelo sino de un emparejamiento entre una
-% dimension del modelo y la del prototipo. Modelo distorsionado: RadioLoop y
+% dimension del modelo y la del prototipo. Modelo distorsionado: RadioDeReferencia y
 % LargoCarro son independientes y cada uno tiene su propio lambda.
-Parametros.RadioLoopReal  = 8.00;   % [m] atraccion de referencia -- SIN VERIFICAR
+Parametros.RadioDeReferenciaReal  = 8.00;   % [m] atraccion de referencia -- SIN VERIFICAR
 Parametros.LargoCarroReal = 2.20;   % [m] atraccion de referencia -- SIN VERIFICAR
 
 %% ---------------------- Fabricacion y espacio -------------------------
@@ -114,7 +149,7 @@ Parametros.DistanciaMinimaEntreVias    = 0.02;   % [m] separacion libre exigida
 % Diametro del cilindro que circunscribe la seccion de via mas la holgura.
 DiametroEnvolvente = hypot(Parametros.AnchoVia  + 2*Parametros.Holgura, ...
                            Parametros.AltoCarro + 2*Parametros.Holgura);
-Parametros.DesplazamientoLateralLoop = 1.2*(DiametroEnvolvente + Parametros.DistanciaMinimaEntreVias);
+Parametros.SeparacionDePatas = 1.2*(DiametroEnvolvente + Parametros.DistanciaMinimaEntreVias);
 
 % Alternativa: imponer la inclinacion helicoidal (tan del angulo entre la
 % tangente y el plano del loop) en vez de pedir un desplazamiento.

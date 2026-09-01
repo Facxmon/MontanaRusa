@@ -1,23 +1,39 @@
-function [Track, Diagnostico] = GenerarLoopVertical(EstadoEntrada, Parametros, PerfilVelocidad)
-%GENERARLOOPVERTICAL Nucleo de generacion de la geometria del loop vertical.
+function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Receta, PerfilVelocidad)
+%GENERARGEOMETRIA Motor de generacion, comun a todos los elementos de via.
 %   Lo usan los dos metodos de acoplamiento: el metodo A no pasa perfil de
 %   velocidad (la curvatura se evalua con la v que lleva la marcha) y el
 %   metodo B pasa el perfil supuesto de la iteracion anterior.
 %
 %   Sub-tramos, en orden:
-%     AcondicionamientoEntrada  lleva a cero la curvatura fuera del plano del
-%                               loop y el roll al que el loop necesita
+%     AcondicionamientoEntrada  lleva a cero la curvatura fuera del plano de
+%                               referencia y el roll al que el elemento pide
 %     ClotoideEntrada           rampa de curvatura desde kappa_0 (clotoide
 %                               desplazada si la entrada ya venia curvada)
-%     ArcoLoop                  curvatura segun el modo elegido
+%     ArcoPrincipal             curvatura segun el modo elegido
 %     ClotoideSalida            rampa de curvatura de vuelta a cero
 %
+%   Todos los elementos son el mismo objeto geometrico: un giro de un angulo
+%   dado alrededor de un eje, con una ley de roll encima. Lo que los distingue
+%   entra por la Receta:
+%
+%     Receta.Nombre                 texto para el reporte y los graficos
+%     Receta.GiroObjetivo           angulo total a girar [rad]
+%     Receta.DesfasajeDeCurvatura   angulo entre el vector curvatura y el eje
+%                                   "arriba" sin peralte. 0 deja la curvatura
+%                                   en el plano vertical (loop, dive loop);
+%                                   +-pi/2 la deja horizontal (giros, helice)
+%     Receta.RollDelElemento        roll del carro respecto de la vertical:
+%                                   0 loop, pi dive loop, el peralte en giros
+%     Receta.DesplazamientoObjetivo avance sobre el eje de la helice [m]. En el
+%                                   loop separa las dos patas; en la helice es
+%                                   directamente cuanto sube
+%
 %   El arco se corta cuando el angulo ya girado mas lo que va a girar la
-%   clotoide de salida llega a 2*pi. Esa prediccion no es exacta cuando la
-%   curvatura depende de v, asi que el residual de cierre se corrige con unas
-%   pocas iteraciones de secante y se reporta siempre.
+%   clotoide de salida llega a GiroObjetivo. Esa prediccion no es exacta cuando
+%   la curvatura depende de v, asi que el residual de cierre se corrige con
+%   unas pocas iteraciones de secante y se reporta siempre.
 
-    if nargin < 3
+    if nargin < 4
         PerfilVelocidad = [];
     end
 
@@ -26,7 +42,7 @@ function [Track, Diagnostico] = GenerarLoopVertical(EstadoEntrada, Parametros, P
     %% ---------------- Marco y curvatura del estado de entrada -------------
     VersorTangenteEntrada = EstadoEntrada.VersorTangente;
     if norm(VersorTangenteEntrada(1:2)) < 1e-9
-        error('GenerarLoopVertical:TangenteVertical', ...
+        error('GenerarGeometria:TangenteVertical', ...
              ['La tangente de entrada es vertical pura: el plano del loop queda ' ...
               'indeterminado. Hace falta dar el azimut del plano como dato.']);
     end
@@ -38,22 +54,29 @@ function [Track, Diagnostico] = GenerarLoopVertical(EstadoEntrada, Parametros, P
     Beta = atan2(dot(NormalEnPlano, VersorLateralTransporteEntrada), ...
                  dot(NormalEnPlano, VersorArribaTransporteEntrada));
 
+    % Direccion en la que el elemento impone la curvatura: la vertical del
+    % plano rotada por el desfasaje. Todo lo que la curvatura de entrada tenga
+    % perpendicular a esa direccion lo tiene que sacar el acondicionamiento.
+    DireccionDeCurvatura = cos(Receta.DesfasajeDeCurvatura)*NormalEnPlano ...
+                         + sin(Receta.DesfasajeDeCurvatura)*cross(VersorTangenteEntrada, NormalEnPlano);
+
     %% ---------------- Plan del elemento -----------------------------------
     Plan.Parametros          = Parametros;
+    Plan.Receta              = Receta;
     Plan.Escala              = Escala;
     Plan.Onset               = Escala.OnsetMaximo;
     Plan.EstadoEntrada       = EstadoEntrada;
     Plan.PerfilVelocidad     = PerfilVelocidad;
     Plan.NormalEnPlano       = NormalEnPlano;
     Plan.Beta                = Beta;
-    Plan.CurvaturaEnPlano    = dot(EstadoEntrada.VectorCurvatura, NormalEnPlano);
-    Plan.CurvaturaFueraPlano = dot(EstadoEntrada.VectorCurvatura, ...
-                                   cross(VersorTangenteEntrada, NormalEnPlano));
+    Plan.CurvaturaParalela      = dot(EstadoEntrada.VectorCurvatura, DireccionDeCurvatura);
+    Plan.CurvaturaPerpendicular = dot(EstadoEntrada.VectorCurvatura, ...
+                                      cross(VersorTangenteEntrada, DireccionDeCurvatura));
     Plan.EstadoInicialY = [EstadoEntrada.Posicion, VersorTangenteEntrada, ...
                            VersorArribaTransporteEntrada, VersorLateralTransporteEntrada, ...
                            EstadoEntrada.Velocidad^2, 0, 0];
 
-    RollObjetivo = Beta + Parametros.RollObjetivoLoop;
+    RollObjetivo = Beta + Receta.RollDelElemento;
     DeltaRoll    = AjustarAngulo(RollObjetivo - EstadoEntrada.AnguloRoll);
 
     %% ---------------- Generacion ------------------------------------------
@@ -68,7 +91,7 @@ function [Track, Diagnostico] = GenerarLoopVertical(EstadoEntrada, Parametros, P
     % del loop es la pendiente. Converge en una o dos pasadas.
     FactorLongitud = 1;
     AjustarInclinacion = isempty(Parametros.InclinacionHelicoidalImpuesta) && ...
-                         Parametros.DesplazamientoLateralLoop ~= 0;
+                         Receta.DesplazamientoObjetivo ~= 0;
     if isempty(Parametros.InclinacionHelicoidalImpuesta)
         Inclinacion = 0;
     else
@@ -85,12 +108,12 @@ function [Track, Diagnostico] = GenerarLoopVertical(EstadoEntrada, Parametros, P
 
         Plan.LongitudAcondicionamiento = LongitudTransicionDeRoll(DeltaRoll, EstadoEntrada.Velocidad, ...
                                                                   Plan.Onset(2), Parametros);
-        if abs(Plan.CurvaturaFueraPlano) > 1e-9
-            LongitudPorCurvatura = LongitudDeClotoide(EstadoEntrada.Velocidad, Plan.CurvaturaFueraPlano, ...
+        if abs(Plan.CurvaturaPerpendicular) > 1e-9
+            LongitudPorCurvatura = LongitudDeClotoide(EstadoEntrada.Velocidad, Plan.CurvaturaPerpendicular, ...
                                                       Plan.Onset(2), Parametros);
             Plan.LongitudAcondicionamiento = max(Plan.LongitudAcondicionamiento, LongitudPorCurvatura);
         end
-        Plan.FuncionRoll = @(Arco, AnguloGirado) PerfilRollDelLoop(Arco, AnguloGirado, ...
+        Plan.FuncionRoll = @(Arco, AnguloGirado) PerfilRollDelElemento(Arco, AnguloGirado, ...
                                EstadoEntrada, RollObjetivo, Plan.LongitudAcondicionamiento, Inclinacion);
 
         AjusteCierre = 0;
@@ -116,9 +139,9 @@ function [Track, Diagnostico] = GenerarLoopVertical(EstadoEntrada, Parametros, P
                           * OnsetMedido / Escala.OnsetMaximo(3);
 
         InclinacionSiguiente = Inclinacion;
-        if AjustarInclinacion && Recorrido.LongitudDelLoop > 0
-            FaltaDesplazamiento = Parametros.DesplazamientoLateralLoop - Recorrido.DesplazamientoLateral;
-            InclinacionSiguiente = Inclinacion + FaltaDesplazamiento / Recorrido.LongitudDelLoop;
+        if AjustarInclinacion && Recorrido.LongitudDelGiro > 0
+            FaltaDesplazamiento = Receta.DesplazamientoObjetivo - Recorrido.DesplazamientoLateral;
+            InclinacionSiguiente = Inclinacion + FaltaDesplazamiento / Recorrido.LongitudDelGiro;
         end
 
         if abs(FactorSiguiente - FactorLongitud) < 1e-6*FactorLongitud && ...
@@ -134,7 +157,7 @@ function [Track, Diagnostico] = GenerarLoopVertical(EstadoEntrada, Parametros, P
     %% ---------------- Armado del Track ------------------------------------
     Registro = RecortarRegistro(Recorrido.Registro);
 
-    Track.Nombre                  = 'LoopVertical';
+    Track.Nombre                  = Receta.Nombre;
     Track.ModoCurvatura           = Parametros.ModoCurvatura;
     Track.Puntos                  = Registro.Posicion;
     Track.LongitudArco            = Registro.Arco;
@@ -168,8 +191,8 @@ function [Track, Diagnostico] = GenerarLoopVertical(EstadoEntrada, Parametros, P
     Diagnostico.InclinacionHelicoidal      = Inclinacion;
     Diagnostico.DesplazamientoLateral      = Recorrido.DesplazamientoLateral;
     Diagnostico.Aviso                      = Recorrido.Aviso;
-    Diagnostico.CurvaturaEntradaEnPlano    = Plan.CurvaturaEnPlano;
-    Diagnostico.CurvaturaEntradaFueraPlano = Plan.CurvaturaFueraPlano;
+    Diagnostico.CurvaturaEntradaParalela      = Plan.CurvaturaParalela;
+    Diagnostico.CurvaturaEntradaPerpendicular = Plan.CurvaturaPerpendicular;
     Diagnostico.CurvaturaResidualFueraPlano = Recorrido.CurvaturaResidualFueraPlano;
     Diagnostico.LongitudAcondicionamiento  = Plan.LongitudAcondicionamiento;
     Diagnostico.LongitudClotoideEntrada    = Recorrido.LongitudClotoideEntrada;
@@ -196,7 +219,8 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     Contexto.FuncionRoll                = Plan.FuncionRoll;
     Contexto.PerfilVelocidad            = Plan.PerfilVelocidad;
     Contexto.VelocidadMinimaDeSeguridad = 1e-3;
-    Contexto.InclinacionHelicoidal      = 0;   % la fija el loop, no el acondicionamiento
+    Contexto.InclinacionHelicoidal      = 0;   % la fija el arco, no el acondicionamiento
+    Contexto.AnguloGiradoDeReferencia   = 0;
     Contexto.FuncionCurvatura           = @(Punto) deal(0, 0);
 
     y    = Plan.EstadoInicialY;
@@ -210,11 +234,12 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     Recorrido.CurvaturaResidualFueraPlano = 0;
     Recorrido.ResidualCierre              = 0;
     Recorrido.DesplazamientoLateral       = 0;
-    Recorrido.LongitudDelLoop             = 0;
-    Recorrido.NormalArco   = Plan.NormalEnPlano;
-    Recorrido.TangenteArco = Plan.EstadoEntrada.VersorTangente;
-    Recorrido.PosicionArco = Plan.EstadoEntrada.Posicion;
-    Recorrido.BinormalArco = cross(Plan.EstadoEntrada.VersorTangente, Plan.NormalEnPlano);
+    Recorrido.LongitudDelGiro             = 0;
+    Recorrido.NormalArco      = Plan.NormalEnPlano;
+    Recorrido.TangenteArco    = Plan.EstadoEntrada.VersorTangente;
+    Recorrido.PosicionArco    = Plan.EstadoEntrada.Posicion;
+    Recorrido.DireccionDeGiro = Plan.NormalEnPlano;
+    Recorrido.EjeDeLaHelice   = cross(Plan.EstadoEntrada.VersorTangente, Plan.NormalEnPlano);
 
     %% --- AcondicionamientoEntrada ---
     if Plan.LongitudAcondicionamiento > 0
@@ -237,10 +262,9 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     NormalArco = NormalDelPlanoVertical(y(4:6));
     BetaArco   = atan2(dot(NormalArco, y(10:12)), dot(NormalArco, y(7:9)));
 
-    Recorrido.NormalArco    = NormalArco;
-    Recorrido.TangenteArco  = y(4:6);
-    Recorrido.PosicionArco  = y(1:3);
-    Recorrido.BinormalArco  = cross(y(4:6), NormalArco);
+    Recorrido.NormalArco   = NormalArco;
+    Recorrido.TangenteArco = y(4:6);
+    Recorrido.PosicionArco = y(1:3);
     ArcoInicioLoop = Arco;
 
     % La direccion de la curvatura gira dentro del marco de transporte a razon
@@ -255,14 +279,30 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     % y de ahi sale torsion = kappa*tan(alfa). Con torsion constante en su
     % lugar, el desplazamiento lateral deja de ser monotono en cuanto kappa
     % varia -- se va para un lado y vuelve -- y el loop se sigue chocando.
+    %
+    % El desfasaje es lo que distingue las dos familias de elementos: con 0 la
+    % curvatura queda en el plano vertical y sale un loop; con +-pi/2 queda
+    % horizontal y sale un giro. El roll va por su lado, asi que un giro puede
+    % estar peraltado lo que se quiera sin tocar la curvatura.
     AnguloGiradoInicio = y(14);
-    AnguloDeCurvatura = @(Punto) BetaArco + Plan.Inclinacion*(Punto.AnguloGirado - AnguloGiradoInicio);
+    Contexto.AnguloGiradoDeReferencia = AnguloGiradoInicio;
+    AnguloDeCurvatura = @(Punto) BetaArco + Plan.Receta.DesfasajeDeCurvatura ...
+                                 + Plan.Inclinacion*(Punto.AnguloGirado - AnguloGiradoInicio);
     Contexto.InclinacionHelicoidal = Plan.Inclinacion;
+
+    % Base en la que se mide el giro y el avance sobre el eje de la helice:
+    % e1 es la tangente al empezar el arco y e2 la direccion de la curvatura
+    % ahi mismo. El eje de la helice es e1 x e2, que para un loop da la lateral
+    % y para un giro da la vertical: el mismo parametro separa las patas del
+    % loop y hace subir la helice.
+    AnguloInicialCurvatura = AnguloDeCurvatura(PuntoCinematico(Arco, y, Contexto));
+    Recorrido.DireccionDeGiro = cos(AnguloInicialCurvatura)*y(7:9) + sin(AnguloInicialCurvatura)*y(10:12);
+    Recorrido.EjeDeLaHelice   = cross(y(4:6), Recorrido.DireccionDeGiro);
 
     [CurvaturaArriba, CurvaturaLateral] = Contexto.FuncionCurvatura(PuntoCinematico(Arco, y, Contexto));
     VectorCurvatura = CurvaturaArriba*y(7:9) + CurvaturaLateral*y(10:12);
-    CurvaturaInicialArco = dot(VectorCurvatura, NormalArco);
-    Recorrido.CurvaturaResidualFueraPlano = dot(VectorCurvatura, cross(y(4:6), NormalArco));
+    CurvaturaInicialArco = dot(VectorCurvatura, Recorrido.DireccionDeGiro);
+    Recorrido.CurvaturaResidualFueraPlano = dot(VectorCurvatura, Recorrido.EjeDeLaHelice);
 
     %% --- ClotoideEntrada ---
     % Las longitudes de las transiciones se dimensionan con la velocidad REAL
@@ -298,16 +338,17 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     Contexto.FuncionCurvatura = @(Punto) ProyectarCurvatura( ...
         CurvaturaDelModo(Punto, Parametros, Plan.Escala, TiempoReferenciaArco), AnguloDeCurvatura(Punto));
 
-    ArcoQueFalta = @(Punto) (2*pi - AjusteCierre - Punto.AnguloGirado ...
+    ArcoQueFalta = @(Punto) (Plan.Receta.GiroObjetivo - AjusteCierre ...
+                             - (Punto.AnguloGirado - AnguloGiradoInicio) ...
                              - GiroDeLaClotoideDeSalida(Punto, Plan)) / max(Punto.Curvatura, eps);
 
     Indice = Recorrido.Registro.NumeroDeNodos + 1;
     [Recorrido.Registro, y, Arco] = IntegrarTramo(Recorrido.Registro, y, Arco, Contexto, 50, ArcoQueFalta);
-    Recorrido.SubTramos(end+1) = struct('Nombre', 'ArcoLoop', ...
+    Recorrido.SubTramos(end+1) = struct('Nombre', 'ArcoPrincipal', ...
         'IndiceInicio', Indice, 'IndiceFin', Recorrido.Registro.NumeroDeNodos);
 
     if y(13) <= 0
-        Recorrido = TerminarSinEnergia(Recorrido, y, Arco, Contexto, 'el arco del loop');
+        Recorrido = TerminarSinEnergia(Recorrido, y, Arco, Contexto, 'el arco principal');
         return
     end
 
@@ -330,20 +371,22 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     Recorrido.SubTramos(end+1) = struct('Nombre', 'ClotoideSalida', ...
         'IndiceInicio', Indice, 'IndiceFin', Recorrido.Registro.NumeroDeNodos);
 
-    % El cierre se mide sobre la ROTACION DENTRO DEL PLANO del loop, no sobre
-    % el angulo total girado: con torsion la tangente sale con una componente
-    % lateral chica y el angulo total ya no vuelve a 2*pi cuando el pitch si
-    % cerro. Proyectar sobre la base {T_arco, N_arco} aisla el pitch.
+    % El cierre se mide sobre la rotacion DENTRO DEL PLANO DE GIRO, no sobre el
+    % angulo total girado: con torsion la tangente sale con una componente
+    % fuera de plano chica y el angulo total ya no vuelve al objetivo cuando el
+    % giro si cerro. Proyectar sobre la base {e1, e2} aisla lo que interesa.
     TangenteFinal = Recorrido.PuntoFinal.VersorTangente;
-    Recorrido.ResidualCierre = atan2(dot(TangenteFinal, Recorrido.NormalArco), ...
-                                     dot(TangenteFinal, Recorrido.TangenteArco));
+    AnguloMedido  = atan2(dot(TangenteFinal, Recorrido.DireccionDeGiro), ...
+                          dot(TangenteFinal, Recorrido.TangenteArco));
+    Recorrido.ResidualCierre = AjustarAngulo(AnguloMedido - Plan.Receta.GiroObjetivo);
+
     Recorrido.DesplazamientoLateral = dot(Recorrido.PuntoFinal.Posicion - Recorrido.PosicionArco, ...
-                                          Recorrido.BinormalArco);
+                                          Recorrido.EjeDeLaHelice);
 
     % Longitud del loop propiamente dicho. Como la tangente mantiene
     % T.B = sin(alfa) constante, el desplazamiento lateral vale sin(alfa) por
     % esta longitud: es la pendiente exacta para el paso de Newton.
-    Recorrido.LongitudDelLoop = Arco - ArcoInicioLoop;
+    Recorrido.LongitudDelGiro = Arco - ArcoInicioLoop;
 end
 
 %% ========================= auxiliares =====================================
@@ -366,12 +409,14 @@ function [CurvaturaArriba, CurvaturaLateral] = ProyectarCurvatura(Curvatura, Ang
 end
 
 function [CurvaturaArriba, CurvaturaLateral] = CurvaturaDeAcondicionamiento(Punto, ArcoInicio, Plan)
-%CURVATURADEACONDICIONAMIENTO Rampa a cero la componente de curvatura que
-%   sale del plano del loop, manteniendo la que ya esta en el plano.
+%CURVATURADEACONDICIONAMIENTO Rampa a cero la componente de curvatura de
+%   entrada que es perpendicular a la direccion que el elemento impone, y
+%   mantiene la componente paralela, que la clotoide de entrada va a retomar.
     Fraccion = FraccionDeTramo(Punto.Arco, ArcoInicio, Plan.LongitudAcondicionamiento);
-    CurvaturaFuera = (1 - Fraccion) * Plan.CurvaturaFueraPlano;
-    CurvaturaArriba  = Plan.CurvaturaEnPlano*cos(Plan.Beta) - CurvaturaFuera*sin(Plan.Beta);
-    CurvaturaLateral = Plan.CurvaturaEnPlano*sin(Plan.Beta) + CurvaturaFuera*cos(Plan.Beta);
+    CurvaturaPerpendicular = (1 - Fraccion) * Plan.CurvaturaPerpendicular;
+    Angulo = Plan.Beta + Plan.Receta.DesfasajeDeCurvatura;
+    CurvaturaArriba  = Plan.CurvaturaParalela*cos(Angulo) - CurvaturaPerpendicular*sin(Angulo);
+    CurvaturaLateral = Plan.CurvaturaParalela*sin(Angulo) + CurvaturaPerpendicular*cos(Angulo);
 end
 
 function Curvatura = MezclaDeClotoide(Punto, ArcoInicio, Longitud, CurvaturaInicial, Parametros, Escala, TiempoReferencia)
@@ -408,7 +453,7 @@ function Normal = NormalDelPlanoVertical(VersorTangente)
     Normal     = Normal / norm(Normal);
 end
 
-function [AnguloRoll, VelocidadRoll, AceleracionRoll] = PerfilRollDelLoop(Arco, AnguloGirado, EstadoEntrada, RollBase, LongitudAcondicionamiento, Inclinacion)
+function [AnguloRoll, VelocidadRoll, AceleracionRoll] = PerfilRollDelElemento(Arco, AnguloGirado, EstadoEntrada, RollBase, LongitudAcondicionamiento, Inclinacion)
 %PERFILROLLDELLOOP Roll del elemento: transicion quintica al roll del loop y,
 %   encima de eso, la parte helicoidal proporcional al angulo ya girado.
 %

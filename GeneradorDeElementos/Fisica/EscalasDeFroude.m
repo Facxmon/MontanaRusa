@@ -4,7 +4,7 @@ function Escala = EscalasDeFroude(Parametros)
 %   emparejamiento entre una dimension del modelo y la del prototipo. Hay uno
 %   por cada dimension y aca no se cablea ninguno.
 
-    Escala.LambdaLoop  = Parametros.RadioLoopReal  / Parametros.RadioLoop;
+    Escala.LambdaLoop  = Parametros.RadioDeReferenciaReal  / Parametros.RadioDeReferencia;
     Escala.LambdaCarro = Parametros.LargoCarroReal / Parametros.LargoCarro;
     Escala.RaizLambdaLoop = sqrt(Escala.LambdaLoop);
 

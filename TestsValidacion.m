@@ -1,7 +1,8 @@
 %% Tests de validacion del constructor de elementos de via
 % Ejecutables, no comentarios. Corre con:  run('TestsValidacion.m')
 % Termina con error si alguno falla, para poder usarlo en verificacion
-% automatica.
+% automatica. Todo pasa por la API publica de los elementos, para que lo que se
+% verifica sea el mismo camino que usa el usuario.
 
 clear; clc
 addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'GeneradorDeElementos')));
@@ -9,7 +10,7 @@ addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'GeneradorDeElementos
 Resultados = struct('Nombre', {}, 'Pasa', {}, 'Detalle', {});
 
 ParametrosBase = ParametrosPorDefecto();
-ParametrosBase.RadioLoop = 0.30;
+ParametrosBase.RadioDelLoop = 0.30;
 ParametrosBase.CalcularVelocidadMinima = false;
 VelocidadDeEnsayo = 4.60;
 
@@ -28,8 +29,8 @@ Parametros.ModelarArrastre = false;
 Parametros.ModoCurvatura = 'Clotoide';
 
 Estado = EstadoDeEnsayo(Parametros);
-[Track, ~] = ResolverMetodoA(Estado, Parametros);
-Sim = SimularSobreTrack(Track, Estado, Parametros);
+[~, Elemento] = ElementoLoopVertical(Estado, Parametros);
+Track = Elemento.Track;  Sim = Elemento.Sim;
 
 AlturaRelativa = Track.Puntos(:,3) - Track.Puntos(1,3);
 VelocidadAnalitica = sqrt(Estado.Velocidad^2 - 2*Parametros.Gravedad*AlturaRelativa);
@@ -44,7 +45,8 @@ Resultados = Anotar(Resultados, 'Conservacion de energia sin perdidas', ErrorRel
 Parametros = ParametrosBase;
 Parametros.ModoCurvatura = 'FuerzaGConstante';
 Estado = EstadoDeEnsayo(Parametros);
-[Track, ~] = ResolverMetodoA(Estado, Parametros);
+[~, Elemento] = ElementoLoopVertical(Estado, Parametros);
+Track = Elemento.Track;
 
 CurvaturaRecuperada = CurvaturaDiscretaDePolilinea(Track.Puntos);
 Interiores = (2:size(Track.Puntos,1)-1).';
@@ -71,23 +73,22 @@ Resultados = Anotar(Resultados, 'Curvatura impuesta contra recuperada', ErrorCur
 % El punto de entrada NO es el endpoint esperado: con clotoides de entrada y
 % salida de distinta longitud el loop no vuelve a su propio arranque. Lo que
 % si tiene que cerrar es la direccion de la tangente tras la vuelta completa.
-% El desplazamiento lateral tampoco es un residual: es el objetivo de diseno
-% que evita que el loop se choque consigo mismo.
+% El avance sobre el eje tampoco es un residual: es el objetivo de diseno que
+% evita que el loop se choque consigo mismo.
 Parametros = ParametrosBase;
 Parametros.ModoCurvatura = 'Clotoide';
 Estado = EstadoDeEnsayo(Parametros);
-[Track, Diagnostico] = ResolverMetodoA(Estado, Parametros);
+[~, Elemento, Reporte] = ElementoLoopVertical(Estado, Parametros);
+Track = Elemento.Track;
 
-Binormal = cross(Track.VersorTangente(1,:), Track.NormalDelPlano);
 ResidualTangente = norm(Track.VersorTangente(end,:) - Track.VersorTangente(1,:));
-DesplazamientoLateral = abs(dot(Track.Puntos(end,:) - Track.Puntos(1,:), Binormal));
-ErrorDesplazamiento = abs(DesplazamientoLateral - Parametros.DesplazamientoLateralLoop) ...
-                      / Parametros.DesplazamientoLateralLoop;
+ErrorDesplazamiento = abs(Reporte.Resumen.DesplazamientoLateral - Parametros.SeparacionDePatas) ...
+                      / Parametros.SeparacionDePatas;
 
 Resultados = Anotar(Resultados, 'Residual del endpoint', ...
     ResidualTangente < 1e-3 && ErrorDesplazamiento < 0.05, ...
-    sprintf('tangente %.3e, desplazamiento lateral %.4f m contra objetivo %.4f m (%.2f %%), posicion final [%.5f %.5f %.5f]', ...
-            ResidualTangente, DesplazamientoLateral, Parametros.DesplazamientoLateralLoop, ...
+    sprintf('tangente %.3e, avance sobre el eje %.4f m contra objetivo %.4f m (%.2f %%), posicion final [%.5f %.5f %.5f]', ...
+            ResidualTangente, Reporte.Resumen.DesplazamientoLateral, Parametros.SeparacionDePatas, ...
             100*ErrorDesplazamiento, Track.Puntos(end,:)));
 
 %% --- Test 4: continuidad en el empalme ---------------------------------
@@ -101,14 +102,16 @@ Resultados = Anotar(Resultados, 'Continuidad en el empalme', ...
             SaltoPosicion, SaltoTangente, SaltoCurvatura));
 
 %% --- Test 5: equivalencia de los metodos en modo clotoide --------------
-% En modo Clotoide kappa no depende de v, y las longitudes de las clotoides
-% se dimensionan con la velocidad real de la marcha y no con el perfil
-% supuesto, asi que la geometria no depende en nada del perfil supuesto: los
-% dos metodos tienen que dar exactamente lo mismo, no parecido.
+% En modo Clotoide kappa no depende de v, y las longitudes de las clotoides se
+% dimensionan con la velocidad real de la marcha y no con el perfil supuesto,
+% asi que la geometria no depende en nada del perfil supuesto: los dos metodos
+% tienen que dar exactamente lo mismo, no parecido.
 Parametros = ParametrosBase;
 Parametros.ModoCurvatura = 'Clotoide';
+Parametros.MetodoDeAcoplamiento = 'Ambos';
 Estado = EstadoDeEnsayo(Parametros);
-Comparacion = CompararMetodos(Estado, Parametros, false);
+[~, ~, ReporteAmbos] = ElementoLoopVertical(Estado, Parametros);
+Comparacion = ReporteAmbos.Comparacion;
 
 Resultados = Anotar(Resultados, 'Equivalencia de metodos A y B en modo clotoide', ...
     Comparacion.DiferenciaGeometrica < 1e-12 && Comparacion.DiferenciaGz < 1e-12, ...
@@ -137,7 +140,8 @@ Parametros.ModoCurvatura = 'Clotoide';
 Parametros.PasoGeneracion = 0.001;
 
 Estado = EstadoDeEnsayo(Parametros);
-[TrackFino, DiagnosticoFino] = ResolverMetodoA(Estado, Parametros);
+[~, ElementoFino] = ElementoLoopVertical(Estado, Parametros);
+TrackFino = ElementoFino.Track;
 
 PitchInicial = asin(TrackFino.VersorTangente(1,3));
 PitchFinal   = asin(TrackFino.VersorTangente(end,3));
@@ -153,6 +157,38 @@ Resultados = Anotar(Resultados, 'Cierre del loop de 360 grados', ...
     abs(PitchFinal - PitchInicial) < 1e-4 && abs(AnguloTotal - AnguloEsperado) < 1e-3, ...
     sprintf('pitch inicial %.3e rad, final %.3e rad, angulo girado %.6f rad contra 2*pi*cos(alfa) = %.6f', ...
             PitchInicial, PitchFinal, AnguloTotal, AnguloEsperado));
+
+%% --- Test 8: los cuatro elementos generan y encadenan -------------------
+% Cada elemento consume el estado del anterior. Se verifica que los cuatro
+% cierran su giro objetivo y que el empalme con el siguiente no tiene saltos:
+% ese contrato es lo que sostiene todo el layout.
+Parametros = ParametrosBase;
+Parametros.ModoCurvatura = 'Clotoide';
+
+Constructores = {@ElementoLoopVertical, @ElementoOverBankedTurn, @ElementoHelice, @ElementoDiveLoop};
+Estado = EstadoInicial([0 0 0.70], [1 0 0], [0 0 1], 6.0, Parametros);
+LayoutDePrueba = LayoutNuevo(Estado, Parametros);
+
+PeorResidual = 0;
+PeorSalto    = 0;
+Detalles     = {};
+for i = 1:numel(Constructores)
+    EstadoPrevio = Estado;
+    [Estado, ElementoEncadenado, ReporteEncadenado] = Constructores{i}(EstadoPrevio, Parametros, LayoutDePrueba);
+    LayoutDePrueba = LayoutAgregarElemento(LayoutDePrueba, ElementoEncadenado, Estado, ReporteEncadenado);
+
+    Salto = norm(ElementoEncadenado.Track.Puntos(1,:) - EstadoPrevio.Posicion) ...
+          + norm(ElementoEncadenado.Track.VersorTangente(1,:) - EstadoPrevio.VersorTangente);
+    PeorResidual = max(PeorResidual, abs(ReporteEncadenado.Resumen.ResidualCierrePitch));
+    PeorSalto    = max(PeorSalto, Salto);
+    Detalles{end+1} = sprintf('%s %.0f grados', ElementoEncadenado.Nombre, ...
+        rad2deg(ElementoEncadenado.Receta.GiroObjetivo)); %#ok<SAGROW>
+end
+
+Resultados = Anotar(Resultados, 'Los cuatro elementos generan y encadenan', ...
+    PeorResidual < 1e-3 && PeorSalto < 1e-12 && ~isnan(Estado.Velocidad), ...
+    sprintf('%s | peor residual de cierre %.2e rad, peor salto de empalme %.2e, v final %.3f m/s', ...
+            strjoin(Detalles, ', '), PeorResidual, PeorSalto, Estado.Velocidad));
 
 %% --- Resumen ----------------------------------------------------------
 fprintf('\n');

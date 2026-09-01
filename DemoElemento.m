@@ -1,10 +1,11 @@
-%% Constructor de elementos de via -- demo del loop vertical
-% Genera un loop vertical a partir de un estado de entrada, lo verifica
-% contra los criterios de aceptacion, grafica los resultados y compara los
-% dos metodos de acoplamiento geometria-dinamica.
+%% Constructor de elementos de via -- demo de un elemento
+% Genera UN elemento a partir de un estado de entrada, lo verifica contra los
+% criterios de aceptacion y grafica los resultados. Para ver los cuatro
+% elementos encadenados en un circuito, correr DemoLayout.m.
 %
-% La documentacion de los criterios esta en memoria_de_calculo.md y la del
-% analisis energetico previo en documentacion_analisis_energia.md.
+% La documentacion del generador esta en documentacion_generador_elementos.md,
+% los criterios de diseno en memoria_de_calculo.md y el analisis energetico
+% previo en documentacion_analisis_energia.md.
 
 clear; close all; clc
 addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'GeneradorDeElementos')));
@@ -14,6 +15,10 @@ addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'GeneradorDeElementos
 % ParametrosPorDefecto. Aca solo se sobrescribe lo propio de este caso.
 Parametros = ParametrosPorDefecto();
 
+% Cual de los cuatro elementos se genera.
+Elegido = @ElementoLoopVertical;   % @ElementoLoopVertical | @ElementoHelice
+                                   % @ElementoOverBankedTurn | @ElementoDiveLoop
+
 Parametros.ModoCurvatura          = 'FuerzaGConstante';   % 'Clotoide' | 'FuerzaGConstante' | 'AceleracionNormalConstante' | 'GMaximas'
 % 'A' marcha acoplada (rapido) | 'B' punto fijo (~3 veces mas lento) |
 % 'Ambos' corre los dos y reporta la comparacion, para el reporte del proyecto.
@@ -21,11 +26,11 @@ Parametros.MetodoDeAcoplamiento   = 'A';
 Parametros.FuerzaGObjetivo        = 3.00;         % [G] G neta incluida la gravedad, constante en el arco
 Parametros.GMinimaCuspide         = 0.50;         % [G]
 
-% RadioLoop es la longitud caracteristica de Froude: fija lambda_loop, el
-% presupuesto de onset y la conversion de duraciones contra las curvas de la
-% norma. En los modos que dependen de v el radio de cuspide es una SALIDA, asi
-% que hay que ponerlo cerca del que va a salir; el reporte avisa si se aparta.
-Parametros.RadioLoop              = 0.11;         % [m]
+% El radio es ademas la longitud caracteristica de Froude del elemento: fija
+% lambda, el presupuesto de onset y la conversion de duraciones contra las
+% curvas de la norma. En los modos que dependen de v el radio de cuspide es una
+% SALIDA, asi que hay que ponerlo cerca del que va a salir; el reporte avisa.
+Parametros.RadioDelLoop           = 0.11;         % [m] radio de cuspide
 
 % Estado de entrada del elemento: via a nivel, carro derecho.
 PosicionInicial   = [0, 0, 0.20];   % [m]
@@ -37,7 +42,7 @@ VelocidadInicial  = 4.60;           % [m/s]
 Estado = EstadoInicial(PosicionInicial, TangenteInicial, ArribaInicial, VelocidadInicial, Parametros);
 Layout = LayoutNuevo(Estado, Parametros);
 
-[EstadoSalida, Elemento, Reporte] = ElementoLoopVertical(Estado, Parametros, Layout);
+[EstadoSalida, Elemento, Reporte] = Elegido(Estado, Parametros, Layout);
 ReportarElemento(Reporte, Elemento);
 
 Layout = LayoutAgregarElemento(Layout, Elemento, EstadoSalida, Reporte);
@@ -50,4 +55,4 @@ disp(EstadoSalida);
 GraficarElemento(Elemento, Reporte);
 
 %% ===================== GUARDADO DEL LAYOUT ===========================
-LayoutGuardar(Layout, 'layout_loop_vertical.mat');
+LayoutGuardar(Layout, 'layout_de_un_elemento.mat');

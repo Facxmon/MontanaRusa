@@ -1,4 +1,4 @@
-function [Track, Diagnostico] = ResolverMetodoB(EstadoEntrada, Parametros)
+function [Track, Diagnostico] = ResolverMetodoB(EstadoEntrada, Parametros, Receta)
 %RESOLVERMETODOB Punto fijo sobre el perfil de velocidad.
 %   1. Suponer un perfil v(s) (se arranca con v constante = v_0)
 %   2. Generar la geometria completa con ese perfil
@@ -25,7 +25,7 @@ function [Track, Diagnostico] = ResolverMetodoB(EstadoEntrada, Parametros)
     Residuo = Inf;
     for Iteracion = 1:Parametros.MaxIteracionesPuntoFijo
         Interpolante = InterpolanteDeVelocidad(ArcoSupuesto, VelocidadSupuesta);
-        [Track, Diagnostico] = GenerarLoopVertical(EstadoEntrada, Parametros, Interpolante);
+        [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Receta, Interpolante);
 
         ArcoNuevo      = Diagnostico.PerfilVelocidad.Arco;
         VelocidadNueva = Diagnostico.PerfilVelocidad.Velocidad;

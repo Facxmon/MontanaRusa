@@ -1,38 +1,52 @@
-# Constructor de elementos de vía — loop vertical
+# Constructor de elementos de vía
 
-Documentación del generador de geometría de vía implementado en [`GeneradorDeElementos/`](GeneradorDeElementos), con el script de demostración [`DemoLoopVertical.m`](DemoLoopVertical.m) y los tests en [`TestsValidacion.m`](TestsValidacion.m).
+Documentación del generador de geometría de vía implementado en [`GeneradorDeElementos/`](GeneradorDeElementos), con los scripts de demostración [`DemoElemento.m`](DemoElemento.m) y [`DemoLayout.m`](DemoLayout.m) y los tests en [`TestsValidacion.m`](TestsValidacion.m).
+
+Elementos implementados: **loop vertical**, **hélice**, **over-banked turn** y **dive loop**.
 
 > **Documentos hermanos.** Los criterios de diseño (continuidad, marco de referencia, cinemática de heartline, semejanza de Froude y límites normativos tabulados) están en [`memoria_de_calculo.md`](memoria_de_calculo.md). El análisis energético preliminar sobre una trayectoria ya dada está en [`documentacion_analisis_energia.md`](documentacion_analisis_energia.md). Este documento cubre sólo el generador de elementos.
 
 ## 1. Cómo se corre
 
 ```matlab
-run('DemoLoopVertical.m')     % genera, verifica, grafica y compara métodos
-run('TestsValidacion.m')      % siete tests, termina con error si alguno falla
+run('DemoElemento.m')         % un elemento en detalle: reporte y gráficos
+run('DemoLayout.m')           % los cuatro elementos encadenados en un circuito
+run('TestsValidacion.m')      % ocho tests, termina con error si alguno falla
 ```
 
 Todos los parámetros de entrada están agrupados en [`ParametrosPorDefecto.m`](GeneradorDeElementos/ParametrosPorDefecto.m). Los que dependen de investigación pendiente (disponibilidad de rodamientos en Argentina, tolerancia de la impresora) están marcados como **SIN CERRAR** ahí mismo.
 
 ## 2. Arquitectura
 
-| Archivo | Rol |
+El código está en [`GeneradorDeElementos/`](GeneradorDeElementos), en seis carpetas por rol. Para encontrar algo, primero se elige la carpeta:
+
+| Carpeta | Qué contiene |
 |---|---|
-| `ParametrosPorDefecto` | bloque único de parámetros de entrada |
-| `EstadoInicial` | contrato de `Estado`, documentado en el encabezado |
-| `DerivadaDeVia`, `PasoRK4`, `IntegrarTramo` | integración RK4 del sistema vía + energía |
-| `PuntoCinematico` | campos geométricos de un punto, sin evaluar curvatura |
-| `MarcoCarroDesdeTransporte`, `MarcoTransporteDesdeCarro`, `Ortonormalizar` | marco de Bishop y marco del carro |
-| `CurvaturaDelModo` | los cuatro modos de curvatura |
-| `PerfilRollQuintico` | smoothstep quíntico del roll |
-| `CargasEnLaVia`, `ResistenciaAlAvance` | dinámica: normales por juego de ruedas y arrastre |
-| `GenerarLoopVertical` | núcleo de generación, con los sub-tramos |
-| `ResolverMetodoA`, `ResolverMetodoB`, `CompararMetodos` | los dos métodos de acoplamiento |
-| `SimularSobreTrack` | estado dinámico sobre geometría congelada |
-| `ChequeosPrevios`, `ChequeosPosteriores`, `DistanciaMinimaEntrePolilineas` | factibilidad |
-| `LimiteNormativo`, `LimitePorPunto`, `VerificarLimitesNormativos` | ASTM F2291 |
-| `EscalasDeFroude` | escalado del modelo distorsionado |
-| `ElementoLoopVertical`, `ReportarElemento`, `GraficarElemento` | API del elemento y salidas |
-| `Layout*` | alta, deshacer, guardar, cargar y re-simular el layout |
+| *(raíz)* | `ParametrosPorDefecto` — el único archivo que se edita para configurar |
+| `Nucleo/` | contrato de `Estado`, marco de Bishop, integrador RK4, registro de nodos |
+| `Fisica/` | cargas por juego de ruedas, resistencia, modos de curvatura, Froude, simulación |
+| `Elementos/` | los cuatro elementos, el motor común y los dos métodos de acoplamiento |
+| `Verificacion/` | curvas de la norma, chequeos de factibilidad, distancia entre polilíneas |
+| `Salida/` | reporte por consola y gráficos |
+| `LayoutDeVia/` | alta, deshacer, guardar, cargar y re-simular el circuito |
+
+### Los cuatro elementos comparten un solo motor
+
+Un elemento no es un algoritmo propio: es una **receta** de cinco campos que describe a [`GenerarGeometria`](GeneradorDeElementos/Elementos/GenerarGeometria.m) qué construir. Todos son el mismo objeto geométrico —un giro de cierto ángulo alrededor de un eje, con una ley de roll encima— y lo que cambia son los números:
+
+| Elemento | Giro objetivo | Desfasaje de curvatura | Roll del elemento | Avance sobre el eje |
+|---|---|---|---|---|
+| `ElementoLoopVertical` | $2\pi$ | 0 — curvatura en el plano vertical | 0 | separación entre patas |
+| `ElementoDiveLoop` | $\pi$ | $\pi$ — curvatura hacia abajo | $\pi$ — entra invertido | 0 |
+| `ElementoHelice` | vueltas $\times\,2\pi$ | $\pm\pi/2$ — curvatura horizontal | el peralte | cuánto sube o baja |
+| `ElementoOverBankedTurn` | cambio de rumbo | $\pm\pi/2$ — curvatura horizontal | el peralte, mayor a $90°$ | 0 |
+
+El **desfasaje de curvatura** es lo que separa las dos familias: con 0 la curvatura queda en el plano vertical y el elemento cambia el *pitch* (loop); con $\pm\pi/2$ queda horizontal y cambia el *rumbo* (giros). El **roll va por su lado**, y eso es lo que permite un over-banked turn: la curva sigue siendo horizontal y lo único que cambia es cómo está parado el carro sobre ella. Con Frenet el peralte quedaría atado a la geometría y no se podría elegir.
+
+Dos consecuencias que salieron gratis de esta unificación:
+
+- El **dive loop** es el loop con tres números cambiados. El medio tonel de entrada lo hace el sub-tramo de acondicionamiento que ya existía para corregir el roll, con su smoothstep quíntico y su longitud dimensionada por el onset lateral.
+- El **avance sobre el eje** es el mismo parámetro que en el loop separa las dos patas para que no se choque. Ahí el eje es lateral; en la hélice el eje es vertical y el parámetro es directamente cuánto sube.
 
 ### Separación Track / Sim
 
@@ -42,7 +56,12 @@ Todos los parámetros de entrada están agrupados en [`ParametrosPorDefecto.m`](
 
 ```matlab
 [EstadoSalida, Elemento, Reporte] = ElementoLoopVertical(EstadoEntrada, Parametros, Layout)
+[EstadoSalida, Elemento, Reporte] = ElementoHelice(EstadoEntrada, Parametros, Layout)
+[EstadoSalida, Elemento, Reporte] = ElementoOverBankedTurn(EstadoEntrada, Parametros, Layout)
+[EstadoSalida, Elemento, Reporte] = ElementoDiveLoop(EstadoEntrada, Parametros, Layout)
 ```
+
+Los cuatro tienen la misma firma y todos delegan en `ConstruirElemento`, que es donde vive lo común. Agregar un elemento nuevo es escribir una receta de cinco campos.
 
 `Estado` lleva posición, los tres versores del marco del carro, el vector curvatura y su derivada, el roll con sus dos derivadas, la longitud acumulada, la velocidad y la energía. El roll se mide **contra el marco de transporte paralelo**, de modo que el `Estado` no necesita arrastrar además ese marco: se recupera rotando el marco del carro por $-\phi$.
 
@@ -60,9 +79,9 @@ Por construcción no tiene rotación alrededor de $\mathbf{T}$, así que queda d
 
 | Sub-tramo | Qué hace | Cuándo aparece |
 |---|---|---|
-| `AcondicionamientoEntrada` | lleva a cero la curvatura fuera del plano del loop y el roll al que el loop necesita | sólo si hace falta |
+| `AcondicionamientoEntrada` | lleva a cero la componente de curvatura que el elemento no puede representar, y el roll al que el elemento pide | sólo si hace falta |
 | `ClotoideEntrada` | rampa lineal de curvatura desde $\kappa_0$ hasta la que pide el modo | siempre |
-| `ArcoLoop` | curvatura según el modo elegido | siempre |
+| `ArcoPrincipal` | curvatura según el modo elegido | siempre |
 | `ClotoideSalida` | rampa de curvatura de vuelta a cero | siempre |
 
 Quedan demarcados por índice de nodo en `Track.SubTramos(k).IndiceInicio/IndiceFin`, se listan en el reporte con su rango de arco, y se distinguen por color en los gráficos.
@@ -71,7 +90,7 @@ La clotoide de entrada arranca en la curvatura que traiga el estado de entrada (
 
 ### El loop no es plano
 
-**Un giro de $2\pi$ contenido en un plano vuelve a pasar por donde entró.** No hay forma de evitarlo: la vía se choca consigo misma siempre. Por eso el elemento tiene una **inclinación helicoidal** y `DesplazamientoLateralLoop` no es opcional.
+**Un giro de $2\pi$ contenido en un plano vuelve a pasar por donde entró.** No hay forma de evitarlo: la vía se choca consigo misma siempre. Por eso el elemento tiene una **inclinación helicoidal** y `SeparacionDePatas` no es opcional. (Un dive loop gira sólo $\pi$ y no llega a cruzarse, así que no la necesita.)
 
 La construcción es una hélice de eje horizontal $\mathbf{B}$: se pide que la tangente mantenga $\mathbf{T}\cdot\mathbf{B} = \sin\alpha$ constante. Eso obliga a que el vector curvatura no tenga componente sobre $\mathbf{B}$, y de esa condición sale
 
@@ -169,7 +188,7 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 
 ## 11. Tests de validación
 
-Los siete son ejecutables y `TestsValidacion.m` termina con error si alguno falla.
+Los ocho son ejecutables y `TestsValidacion.m` termina con error si alguno falla. Todos pasan por la API pública de los elementos, para que lo que se verifica sea el mismo camino que usa el usuario.
 
 | # | Test | Resultado típico |
 |---|---|---|
@@ -203,7 +222,21 @@ $$G_{abajo} = \frac{v_{abajo}^2}{gR} + 1 = \frac{v_{arriba}^2}{gR} - 1 + 6 = G_{
 
 **La diferencia es exactamente 6 G, independiente de $R$ y de $v$.** Con el criterio de $G_{arriba} \geq 0.5$ queda $G_{abajo} \geq 6.5$, por encima del límite de 6.0 G de la Fig. 10 aun en su punto más permisivo. Un loop circular no puede satisfacer los dos criterios simultáneamente: por eso los loops reales son clotoides. El modo `FuerzaGConstante` resuelve el problema y produce la forma de lágrima característica.
 
-### 12.3 `RadioLoop` es una entrada que en tres de los cuatro modos describe una salida
+### 12.3 Dos ángulos de roll distintos, y sólo uno se ve en la vía
+
+`Track.AnguloRoll` está medido **contra el marco de transporte paralelo**, que va girando por su cuenta a razón de la torsión. En un loop helicoidal ese número termina en unos 48°, y sin embargo el carro sale perfectamente derecho: lo que giró fue la referencia, no el carro.
+
+Por eso se reporta y grafica también `Track.AnguloPeralte`, que es el mismo roll medido **contra la vertical** —el que se ve mirando la vía— y termina en cero. Los dos aparecen juntos en el gráfico de roll, y la vista 3D de orientación dibuja los versores $\mathbf{U}$ y $\mathbf{L}$ sobre la trayectoria, que es la forma directa de ver hacia dónde apunta el carro.
+
+### 12.4 $G_x$ casi no depende de la aceleración tangencial
+
+Parece raro que $G_x$ salga casi plana cuando la aceleración tangencial varía mucho a lo largo del recorrido. Sale de la definición:
+
+$$G_x = \frac{a_t}{g} + T_z, \qquad a_t = -g\,T_z - \frac{F_{res}}{m} \quad\Longrightarrow\quad G_x = -\frac{F_{res}}{m\,g}$$
+
+**La componente de la gravedad a lo largo de la vía se cancela exactamente contra la aceleración tangencial que ella misma produce.** Lo único que queda es la resistencia al avance. Tiene sentido físico: un acelerómetro montado en el carro, sobre vía sin rozamiento, no mide nada en el eje longitudinal, igual que un cuerpo en caída libre no mide nada. Que $G_x$ valga alrededor de $-0.1$ G y varíe poco es la confirmación de que el modelo está bien planteado, no un error.
+
+### 12.5 `RadioDeReferencia` es una entrada que en tres de los cuatro modos describe una salida
 
 `RadioLoop` es la longitud característica de Froude: fija $\lambda_{loop}$ y con él el presupuesto de onset y la conversión de duraciones contra las curvas normativas. Pero en los modos que dependen de $v$ el radio de cúspide **sale** de la integración. Si el nominal y el alcanzado se apartan, esos dos números se calcularon con la longitud de referencia equivocada. Hay un chequeo posterior que lo detecta y avisa.
 

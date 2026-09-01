@@ -4,7 +4,8 @@ function ReportarElemento(Reporte, Elemento)
     Resumen = Reporte.Resumen;
 
     fprintf('\n=====================================================================\n');
-    fprintf(' Loop vertical -- modo %s -- metodo %s\n', Elemento.Track.ModoCurvatura, Resumen.Metodo);
+    fprintf(' %s -- giro %.0f grados -- modo %s -- metodo %s\n', Elemento.Nombre, ...
+            rad2deg(Elemento.Receta.GiroObjetivo), Elemento.Track.ModoCurvatura, Resumen.Metodo);
     fprintf('=====================================================================\n');
 
     fprintf('\n--- Geometria y recorrido ---\n');
@@ -43,10 +44,10 @@ function ReportarElemento(Reporte, Elemento)
     fprintf('  Salto de curvatura en empalme : %10.3e 1/m\n', Resumen.SaltoDeCurvatura);
     fprintf('  Posicion final                : [%.5f %.5f %.5f] m\n', Resumen.PosicionFinal);
 
-    fprintf('\n--- Salida del plano (es lo que evita que el loop se choque consigo mismo) ---\n');
+    fprintf('\n--- Salida del plano de giro (inclinacion helicoidal) ---\n');
     fprintf('  Inclinacion helicoidal        : %8.4f   (%.2f grados)\n', ...
             Resumen.InclinacionHelicoidal, rad2deg(atan(Resumen.InclinacionHelicoidal)));
-    fprintf('  Desplazamiento lateral        : %8.4f m   (objetivo %.4f m)\n', ...
+    fprintf('  Avance sobre el eje           : %8.4f m   (objetivo %.4f m)\n', ...
             Resumen.DesplazamientoLateral, Resumen.DesplazamientoLateralObjetivo);
     % Los dos numeros de roll miden lo mismo contra referencias distintas. El
     % primero crece porque el marco de transporte gira con la torsion; el

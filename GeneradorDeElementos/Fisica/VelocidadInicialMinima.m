@@ -1,4 +1,4 @@
-function [VelocidadMinima, Busqueda] = VelocidadInicialMinima(EstadoEntrada, Parametros)
+function [VelocidadMinima, Busqueda] = VelocidadInicialMinima(EstadoEntrada, Parametros, Receta)
 %VELOCIDADINICIALMINIMA Menor v_0 que permite recorrer el elemento completo
 %   respetando la G minima sobre el eje vertical del carro y el radio minimo
 %   fabricable.
@@ -19,7 +19,7 @@ function [VelocidadMinima, Busqueda] = VelocidadInicialMinima(EstadoEntrada, Par
     ParametrosBusqueda = Parametros;
     ParametrosBusqueda.PasoGeneracion = Parametros.PasoBusquedaVelocidad;
 
-    Holgura = @(Velocidad) HolguraDeCuspide(EstadoEntrada, ParametrosBusqueda, Velocidad);
+    Holgura = @(Velocidad) HolguraDeCuspide(EstadoEntrada, ParametrosBusqueda, Receta, Velocidad);
 
     %% --- Bracketing --------------------------------------------------------
     VelocidadAlta = max(EstadoEntrada.Velocidad, 0.5);
@@ -63,7 +63,7 @@ function [VelocidadMinima, Busqueda] = VelocidadInicialMinima(EstadoEntrada, Par
                       'Motivo', sprintf('Biseccion cerrada en %.4f m/s con tolerancia 1e-3 m/s.', VelocidadMinima));
 end
 
-function Holgura = HolguraDeCuspide(EstadoEntrada, Parametros, Velocidad)
+function Holgura = HolguraDeCuspide(EstadoEntrada, Parametros, Receta, Velocidad)
 %HOLGURADECUSPIDE Margen combinado de G en la cuspide y de radio fabricable,
 %   normalizado para poder tomar el mas chico de los dos. Negativo = no sirve.
 
@@ -74,7 +74,7 @@ function Holgura = HolguraDeCuspide(EstadoEntrada, Parametros, Velocidad)
 
     Advertencia = warning('off', 'all');
     try
-        [Track, Diagnostico] = GenerarLoopVertical(Estado, Parametros, []);
+        [Track, Diagnostico] = GenerarGeometria(Estado, Parametros, Receta, []);
     catch
         warning(Advertencia);
         Holgura = -Inf;

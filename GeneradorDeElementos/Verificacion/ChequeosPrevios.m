@@ -1,4 +1,4 @@
-function Criterios = ChequeosPrevios(EstadoEntrada, Parametros)
+function Criterios = ChequeosPrevios(EstadoEntrada, Parametros, Receta)
 %CHEQUEOSPREVIOS Factibilidad evaluable ANTES de construir la geometria.
 %   Son los que dependen solo del estado de entrada y de los parametros. Los
 %   que necesitan la geometria -- interferencia, radio minimo real, altura
@@ -12,7 +12,7 @@ function Criterios = ChequeosPrevios(EstadoEntrada, Parametros)
     ProyeccionHorizontal = norm(EstadoEntrada.VersorTangente(1:2));
     Criterios = AgregarCriterio(Criterios, 'Tangente de entrada no vertical', 'MayorOIgual', ...
         ProyeccionHorizontal, 1e-6, '-', ...
-        'Con la tangente vertical pura el plano del loop queda indeterminado: hay que dar el azimut.');
+        'Con la tangente vertical pura el plano del elemento queda indeterminado: hay que dar el azimut.');
 
     Pitch = asin(max(min(EstadoEntrada.VersorTangente(3), 1), -1));
     Criterios = AgregarCriterio(Criterios, 'Pitch de entrada no descendente', 'MayorOIgual', ...
@@ -32,26 +32,28 @@ function Criterios = ChequeosPrevios(EstadoEntrada, Parametros)
         'Si no es nula se inserta un tramo de acondicionamiento que la lleva a cero.');
 
     Beta = AnguloEntreNormalYTransporte(EstadoEntrada, NormalEnPlano);
-    DeltaRoll = mod(Beta + Parametros.RollObjetivoLoop - EstadoEntrada.AnguloRoll + pi, 2*pi) - pi;
+    DeltaRoll = mod(Beta + Receta.RollDelElemento - EstadoEntrada.AnguloRoll + pi, 2*pi) - pi;
     Criterios = AgregarCriterio(Criterios, 'Roll de entrada compatible', 'Informativo', ...
         rad2deg(DeltaRoll), NaN, 'grados', ...
         'Si no es cero se inserta una transicion de roll con smoothstep quintico.');
 
     %% --- Factibilidad energetica (estimacion a priori) --------------------
-    % Estimacion con el radio nominal: cuspide a 2*R y G minima pedida ahi.
-    % Es una cota de arranque, no el resultado. El chequeo exacto sale de la
-    % geometria generada.
-    RadioNominal = Parametros.RadioLoop;
-    AlturaCuspide = 2*RadioNominal;
-    VelocidadCuspideCuadrado = (Parametros.GMinimaCuspide + 1)*g*RadioNominal;
-    VelocidadMinimaEstimada = sqrt(VelocidadCuspideCuadrado + 2*g*AlturaCuspide);
+    % Cota de arranque, no el resultado: el chequeo exacto sale de la geometria
+    % generada. El coseno del desfasaje dice cuanto del giro es vertical: vale
+    % 1 en un loop (sube 2*R), -1 en un dive loop (baja) y 0 en un giro
+    % horizontal, que a esta altura no sube nada.
+    RadioNominal    = Parametros.RadioDeReferencia;
+    FraccionVertical = max(cos(Receta.DesfasajeDeCurvatura), 0);
+    AlturaCuspide    = RadioNominal * (1 - cos(min(Receta.GiroObjetivo, pi))) * FraccionVertical;
+    VelocidadCuspideCuadrado = (Parametros.GMinimaCuspide + FraccionVertical)*g*RadioNominal;
+    VelocidadMinimaEstimada  = sqrt(VelocidadCuspideCuadrado + 2*g*AlturaCuspide);
 
     Criterios = AgregarCriterio(Criterios, 'Velocidad de entrada suficiente (estimada)', 'MayorOIgual', ...
         EstadoEntrada.Velocidad, VelocidadMinimaEstimada, 'm/s', ...
-        'Estimacion sin perdidas sobre un loop circular de radio nominal.');
+        'Estimacion sin perdidas sobre un arco circular de radio nominal.');
 
-    Criterios = AgregarCriterio(Criterios, 'Altura estimada del loop', 'MenorOIgual', ...
-        AlturaCuspide, Parametros.AlturaMaximaLoop, 'm', ...
+    Criterios = AgregarCriterio(Criterios, 'Altura estimada del elemento', 'MenorOIgual', ...
+        AlturaCuspide, Parametros.AlturaMaximaDelElemento, 'm', ...
         'Estimacion con el radio nominal; la altura real sale de la geometria.');
 
     Criterios = AgregarCriterio(Criterios, 'Radio nominal fabricable', 'MayorOIgual', ...

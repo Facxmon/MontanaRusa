@@ -1,4 +1,4 @@
-function Comparacion = CompararMetodos(EstadoEntrada, Parametros, Imprimir)
+function Comparacion = CompararMetodos(EstadoEntrada, Parametros, Receta, Imprimir)
 %COMPARARMETODOS Corre los dos metodos de acoplamiento sobre el mismo caso.
 %   Reporta diferencia de geometria punto a punto, diferencia de perfil de G,
 %   tiempo de computo e iteraciones del punto fijo.
@@ -7,12 +7,12 @@ function Comparacion = CompararMetodos(EstadoEntrada, Parametros, Imprimir)
 %   dos metodos tienen que dar lo mismo. Si difieren mas que la tolerancia de
 %   convergencia del punto fijo, hay un bug.
 
-    if nargin < 3
+    if nargin < 4
         Imprimir = true;
     end
 
-    [TrackA, DiagnosticoA] = ResolverMetodoA(EstadoEntrada, Parametros);
-    [TrackB, DiagnosticoB] = ResolverMetodoB(EstadoEntrada, Parametros);
+    [TrackA, DiagnosticoA] = ResolverMetodoA(EstadoEntrada, Parametros, Receta);
+    [TrackB, DiagnosticoB] = ResolverMetodoB(EstadoEntrada, Parametros, Receta);
 
     SimA = SimularSobreTrack(TrackA, EstadoEntrada, Parametros);
     SimB = SimularSobreTrack(TrackB, EstadoEntrada, Parametros);

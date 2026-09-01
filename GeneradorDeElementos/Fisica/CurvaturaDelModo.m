@@ -17,7 +17,7 @@ function Curvatura = CurvaturaDelModo(Punto, Parametros, Escala, ArcoTiempoDeRef
             Curvatura = Parametros.AceleracionNormalObjetivo / Velocidad^2;
 
         case 'Clotoide'
-            Curvatura = 1 / Parametros.RadioLoop;
+            Curvatura = 1 / Parametros.RadioDeReferencia;
 
         case 'FuerzaGConstante'
             Curvatura = g*(Parametros.FuerzaGObjetivo - ArribaVertical) / Velocidad^2;
