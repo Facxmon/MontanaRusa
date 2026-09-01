@@ -48,6 +48,12 @@ function ReportarElemento(Reporte, Elemento)
             Resumen.InclinacionHelicoidal, rad2deg(atan(Resumen.InclinacionHelicoidal)));
     fprintf('  Desplazamiento lateral        : %8.4f m   (objetivo %.4f m)\n', ...
             Resumen.DesplazamientoLateral, Resumen.DesplazamientoLateralObjetivo);
+    % Los dos numeros de roll miden lo mismo contra referencias distintas. El
+    % primero crece porque el marco de transporte gira con la torsion; el
+    % segundo es el que se ve mirando la via, y termina en cero: el carro sale
+    % derecho aunque el angulo de roll no valga cero.
+    fprintf('  Roll final contra el marco    : %8.2f grados\n', rad2deg(Elemento.EstadoSalida.AnguloRoll));
+    fprintf('  Peralte final contra vertical : %8.2f grados\n', rad2deg(Resumen.PeralteFinal));
 
     fprintf('\n--- Escalado (modelo distorsionado) ---\n');
     fprintf('  lambda del loop               : %8.3f\n', Resumen.LambdaLoop);
@@ -55,6 +61,16 @@ function ReportarElemento(Reporte, Elemento)
     fprintf('  Distorsion (lambda_c/lambda_l): %8.3f\n', Resumen.Distorsion);
     fprintf('  Equivalente en carros reales  : %8.3f\n', Resumen.CarrosEquivalentes);
     fprintf('  Presupuesto de onset [Gx Gy Gz]: %.1f  %.1f  %.1f G/s\n', Resumen.OnsetMaximoModelo);
+
+    if isfield(Reporte, 'Comparacion') && ~isempty(Reporte.Comparacion)
+        Comparacion = Reporte.Comparacion;
+        fprintf('\n--- Comparacion de metodos de acoplamiento ---\n');
+        fprintf('  Diferencia maxima de geometria: %10.3e m\n', Comparacion.DiferenciaGeometrica);
+        fprintf('  Diferencia maxima de Gz       : %10.3e G\n', Comparacion.DiferenciaGz);
+        fprintf('  Metodo A                      : %8.2f s\n', Comparacion.TiempoMetodoA);
+        fprintf('  Metodo B                      : %8.2f s  (%d iteraciones)\n', ...
+                Comparacion.TiempoMetodoB, Comparacion.IteracionesMetodoB);
+    end
 
     ImprimirCriterios('Chequeos previos (solo dependen del estado de entrada)', Reporte.Previos);
     ImprimirCriterios('Chequeos posteriores (necesitan la geometria generada)', Reporte.Posteriores);

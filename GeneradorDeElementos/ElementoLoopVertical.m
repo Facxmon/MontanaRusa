@@ -17,14 +17,24 @@ function [EstadoSalida, Elemento, Reporte] = ElementoLoopVertical(EstadoEntrada,
     Reporte.Previos = ChequeosPrevios(EstadoEntrada, Parametros);
 
     %% ---------------- Generacion ------------------------------------------
+    % El metodo B itera y tarda alrededor de tres veces mas que el A. Solo se
+    % corre si se lo pide: con 'Ambos' se corren los dos y se reporta la
+    % comparacion, que es lo que hace falta para el reporte del proyecto, pero
+    % no es lo que uno quiere en cada corrida de trabajo.
+    Reporte.Comparacion = [];
     switch upper(Parametros.MetodoDeAcoplamiento)
         case 'A'
             [Track, Diagnostico] = ResolverMetodoA(EstadoEntrada, Parametros);
         case 'B'
             [Track, Diagnostico] = ResolverMetodoB(EstadoEntrada, Parametros);
+        case 'AMBOS'
+            Reporte.Comparacion = CompararMetodos(EstadoEntrada, Parametros, false);
+            Track       = Reporte.Comparacion.TrackA;
+            Diagnostico = Reporte.Comparacion.DiagnosticoA;
         otherwise
             error('ElementoLoopVertical:MetodoDesconocido', ...
-                  'Metodo de acoplamiento no reconocido: %s', Parametros.MetodoDeAcoplamiento);
+                 ['Metodo de acoplamiento no reconocido: %s. ' ...
+                  'Las opciones son ''A'', ''B'' o ''Ambos''.'], Parametros.MetodoDeAcoplamiento);
     end
 
     Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros);
@@ -64,6 +74,8 @@ function [EstadoSalida, Elemento, Reporte] = ElementoLoopVertical(EstadoEntrada,
     Resumen.GzMaxima               = max(Sim.Gz);
     Resumen.GzMinima               = min(Sim.Gz);
     Resumen.GyMaximaAbsoluta       = max(abs(Sim.Gy));
+    Resumen.PeralteFinal           = Track.AnguloPeralte(end);
+    Resumen.PeralteMaximo          = max(abs(Track.AnguloPeralte));
 
     % Residual del endpoint. El punto de entrada NO es el endpoint esperado:
     % un loop con clotoides de entrada y salida de distinta longitud no vuelve
@@ -128,8 +140,9 @@ function Tabla = TablaDeResultados(Track, Sim)
     Tabla = table(Track.LongitudArco, Track.Puntos(:,1), Track.Puntos(:,2), Track.Puntos(:,3), ...
                   Sim.Tiempo, Sim.Velocidad, Sim.AceleracionTangencial, ...
                   Sim.Gx, Sim.Gy, Sim.Gz, Sim.JerkGx, Sim.JerkGy, Sim.JerkGz, ...
-                  Track.Curvatura, Radio, rad2deg(Track.AnguloRoll), Sim.FuerzaNormal, ...
+                  Track.Curvatura, Radio, rad2deg(Track.AnguloRoll), ...
+                  rad2deg(Track.AnguloPeralte), Sim.FuerzaNormal, ...
         'VariableNames', {'Arco','X','Y','Z','Tiempo','Velocidad','AceleracionTangencial', ...
                           'Gx','Gy','Gz','JerkGx','JerkGy','JerkGz', ...
-                          'Curvatura','Radio','RollGrados','FuerzaNormal'});
+                          'Curvatura','Radio','RollGrados','PeralteGrados','FuerzaNormal'});
 end

@@ -36,6 +36,8 @@ function Comparacion = CompararMetodos(EstadoEntrada, Parametros, Imprimir)
     Comparacion.ResiduoMetodoB     = DiagnosticoB.ResiduoPuntoFijo;
     Comparacion.TrackA = TrackA;
     Comparacion.TrackB = TrackB;
+    Comparacion.DiagnosticoA = DiagnosticoA;
+    Comparacion.DiagnosticoB = DiagnosticoB;
 
     if Imprimir
         fprintf('\n--- Comparacion de metodos, modo %s ---\n', Comparacion.ModoCurvatura);

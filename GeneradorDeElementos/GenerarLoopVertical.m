@@ -157,6 +157,7 @@ function [Track, Diagnostico] = GenerarLoopVertical(EstadoEntrada, Parametros, P
     Track.PasoGeneracion          = Parametros.PasoGeneracion;
     Track.NormalDelPlano          = NormalEnPlano;
     Track.InclinacionHelicoidal   = Inclinacion;
+    Track.AnguloPeralte           = AnguloDePeralte(Registro.VersorTangente, Registro.VersorArribaCarro);
     Track.DerivadaCurvatura       = gradient(Registro.Curvatura, Registro.Arco);
 
     %% ---------------- Diagnostico -----------------------------------------
@@ -430,6 +431,27 @@ end
 
 function Angulo = AjustarAngulo(Angulo)
     Angulo = mod(Angulo + pi, 2*pi) - pi;
+end
+
+function Peralte = AnguloDePeralte(VersorTangente, VersorArribaCarro)
+%ANGULODEPERALTE Inclinacion del eje "arriba" del carro medida contra la
+%   vertical, girando alrededor de la tangente. Es el peralte que se ve
+%   mirando la via, y NO coincide con AnguloRoll: ese esta medido contra el
+%   marco de transporte, que va girando por su cuenta a razon de la torsion.
+%   Un roll de 50 grados con peralte casi nulo significa que giro la
+%   referencia, no el carro.
+
+    NumeroDeNodos = size(VersorTangente, 1);
+    Horizontal = [VersorTangente(:,1), VersorTangente(:,2), zeros(NumeroDeNodos,1)];
+    NormaHorizontal = vecnorm(Horizontal, 2, 2);
+
+    Normal = -VersorTangente(:,3).*(Horizontal ./ max(NormaHorizontal, eps)) ...
+           + NormaHorizontal.*[0 0 1];
+    Normal = Normal ./ max(vecnorm(Normal, 2, 2), eps);
+    Binormal = cross(VersorTangente, Normal, 2);
+
+    Peralte = atan2(sum(VersorArribaCarro.*Binormal, 2), sum(VersorArribaCarro.*Normal, 2));
+    Peralte(NormaHorizontal < 1e-9) = NaN;   % tangente vertical: no esta definido
 end
 
 function Onset = OnsetVerticalDelRecorrido(Registro)

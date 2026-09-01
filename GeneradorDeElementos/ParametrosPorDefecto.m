@@ -52,7 +52,11 @@ Parametros.RollObjetivoLoop = 0;      % [rad] 0 = loop vertical estandar
 %   'AceleracionNormalConstante' | 'Clotoide' | 'FuerzaGConstante' | 'GMaximas'
 Parametros.ModoCurvatura              = 'Clotoide';
 
-% Metodo de acoplamiento geometria-dinamica: 'A' marcha acoplada, 'B' punto fijo.
+% Metodo de acoplamiento geometria-dinamica:
+%   'A'      marcha acoplada hacia adelante, una sola pasada. Es el rapido.
+%   'B'      punto fijo sobre el perfil de velocidad. Itera, tarda ~3 veces mas.
+%   'Ambos'  corre los dos y reporta la comparacion. Solo para el reporte:
+%            la geometria que queda es la del metodo A.
 Parametros.MetodoDeAcoplamiento = 'A';
 Parametros.CalcularVelocidadMinima = true;
 Parametros.AceleracionNormalObjetivo  = 20;    % [m/s^2] modo 1
@@ -89,6 +93,7 @@ Parametros.AlturaMinimaSuelo     = 0.05;   % [m] z minimo admisible
 Parametros.PasoGeneracion = 0.002;   % [m]
 Parametros.PasoSimulacion = 0.005;   % [m]
 Parametros.PasosEntreOrtonormalizaciones = 25;
+Parametros.VersoresEnGrafico3D = 40;   % flechas del marco del carro en la vista 3D
 Parametros.PasoBusquedaVelocidad = 0.010;   % [m] paso grueso para la biseccion de v0
 
 %% ------------------------- Tolerancias --------------------------------

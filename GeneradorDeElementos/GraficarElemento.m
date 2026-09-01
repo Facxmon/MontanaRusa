@@ -38,6 +38,21 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     end
     xlabel('x [m]'); ylabel('y [m]'); zlabel('z [m]'); title('Trayectoria 3D')
 
+    %% --- Orientacion del carro sobre la trayectoria -----------------------
+    % En figura aparte y a tamano completo: en el 2x2 las flechas quedan
+    % ilegibles. Es la forma de ver hacia donde apunta el carro, que el numero
+    % del angulo de roll no deja leer directamente.
+    Figuras(end+1) = figure('Name', 'Orientacion del carro');
+    hold on; grid on; axis equal; view(45, 20)
+    for i = 1:numel(Track.SubTramos)
+        Rango = RangoDelSubTramo(Track, i);
+        plot3(Track.Puntos(Rango,1), Track.Puntos(Rango,2), Track.Puntos(Rango,3), ...
+              'Color', Colores(i,:), 'LineWidth', 2)
+    end
+    DibujarMarcoDelCarro(Track, Parametros);
+    xlabel('x [m]'); ylabel('y [m]'); zlabel('z [m]')
+    title('Marco del carro: U de asiento a cabeza, L lateral')
+
     %% --- Velocidad y aceleracion tangencial --------------------------------
     Figuras(end+1) = figure('Name', 'Velocidad y aceleracion tangencial');
 
@@ -93,8 +108,12 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     Figuras(end+1) = figure('Name', 'Perfil de roll');
     subplot(2,1,1)
     plot(Arco, rad2deg(Track.AnguloRoll), 'LineWidth', 2); grid on; hold on
+    plot(Arco, rad2deg(Track.AnguloPeralte), 'LineWidth', 2)
     MarcarSubTramos(Track);
-    ylabel('\phi [grados]'); title('Angulo de roll (smoothstep quintico en la transicion)')
+    ylabel('grados')
+    legend('\phi contra el marco de transporte', 'Peralte contra la vertical', 'Location', 'best')
+    title(['Angulo de roll. Los dos miden lo mismo contra referencias distintas: ' ...
+           '\phi crece porque el marco de transporte gira, el peralte es lo que se ve en la via'])
 
     subplot(2,1,2)
     plot(Arco, rad2deg(Track.VelocidadRoll), 'LineWidth', 2); grid on; hold on
@@ -135,51 +154,92 @@ function MarcarSubTramos(Track)
     end
 end
 
+function DibujarMarcoDelCarro(Track, Parametros)
+%DIBUJARMARCODELCARRO Flechas del marco del carro sobre la trayectoria.
+%   U es el eje del asiento a la cabeza del pasajero y L el lateral. Sirve
+%   para ver de un vistazo hacia donde apunta el carro, que es lo que el
+%   numero del angulo de roll no deja leer directamente.
+
+    NumeroDeNodos = size(Track.Puntos, 1);
+    Cantidad = min(Parametros.VersoresEnGrafico3D, NumeroDeNodos);
+    Indices  = unique(round(linspace(1, NumeroDeNodos, Cantidad)));
+
+    Extension = max(max(Track.Puntos, [], 1) - min(Track.Puntos, [], 1));
+    Longitud  = 0.06 * Extension;
+
+    Base = Track.Puntos(Indices, :);
+    Arriba  = Longitud * Track.VersorArribaCarro(Indices, :);
+    Lateral = Longitud * Track.VersorLateral(Indices, :);
+
+    quiver3(Base(:,1), Base(:,2), Base(:,3), Arriba(:,1), Arriba(:,2), Arriba(:,3), ...
+            0, 'Color', [0.15 0.15 0.15], 'LineWidth', 1.1)
+    quiver3(Base(:,1), Base(:,2), Base(:,3), Lateral(:,1), Lateral(:,2), Lateral(:,3), ...
+            0, 'Color', [0.60 0.60 0.85], 'LineWidth', 0.8)
+    legend([{Track.SubTramos.Nombre}, {'U: arriba del carro', 'L: lateral'}], ...
+           'Location', 'best', 'Interpreter', 'none')
+end
+
 function GraficarGConBanda(Arco, G, Tiempo, FactorTiempo, CurvaPositiva, CurvaNegativa, Track)
-%GRAFICARGCONBANDA Superpone el limite aplicable punto a punto.
-%   El limite depende de la duracion del evento sostenido, asi que no es una
-%   recta: se evalua en cada nodo con la duracion de su propio evento.
+%GRAFICARGCONBANDA Superpone los limites normativos, que dependen de la
+%   duracion del evento sostenido y por lo tanto NO son un escalar.
+%
+%   Se dibujan tres cosas distintas, que antes estaban colapsadas en una sola
+%   linea y daban una lectura enganosa:
+%
+%     banda verde      entre los limites de evento largo. Lo que cae adentro es
+%                      admisible dure lo que dure: es el piso de la curva.
+%     lineas de trazos los limites a 200 ms, el techo de lo que la norma llega
+%                      a admitir. Para +Gx la curva de la Fig. 6 va de 6.0 G a
+%                      200 ms hasta 2.5 G en regimen: esas son las dos lineas.
+%     linea roja llena el limite que efectivamente aplica en cada punto, con la
+%                      duracion del evento sostenido que contiene a ese nodo.
+%                      Solo existe donde la G tiene ese signo; si la senal nunca
+%                      entra en ese lado no se dibuja, en vez de inventar un
+%                      valor y hacerlo pasar por el limite aplicable.
 
-    LimiteSuperior = LimitePorPunto(G, Tiempo, CurvaPositiva, FactorTiempo, +1);
-    LimiteInferior = LimitePorPunto(G, Tiempo, CurvaNegativa, FactorTiempo, -1);
+    LimiteCortoSuperior =  abs(LimiteNormativo(CurvaPositiva, 0.2));
+    LimiteCortoInferior = -abs(LimiteNormativo(CurvaNegativa, 0.2));
+    LimiteLargoSuperior =  abs(LimiteNormativo(CurvaPositiva, 40));
+    LimiteLargoInferior = -abs(LimiteNormativo(CurvaNegativa, 40));
 
-    % Donde la G nunca cruza ese signo el limite punto a punto no esta
-    % definido. Se rellena con el limite evaluado en la duracion total del
-    % elemento, que es el extremo mas restrictivo de la curva en ese rango.
-    TiempoValido = Tiempo(~isnan(Tiempo));
-    DuracionTotalReal = (TiempoValido(end) - TiempoValido(1)) * FactorTiempo;
-    LimiteSuperior = RellenarHuecos(LimiteSuperior,  abs(LimiteNormativo(CurvaPositiva, DuracionTotalReal)));
-    LimiteInferior = RellenarHuecos(LimiteInferior, -abs(LimiteNormativo(CurvaNegativa, DuracionTotalReal)));
-
-    Valido = ~isnan(LimiteSuperior) & ~isnan(LimiteInferior) & ~isnan(Arco);
+    Extremos = [Arco(1), Arco(end)];
     hold on; grid on
+
+    fill([Extremos, fliplr(Extremos)], ...
+         [LimiteLargoInferior LimiteLargoInferior LimiteLargoSuperior LimiteLargoSuperior], ...
+         [0.88 0.94 0.88], 'EdgeColor', 'none', 'HandleVisibility', 'off')
 
     Trazos = gobjects(0);
     Etiquetas = {};
-    if any(Valido)
-        fill([Arco(Valido); flipud(Arco(Valido))], ...
-             [LimiteSuperior(Valido); flipud(LimiteInferior(Valido))], ...
-             [0.85 0.92 0.85], 'EdgeColor', 'none', 'HandleVisibility', 'off')
-        Trazos(end+1) = plot(Arco, LimiteSuperior, 'r--', 'LineWidth', 1.2);
-        Etiquetas{end+1} = 'Limite normativo aplicable';
-        plot(Arco, LimiteInferior, 'r--', 'LineWidth', 1.2, 'HandleVisibility', 'off')
+
+    Trazos(end+1) = plot(Extremos, [LimiteCortoSuperior LimiteCortoSuperior], 'r--', 'LineWidth', 1.2);
+    Etiquetas{end+1} = sprintf('Limite a 200 ms (%+.1f / %+.1f G)', LimiteCortoSuperior, LimiteCortoInferior);
+    plot(Extremos, [LimiteCortoInferior LimiteCortoInferior], 'r--', 'LineWidth', 1.2, 'HandleVisibility', 'off')
+
+    LimiteAplicableSuperior = LimitePorPunto(G, Tiempo, CurvaPositiva, FactorTiempo, +1);
+    LimiteAplicableInferior = LimitePorPunto(G, Tiempo, CurvaNegativa, FactorTiempo, -1);
+
+    HayAplicable = false;
+    if any(~isnan(LimiteAplicableSuperior))
+        Trazos(end+1) = plot(Arco, LimiteAplicableSuperior, 'r-', 'LineWidth', 1.6);
+        HayAplicable = true;
     end
+    if any(~isnan(LimiteAplicableInferior))
+        if HayAplicable
+            plot(Arco, LimiteAplicableInferior, 'r-', 'LineWidth', 1.6, 'HandleVisibility', 'off')
+        else
+            Trazos(end+1) = plot(Arco, LimiteAplicableInferior, 'r-', 'LineWidth', 1.6);
+            HayAplicable = true;
+        end
+    end
+    if HayAplicable
+        Etiquetas{end+1} = 'Limite aplicable segun la duracion del evento';
+    end
+
     Trazos(end+1) = plot(Arco, G, 'LineWidth', 2);
     Etiquetas{end+1} = 'Valor calculado';
 
     yline(0, 'k:', 'HandleVisibility', 'off');
     MarcarSubTramos(Track);
     legend(Trazos, Etiquetas, 'Location', 'best')
-end
-
-function Valores = RellenarHuecos(Valores, ValorPorDefecto)
-%RELLENARHUECOS Extiende el limite a los nodos donde el signo no aplica, para
-%   que la banda se dibuje continua.
-    Indices = find(~isnan(Valores));
-    if isempty(Indices)
-        Valores(:) = ValorPorDefecto;
-        return
-    end
-    Valores = interp1(Indices, Valores(Indices), (1:numel(Valores)).', 'nearest', 'extrap');
-    Valores(isnan(Valores)) = ValorPorDefecto;
 end

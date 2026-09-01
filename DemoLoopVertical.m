@@ -15,7 +15,9 @@ addpath(fullfile(fileparts(mfilename('fullpath')), 'GeneradorDeElementos'));
 Parametros = ParametrosPorDefecto();
 
 Parametros.ModoCurvatura          = 'FuerzaGConstante';   % 'Clotoide' | 'FuerzaGConstante' | 'AceleracionNormalConstante' | 'GMaximas'
-Parametros.MetodoDeAcoplamiento   = 'A';          % 'A' marcha acoplada | 'B' punto fijo
+% 'A' marcha acoplada (rapido) | 'B' punto fijo (~3 veces mas lento) |
+% 'Ambos' corre los dos y reporta la comparacion, para el reporte del proyecto.
+Parametros.MetodoDeAcoplamiento   = 'A';
 Parametros.FuerzaGObjetivo        = 3.00;         % [G] G neta incluida la gravedad, constante en el arco
 Parametros.GMinimaCuspide         = 0.50;         % [G]
 
@@ -46,9 +48,6 @@ disp(EstadoSalida);
 
 %% ===================== GRAFICOS =======================================
 GraficarElemento(Elemento, Reporte);
-
-%% ===================== COMPARACION DE METODOS ========================
-CompararMetodos(Estado, Parametros);
 
 %% ===================== GUARDADO DEL LAYOUT ===========================
 LayoutGuardar(Layout, 'layout_loop_vertical.mat');
