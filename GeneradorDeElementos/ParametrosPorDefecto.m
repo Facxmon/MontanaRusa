@@ -31,8 +31,38 @@ Parametros.AltoCarro          = 0.06;    % [m]
 Parametros.AnchoVia           = 0.06;    % [m] trocha
 Parametros.Holgura            = 0.010;   % [m] margen sobre la envolvente
 Parametros.DiametroRueda      = 0.0136;  % [m] piso impuesto por el rodamiento minimo
-Parametros.DistanciaHeartline = 0.030;   % [m] parametro virtual de evaluacion, no fisico
 Parametros.AreaFrontal        = 0.0036;  % [m^2] proyeccion frontal de un carro
+
+% Offset del heartline: distancia del pasajero al eje del riel, medida sobre U.
+% NO es un parametro de evaluacion: es la separacion fisica que define la via.
+% La curva que integra el generador ES el heartline, y el riel se deriva de
+% ella restando d*U. Consecuencias:
+%   - el modo de curvatura dimensiona el radio para la G del PASAJERO;
+%   - el heartline es tambien el eje de roll, asi que el pasajero no siente
+%     nada por el roll (esta sobre el eje de rotacion);
+%   - el riel recorre un radio distinto al del pasajero, y esa diferencia vale
+%     d/R -- a R = 0.11 m son 27 %, no es despreciable.
+Parametros.DistanciaHeartline = 0.030;   % [m]
+
+% Punto donde se evalua al pasajero, medido desde el heartline sobre U. El
+% heartline es el eje de roll, asi que un punto matematico ahi no recibe
+% aporte de la rotacion -- pero el pasajero no es un punto: cabeza y hombros
+% quedan fuera del eje y si la sienten. Este es el brazo de palanca con el que
+% se transporta la aceleracion del heartline al cuerpo.
+%
+% Se usa en dos lugares y tiene que ser el mismo numero en los dos:
+%   - la G reportada y verificada contra la norma (SimularSobreTrack);
+%   - la longitud de la transicion de roll (GenerarGeometria).
+%
+% NO confundir con DistanciaHeartline: esa va del riel al heartline y es
+% geometria de la via; esta va del heartline al cuerpo y es confort.
+%
+% SIN CERRAR: el valor por defecto reproduce la geometria previa a la
+% correccion de heartline, no una medida antropometrica. A escala del modelo
+% (lambda ~ 22) un offset cabeza-corazon real de ~0.25 m daria ~0.011 m.
+% Ademas, para la rotacion pura el criterio normativo propio es un limite de
+% velocidad angular (ASTM F2291 7.1.6), no un offset equivalente.
+Parametros.DistanciaEvaluacionPasajero = 0.030;   % [m]
 
 %% -------------------- Geometria del loop ------------------------------
 % SIN CERRAR: las dimensiones definitivas dependen de la huella disponible.

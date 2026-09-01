@@ -45,7 +45,7 @@ for i = 1:numel(Secuencia)
     NoPasan = sum(~[Reporte.Posteriores.Pasa]);
     fprintf('%-16s %9.3f %9.3f %9.3f %9.2f %9.2f %9.3f', Elemento.Nombre, ...
             Resumen.LongitudRecorrida, ...
-            Elemento.Track.Puntos(end,3) - Elemento.Track.Puntos(1,3), ...
+            Elemento.Track.PuntosHeartline(end,3) - Elemento.Track.PuntosHeartline(1,3), ...
             Estado.Velocidad, Resumen.GzMaxima, Resumen.GyMaximaAbsoluta, Resumen.RadioMinimo);
     if NoPasan > 0
         fprintf('   <-- %d criterios no pasan', NoPasan);
@@ -54,7 +54,7 @@ for i = 1:numel(Secuencia)
 end
 
 fprintf('\nVia total: %.3f m en %d elementos. Velocidad final %.3f m/s.\n', ...
-        sum(vecnorm(diff(Layout.Puntos,1,1), 2, 2)), numel(Layout.Elementos), Estado.Velocidad);
+        sum(vecnorm(diff(Layout.PuntosRiel,1,1), 2, 2)), numel(Layout.Elementos), Estado.Velocidad);
 
 %% ===================== REPORTE DEL ULTIMO ELEMENTO ====================
 % El detalle completo de uno solo, para no llenar la consola con cuatro.

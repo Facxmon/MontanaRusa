@@ -15,11 +15,11 @@ function Layout = LayoutAgregarElemento(Layout, Elemento, EstadoSalida, Reporte)
 
     % El primer nodo del elemento coincide con el ultimo del layout, asi que
     % se descarta para no duplicar puntos en la polilinea.
-    if isempty(Layout.Puntos)
-        Layout.Puntos       = Elemento.Track.Puntos;
-        Layout.LongitudArco = Elemento.Track.LongitudArco;
+    if isempty(Layout.PuntosRiel)
+        Layout.PuntosRiel       = Elemento.Track.PuntosRiel;
+        Layout.LongitudArcoRiel = Elemento.Track.LongitudArcoRiel;
     else
-        Layout.Puntos       = [Layout.Puntos;       Elemento.Track.Puntos(2:end, :)];
-        Layout.LongitudArco = [Layout.LongitudArco; Elemento.Track.LongitudArco(2:end)];
+        Layout.PuntosRiel       = [Layout.PuntosRiel;       Elemento.Track.PuntosRiel(2:end, :)];
+        Layout.LongitudArcoRiel = [Layout.LongitudArcoRiel; Elemento.Track.LongitudArcoRiel(2:end)];
     end
 end

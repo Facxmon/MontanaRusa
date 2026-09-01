@@ -18,8 +18,8 @@ function Comparacion = CompararMetodos(EstadoEntrada, Parametros, Receta, Imprim
     SimB = SimularSobreTrack(TrackB, EstadoEntrada, Parametros);
 
     ArcoComun = linspace(0, min(TrackA.LongitudArco(end), TrackB.LongitudArco(end)), 2000).';
-    PuntosA = InterpolarFilas(TrackA.LongitudArco, TrackA.Puntos, ArcoComun);
-    PuntosB = InterpolarFilas(TrackB.LongitudArco, TrackB.Puntos, ArcoComun);
+    PuntosA = InterpolarFilas(TrackA.LongitudArco, TrackA.PuntosHeartline, ArcoComun);
+    PuntosB = InterpolarFilas(TrackB.LongitudArco, TrackB.PuntosHeartline, ArcoComun);
 
     Comparacion.ModoCurvatura        = Parametros.ModoCurvatura;
     Comparacion.DiferenciaGeometrica = max(vecnorm(PuntosA - PuntosB, 2, 2));

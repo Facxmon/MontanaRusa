@@ -20,7 +20,7 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     subplot(2,2,1); hold on; grid on; axis equal
     DibujarPorSubTramo(Track, Colores, 1, 3);
     xlabel('x [m]'); ylabel('z [m]'); title('Vista lateral (X,Z)')
-    legend({Track.SubTramos.Nombre}, 'Location', 'best', 'Interpreter', 'none')
+    legend([{Track.SubTramos.Nombre}, {'Heartline'}], 'Location', 'best', 'Interpreter', 'none')
 
     subplot(2,2,2); hold on; grid on; axis equal
     DibujarPorSubTramo(Track, Colores, 2, 3);
@@ -33,10 +33,13 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     subplot(2,2,4); hold on; grid on; axis equal; view(45, 20)
     for i = 1:numel(Track.SubTramos)
         Rango = RangoDelSubTramo(Track, i);
-        plot3(Track.Puntos(Rango,1), Track.Puntos(Rango,2), Track.Puntos(Rango,3), ...
+        plot3(Track.PuntosRiel(Rango,1), Track.PuntosRiel(Rango,2), Track.PuntosRiel(Rango,3), ...
               'Color', Colores(i,:), 'LineWidth', 2)
     end
-    xlabel('x [m]'); ylabel('y [m]'); zlabel('z [m]'); title('Trayectoria 3D')
+    plot3(Track.PuntosHeartline(:,1), Track.PuntosHeartline(:,2), Track.PuntosHeartline(:,3), ...
+          ':', 'Color', [0.45 0.45 0.45], 'LineWidth', 1)
+    xlabel('x [m]'); ylabel('y [m]'); zlabel('z [m]')
+    title('Trayectoria 3D -- llena: riel, punteada: heartline')
 
     %% --- Orientacion del carro sobre la trayectoria -----------------------
     % En figura aparte y a tamano completo: en el 2x2 las flechas quedan
@@ -46,12 +49,12 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     hold on; grid on; axis equal; view(45, 20)
     for i = 1:numel(Track.SubTramos)
         Rango = RangoDelSubTramo(Track, i);
-        plot3(Track.Puntos(Rango,1), Track.Puntos(Rango,2), Track.Puntos(Rango,3), ...
+        plot3(Track.PuntosRiel(Rango,1), Track.PuntosRiel(Rango,2), Track.PuntosRiel(Rango,3), ...
               'Color', Colores(i,:), 'LineWidth', 2)
     end
     DibujarMarcoDelCarro(Track, Parametros);
     xlabel('x [m]'); ylabel('y [m]'); zlabel('z [m]')
-    title('Marco del carro: U de asiento a cabeza, L lateral')
+    title('Marco del carro: U del riel al heartline, L lateral')
 
     %% --- Velocidad y aceleracion tangencial --------------------------------
     Figuras(end+1) = figure('Name', 'Velocidad y aceleracion tangencial');
@@ -121,18 +124,26 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     MarcarSubTramos(Track);
     legend('d\phi/ds [grados/m]', 'd^2\phi/ds^2 [grados/m^2]', 'Location', 'best')
     xlabel('Longitud recorrida [m]')
-    title('Derivadas del roll -- la G lateral de la heartline depende de la segunda')
+    title(['Derivadas del roll -- entran en la G del pasajero por el brazo ' ...
+           'respecto del eje de roll, y dimensionan la transicion'])
 
     %% --- Radio de curvatura ------------------------------------------------
+    % Las dos curvas tienen radios distintos y la diferencia es el punto de
+    % todo el modelo de heartline: el que hay que comparar contra el limite de
+    % la impresora es el del riel, y el que fija la G del pasajero es el del
+    % heartline.
     Figuras(end+1) = figure('Name', 'Radio de curvatura');
     Radio = 1 ./ max(Track.Curvatura, eps);
     Radio(Track.Curvatura < 1e-9) = NaN;   % tramo recto: radio infinito, no se dibuja
-    semilogy(Arco, Radio, 'LineWidth', 2); grid on; hold on
+    RadioRiel = 1 ./ max(Track.CurvaturaRiel, eps);
+    RadioRiel(Track.CurvaturaRiel < 1e-9) = NaN;
+    semilogy(Arco, RadioRiel, 'LineWidth', 2); grid on; hold on
+    semilogy(Arco, Radio, '--', 'LineWidth', 1.5);
     yline(Parametros.RadioMinimoFabricable, 'r--', 'LineWidth', 2);
     MarcarSubTramos(Track);
     xlabel('Longitud recorrida [m]'); ylabel('Radio de curvatura [m]')
-    legend('Radio de la via', 'Radio minimo fabricable', 'Location', 'best')
-    title('Radio de curvatura contra el limite de fabricacion')
+    legend('Radio del riel', 'Radio del heartline', 'Radio minimo fabricable', 'Location', 'best')
+    title('Radio de curvatura: riel contra heartline y contra el limite de fabricacion')
 end
 
 %% ========================= auxiliares =====================================
@@ -141,11 +152,17 @@ function Rango = RangoDelSubTramo(Track, Indice)
 end
 
 function DibujarPorSubTramo(Track, Colores, EjeHorizontal, EjeVertical)
+%DIBUJARPORSUBTRAMO Riel en linea llena y heartline en trazos finos.
+%   El riel es la pieza que se fabrica, asi que es el que va destacado; el
+%   heartline se dibuja al lado para que se vea cuanto se separan, que en las
+%   partes de radio chico no es poco.
     for i = 1:numel(Track.SubTramos)
         Rango = RangoDelSubTramo(Track, i);
-        plot(Track.Puntos(Rango, EjeHorizontal), Track.Puntos(Rango, EjeVertical), ...
+        plot(Track.PuntosRiel(Rango, EjeHorizontal), Track.PuntosRiel(Rango, EjeVertical), ...
              'Color', Colores(i,:), 'LineWidth', 2)
     end
+    plot(Track.PuntosHeartline(:, EjeHorizontal), Track.PuntosHeartline(:, EjeVertical), ...
+         ':', 'Color', [0.45 0.45 0.45], 'LineWidth', 1)
 end
 
 function MarcarSubTramos(Track)
@@ -156,26 +173,29 @@ end
 
 function DibujarMarcoDelCarro(Track, Parametros)
 %DIBUJARMARCODELCARRO Flechas del marco del carro sobre la trayectoria.
-%   U es el eje del asiento a la cabeza del pasajero y L el lateral. Sirve
-%   para ver de un vistazo hacia donde apunta el carro, que es lo que el
-%   numero del angulo de roll no deja leer directamente.
+%   Nacen en el RIEL. La flecha de U se dibuja con la longitud real del offset
+%   de heartline, asi que su punta cae exactamente sobre el heartline: es la
+%   forma de ver de un vistazo cuanto se separan las dos curvas y por que en
+%   los radios chicos esa separacion deja de ser despreciable. La de L va a
+%   escala del dibujo, que si no queda invisible.
 
-    NumeroDeNodos = size(Track.Puntos, 1);
+    NumeroDeNodos = size(Track.PuntosRiel, 1);
     Cantidad = min(Parametros.VersoresEnGrafico3D, NumeroDeNodos);
     Indices  = unique(round(linspace(1, NumeroDeNodos, Cantidad)));
 
-    Extension = max(max(Track.Puntos, [], 1) - min(Track.Puntos, [], 1));
+    Extension = max(max(Track.PuntosRiel, [], 1) - min(Track.PuntosRiel, [], 1));
     Longitud  = 0.06 * Extension;
 
-    Base = Track.Puntos(Indices, :);
-    Arriba  = Longitud * Track.VersorArribaCarro(Indices, :);
+    Base = Track.PuntosRiel(Indices, :);
+    Arriba  = Parametros.DistanciaHeartline * Track.VersorArribaCarro(Indices, :);
     Lateral = Longitud * Track.VersorLateral(Indices, :);
 
     quiver3(Base(:,1), Base(:,2), Base(:,3), Arriba(:,1), Arriba(:,2), Arriba(:,3), ...
             0, 'Color', [0.15 0.15 0.15], 'LineWidth', 1.1)
     quiver3(Base(:,1), Base(:,2), Base(:,3), Lateral(:,1), Lateral(:,2), Lateral(:,3), ...
             0, 'Color', [0.60 0.60 0.85], 'LineWidth', 0.8)
-    legend([{Track.SubTramos.Nombre}, {'U: arriba del carro', 'L: lateral'}], ...
+    legend([{Track.SubTramos.Nombre}, ...
+            {sprintf('U: riel -> heartline (%.0f mm)', 1000*Parametros.DistanciaHeartline), 'L: lateral'}], ...
            'Location', 'best', 'Interpreter', 'none')
 end
 

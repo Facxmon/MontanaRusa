@@ -26,7 +26,7 @@ function [Layout, Avisos] = LayoutResimular(Layout, Parametros)
                                     i, Elemento.Nombre, Sim.PuntoDeParada); %#ok<AGROW>
         end
 
-        Ultimo = size(Elemento.Track.Puntos, 1);
+        Ultimo = size(Elemento.Track.PuntosHeartline, 1);
         Estado = Elemento.EstadoSalida;
         Estado.Velocidad    = Sim.Velocidad(Ultimo);
         Estado.EnergiaTotal = Sim.EnergiaTotal(Ultimo);

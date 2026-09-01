@@ -1,8 +1,14 @@
 function Estado = EstadoInicial(Posicion, VersorTangente, VersorArribaCarro, Velocidad, Parametros)
 %ESTADOINICIAL Arma un Estado valido para arrancar un layout.
-%   Contrato de Estado -- lo consume y lo produce todo elemento de via:
+%   Contrato de Estado -- lo consume y lo produce todo elemento de via.
 %
-%     Posicion            [x y z]                   (m)
+%   La Posicion viaja sobre el HEARTLINE, no sobre el riel: la curva que
+%   integra el generador es la del pasajero y el riel se deriva de ella
+%   restando d*U. Al elegir el punto de arranque hay que tenerlo en cuenta --
+%   el riel va a quedar DistanciaHeartline por debajo del punto que se pase
+%   aca, medido sobre U.
+%
+%     Posicion            [x y z]                   (m)  sobre el heartline
 %     VersorTangente      [Tx Ty Tz]                direccion de avance
 %     VersorArribaCarro   [Ux Uy Uz]                asiento -> cabeza
 %     VersorLateral       [Lx Ly Lz]                L = T x U

@@ -159,7 +159,7 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
 
     Track.Nombre                  = Receta.Nombre;
     Track.ModoCurvatura           = Parametros.ModoCurvatura;
-    Track.Puntos                  = Registro.Posicion;
+    Track.PuntosHeartline         = Registro.Posicion;
     Track.LongitudArco            = Registro.Arco;
     Track.VersorTangente          = Registro.VersorTangente;
     Track.VersorArribaTransporte  = Registro.VersorArribaTransporte;
@@ -183,6 +183,16 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
     Track.AnguloPeralte           = AnguloDePeralte(Registro.VersorTangente, Registro.VersorArribaCarro);
     Track.DerivadaCurvatura       = gradient(Registro.Curvatura, Registro.Arco);
 
+    % --- Riel: la curva integrada es el heartline, el riel se deriva ---------
+    % El riel va desplazado -d*U respecto del heartline. Es un desplazamiento
+    % puramente geometrico: define donde esta la via para fabricarla y para
+    % chequear interferencia, y no interviene en ninguna fuerza. Su curvatura
+    % NO es la del heartline -- esa es exactamente la diferencia que motiva
+    % toda esta separacion -- asi que se calcula aparte y es la que hay que
+    % contrastar contra el radio minimo fabricable.
+    [Track.PuntosRiel, Track.LongitudArcoRiel, Track.CurvaturaRiel] = ...
+        DerivarRiel(Registro.Posicion, Registro.VersorArribaCarro, Registro.Arco, Parametros);
+
     %% ---------------- Diagnostico -----------------------------------------
     Diagnostico.ResidualCierrePitch        = ResidualCierre;
     Diagnostico.IteracionesCierre          = IteracionCierre;
@@ -205,9 +215,34 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
     % Perfil de velocidad que salio de la marcha acoplada. Es lo que el
     % metodo B realimenta en la iteracion siguiente.
     Diagnostico.PerfilVelocidad = struct('Arco', Registro.Arco, 'Velocidad', Registro.Velocidad);
-    Diagnostico.TiempoDeRecorrido = Registro.Tiempo;
-    Diagnostico.GArribaRiel       = Registro.GArribaRiel;
-    Diagnostico.GLateralRiel      = Registro.GLateralRiel;
+    Diagnostico.TiempoDeRecorrido   = Registro.Tiempo;
+    Diagnostico.GArribaHeartline    = Registro.GArribaHeartline;
+    Diagnostico.GLateralHeartline   = Registro.GLateralHeartline;
+end
+
+%% ========================= derivacion del riel ============================
+function [PuntosRiel, ArcoRiel, CurvaturaRiel] = DerivarRiel(PuntosHeartline, VersorArribaCarro, Arco, Parametros)
+%DERIVARRIEL Riel a partir del heartline: r_riel = r_heartline - d*U.
+%   La curvatura del riel se saca con kappa = |r' x r''|/|r'|^3 derivando
+%   respecto del arco DEL HEARTLINE. La formula del producto vectorial vale
+%   para cualquier parametrizacion, asi que no hace falta reparametrizar el
+%   riel por su propio arco: alcanza con no suponer |r'| = 1, que es
+%   justamente lo que deja de valer al desplazar la curva.
+%
+%   Los nodos repetidos se filtran antes de derivar. Aparecen cuando un
+%   sub-tramo termina con un paso acortado, y sobre una segunda derivada un
+%   paso nulo no da ruido sino un infinito.
+
+    Distancia  = Parametros.DistanciaHeartline;
+    PuntosRiel = PuntosHeartline - Distancia*VersorArribaCarro;
+
+    ArcoRiel = [0; cumsum(vecnorm(diff(PuntosRiel, 1, 1), 2, 2))] + Arco(1);
+
+    Primera = DerivadaPorArco(PuntosRiel, Arco);
+    Segunda = DerivadaPorArco(Primera,    Arco);
+
+    NormaPrimera  = vecnorm(Primera, 2, 2);
+    CurvaturaRiel = vecnorm(cross(Primera, Segunda, 2), 2, 2) ./ max(NormaPrimera.^3, eps);
 end
 
 %% ========================= recorrido del elemento =========================
@@ -500,17 +535,18 @@ function Peralte = AnguloDePeralte(VersorTangente, VersorArribaCarro)
 end
 
 function Onset = OnsetVerticalDelRecorrido(Registro)
-%ONSETVERTICALDELRECORRIDO Tasa de aparicion de la G vertical sobre el riel,
+%ONSETVERTICALDELRECORRIDO Tasa de aparicion de la G vertical del heartline,
 %   medida sobre el recorrido recien generado. Se usa para realimentar la
-%   longitud de las transiciones. Es la G del riel, no la de la heartline: el
-%   aporte de heartline depende de phi'' y lo dimensiona el onset lateral.
+%   longitud de las transiciones. Es la G que siente el pasajero, que es la
+%   que la norma limita: la curva integrada es el heartline y no lleva
+%   correccion de offset.
     n = Registro.NumeroDeNodos;
     if n < 3
         Onset = 0;
         return
     end
     Arco = Registro.Arco(1:n);
-    Onset = max(abs(gradient(Registro.GArribaRiel(1:n), Arco) .* Registro.Velocidad(1:n)));
+    Onset = max(abs(gradient(Registro.GArribaHeartline(1:n), Arco) .* Registro.Velocidad(1:n)));
 end
 
 function Longitud = LongitudDeClotoide(Velocidad, DeltaCurvatura, Onset, Parametros)
@@ -524,16 +560,27 @@ end
 function Longitud = LongitudTransicionDeRoll(DeltaRoll, Velocidad, Onset, Parametros)
 %LONGITUDTRANSICIONDEROLL Dimensiona la transicion de roll por el onset lateral.
 %   Con el smoothstep quintico max|phi'''| = 60*|DeltaRoll|/L^3, y la G lateral
-%   de la heartline vale d*v^2*phi''/g, asi que su tasa de aparicion es
-%   d*v^3*phi'''/g. Despejando L:
-%       L = (60*d*v^3*|DeltaRoll| / (g*Onset))^(1/3)
+%   de un punto a distancia e del eje de roll vale e*v^2*phi''/g, asi que su
+%   tasa de aparicion es e*v^3*phi'''/g. Despejando L:
+%       L = (60*e*v^3*|DeltaRoll| / (g*Onset))^(1/3)
+%
+%   El brazo de palanca e es DistanciaEvaluacionPasajero y NO
+%   DistanciaHeartline. Desde que la curva integrada es el heartline, el
+%   heartline es tambien el eje de roll: un punto ahi tiene brazo cero. Lo que
+%   justifica seguir limitando esto es que el pasajero no es un punto --
+%   hombros y cabeza quedan fuera del eje. Es el mismo brazo con el que
+%   SimularSobreTrack transporta la G, y tiene que serlo: dimensionar la
+%   transicion con un offset y despues verificarla con otro no cierra.
+%
+%   SIN CERRAR: el criterio normativo propio de la rotacion pura es un limite
+%   de velocidad angular del carro (ASTM F2291 7.1.6), no un offset.
     if abs(DeltaRoll) < 1e-9
         Longitud = 0;
         return
     end
-    Distancia = Parametros.DistanciaHeartline;
+    Distancia = Parametros.DistanciaEvaluacionPasajero;
     if Distancia <= 0
-        Longitud = Parametros.LargoCarro;   % sin heartline el criterio de onset no aplica
+        Longitud = Parametros.LargoCarro;   % sin brazo de palanca el criterio no aplica
         return
     end
     Longitud = (60*Distancia*Velocidad^3*abs(DeltaRoll) / (Parametros.Gravedad*Onset))^(1/3);

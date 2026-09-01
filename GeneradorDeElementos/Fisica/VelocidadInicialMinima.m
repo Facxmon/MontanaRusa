@@ -87,7 +87,7 @@ function Holgura = HolguraDeCuspide(EstadoEntrada, Parametros, Receta, Velocidad
         return
     end
 
-    HolguraDeG      = min(Diagnostico.GArribaRiel) - Parametros.GMinimaCuspide;
+    HolguraDeG      = min(Diagnostico.GArribaHeartline) - Parametros.GMinimaCuspide;
     RadioAlcanzado  = 1/max(max(Track.Curvatura), eps);
     HolguraDeRadio  = (RadioAlcanzado - Parametros.RadioMinimoFabricable) / Parametros.RadioMinimoFabricable;
 

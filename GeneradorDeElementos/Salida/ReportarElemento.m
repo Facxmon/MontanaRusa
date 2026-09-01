@@ -9,10 +9,13 @@ function ReportarElemento(Reporte, Elemento)
     fprintf('=====================================================================\n');
 
     fprintf('\n--- Geometria y recorrido ---\n');
-    fprintf('  Longitud recorrida            : %8.4f m\n', Resumen.LongitudRecorrida);
-    fprintf('  Longitud de material de via   : %8.4f m\n', Resumen.LongitudDeMaterial);
+    fprintf('  Longitud recorrida (heartline): %8.4f m\n', Resumen.LongitudRecorrida);
+    fprintf('  Longitud de material de via   : %8.4f m   (riel)\n', Resumen.LongitudDeMaterial);
     fprintf('  Altura maxima sobre la entrada: %8.4f m\n', Resumen.AlturaMaxima);
-    fprintf('  Radio de curvatura minimo     : %8.4f m\n', Resumen.RadioMinimo);
+    fprintf('  Radio minimo del heartline    : %8.4f m   (lo que fija la G del pasajero)\n', ...
+            Resumen.RadioMinimo);
+    fprintf('  Radio minimo del riel         : %8.4f m   (lo que tiene que imprimirse)\n', ...
+            Resumen.RadioMinimoRiel);
     fprintf('  Tiempo de recorrido           : %8.4f s\n', Resumen.TiempoDeRecorrido);
 
     fprintf('\n--- Sub-tramos ---\n');

@@ -77,31 +77,31 @@ function Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros)
     Sim.AceleracionTangencial = -g*GeometriaNodos.TangenteVertical - FuerzaResistencia/Parametros.Masa;
     Sim.AceleracionTangencial(isnan(Velocidad)) = NaN;
 
-    Sim.GArribaRiel  = VelocidadCuadradoNodos.*GeometriaNodos.CurvaturaSobreArriba/g  + GeometriaNodos.ArribaVertical;
-    Sim.GLateralRiel = VelocidadCuadradoNodos.*GeometriaNodos.CurvaturaSobreLateral/g + GeometriaNodos.LateralVertical;
+    Sim.GArribaHeartline  = VelocidadCuadradoNodos.*GeometriaNodos.CurvaturaSobreArriba/g  + GeometriaNodos.ArribaVertical;
+    Sim.GLateralHeartline = VelocidadCuadradoNodos.*GeometriaNodos.CurvaturaSobreLateral/g + GeometriaNodos.LateralVertical;
 
-    % Aporte de la rotacion de roll sobre la heartline (memoria de calculo,
-    % seccion 3.5). Es la razon por la que el perfil de roll tiene que ser C2:
-    % la G lateral depende de phi''.
-    Distancia = Parametros.DistanciaHeartline;
-    AporteLateral  = Distancia*(Sim.AceleracionTangencial.*Track.VelocidadRoll ...
-                              + VelocidadCuadradoNodos.*Track.AceleracionRoll) / g;
-    AporteVertical = -Distancia*VelocidadCuadradoNodos.*Track.VelocidadRoll.^2 / g;
+    % G reportadas: transporte de cuerpo rigido desde el heartline hasta el
+    % punto donde se evalua al pasajero. NO son las del heartline pelado.
+    %
+    % El heartline es el eje de roll, asi que un punto matematico ahi no
+    % recibe aporte de la rotacion. Pero el pasajero no es un punto: cabeza y
+    % hombros quedan fuera del eje y si sienten la rotacion. Por eso la G que
+    % se verifica contra la norma se evalua desplazada e*U del eje.
+    [Sim.Gx, Sim.Gy, Sim.Gz] = GEnPuntoDeEvaluacion(Track, Sim, Parametros);
 
-    Sim.Gx = Sim.AceleracionTangencial/g + GeometriaNodos.TangenteVertical;
-    Sim.Gy = Sim.GLateralRiel + AporteLateral;
-    Sim.Gz = Sim.GArribaRiel  + AporteVertical;
-
-    Sim.FuerzaNormal = Parametros.Masa*g*hypot(Sim.GArribaRiel, Sim.GLateralRiel);
+    % Masa puntual con el centro de masa en el heartline: la fuerza que el
+    % riel le hace al carro vale m*(a_cm - g_vec).
+    Sim.FuerzaNormal = Parametros.Masa*g*hypot(Sim.GArribaHeartline, Sim.GLateralHeartline);
 
     Sim.EnergiaCinetica  = 0.5*Parametros.Masa*VelocidadCuadradoNodos;
-    Sim.EnergiaPotencial = Parametros.Masa*g*Track.Puntos(:,3);
+    Sim.EnergiaPotencial = Parametros.Masa*g*Track.PuntosHeartline(:,3);
     Sim.EnergiaTotal     = Sim.EnergiaCinetica + Sim.EnergiaPotencial;
 
     % Jerk por eje, en G/s: dG/dt = (dG/ds)*v.
-    Sim.JerkGx = gradient(Sim.Gx, Arco).*Velocidad;
-    Sim.JerkGy = gradient(Sim.Gy, Arco).*Velocidad;
-    Sim.JerkGz = gradient(Sim.Gz, Arco).*Velocidad;
+    Jerk = DerivadaPorArco([Sim.Gx, Sim.Gy, Sim.Gz], Arco) .* Velocidad;
+    Sim.JerkGx = Jerk(:,1);
+    Sim.JerkGy = Jerk(:,2);
+    Sim.JerkGz = Jerk(:,3);
 
     Sim.VelocidadDeDiseno = Track.VelocidadDeDiseno;
     Sim.AvisoVelocidadDeDiseno = '';
@@ -114,6 +114,78 @@ function Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros)
 end
 
 %% ========================= auxiliares =====================================
+function [Gx, Gy, Gz] = GEnPuntoDeEvaluacion(Track, Sim, Parametros)
+%GENPUNTODEEVALUACION G sentida en el punto donde se evalua al pasajero.
+%   Transporte de cuerpo rigido desde el heartline, que es a la vez la curva
+%   integrada, el eje de roll y el centro de masa supuesto:
+%
+%       a_e = a_h + dw/dt x r + w x (w x r),      r = e*U
+%
+%   La velocidad angular del marco del carro tiene DOS aportes y no uno:
+%
+%       w = v * ( T x kappa_vec  +  phi' * T )
+%           \_______________/     \_________/
+%            giro del marco de      roll
+%            transporte, que da
+%            vueltas con la via
+%
+%   El primero es el que la version anterior no tenia. Solo se sumaba el
+%   termino de roll e*(a_t*phi' + v^2*phi'')/g, y por eso el aporte de
+%   rotacion quedaba incompleto justo donde la via curva y rola a la vez, que
+%   es todo el interes de un over-banked turn o un dive loop.
+%
+%   Con e = 0 esto se reduce exactamente a GArribaHeartline / GLateralHeartline
+%   / Gx del heartline, y el test 10 lo verifica.
+%
+%   Que e NO sea DistanciaHeartline es deliberado: DistanciaHeartline mide del
+%   riel al heartline (geometria de la via) y e mide del heartline al cuerpo
+%   del pasajero (donde se evalua el confort). Son dos cosas distintas que
+%   antes estaban colapsadas en un solo numero.
+
+    g = Parametros.Gravedad;
+    Arco = Track.LongitudArco;
+    T = Track.VersorTangente;
+    U = Track.VersorArribaCarro;
+    L = Track.VersorLateral;
+
+    VelocidadCuadrado = Sim.Velocidad.^2;
+
+    % Aceleracion del heartline: tangencial mas centripeta.
+    Aceleracion = Sim.AceleracionTangencial.*T + VelocidadCuadrado.*Track.VectorCurvatura;
+
+    Offset = Parametros.DistanciaEvaluacionPasajero;
+    if Offset ~= 0
+        OmegaPorArco = cross(T, Track.VectorCurvatura, 2) + Track.VelocidadRoll.*T;
+        Omega        = Sim.Velocidad .* OmegaPorArco;
+
+        % dw/dt = v * dw/ds. La derivada se toma sobre la polilinea ya
+        % construida porque phi'' del tramo helicoidal depende de dkappa/ds,
+        % que no esta disponible dentro del paso de integracion.
+        DerivadaOmega = Sim.Velocidad .* DerivadaPorArco(Omega, Arco);
+
+        Brazo = Offset * U;
+        Aceleracion = Aceleracion ...
+                    + cross(DerivadaOmega, Brazo, 2) ...
+                    + cross(Omega, cross(Omega, Brazo, 2), 2);
+    end
+
+    % Fuerza especifica f = a - g_vec, con g_vec = -g*zhat. Es lo que mide un
+    % acelerometro solidario al carro: en reposo sobre via a nivel da 1 G,
+    % que es como la ASTM 7.1.4.5 define la magnitud que limita.
+    Fuerza = Aceleracion;
+    Fuerza(:,3) = Fuerza(:,3) + g;
+
+    Gx = sum(Fuerza.*T, 2) / g;
+    Gy = sum(Fuerza.*L, 2) / g;
+    Gz = sum(Fuerza.*U, 2) / g;
+
+    % Donde la marcha se quedo sin energia no hay estado dinamico que reportar.
+    SinVelocidad = isnan(Sim.Velocidad);
+    Gx(SinVelocidad) = NaN;
+    Gy(SinVelocidad) = NaN;
+    Gz(SinVelocidad) = NaN;
+end
+
 function [VelocidadCuadrado, Tiempo] = PasoDeEnergia(Arco, VelocidadCuadrado, Tiempo, Paso, Geometria, Parametros)
     k1 = DerivadaDeEnergia(Arco,          VelocidadCuadrado,               Geometria, Parametros);
     k2 = DerivadaDeEnergia(Arco + Paso/2, VelocidadCuadrado + Paso/2*k1(1), Geometria, Parametros);
@@ -137,12 +209,12 @@ function [FuerzaResistencia, Rodadura, Arrastre] = ResistenciaEnArco(Arco, Veloc
     VelocidadCuadrado = max(VelocidadCuadrado, 0);
     Velocidad = sqrt(VelocidadCuadrado);
 
-    GArribaRiel  = VelocidadCuadrado*Geometria.CurvaturaSobreArriba(Arco) /Parametros.Gravedad ...
-                 + Geometria.ArribaVertical(Arco);
-    GLateralRiel = VelocidadCuadrado*Geometria.CurvaturaSobreLateral(Arco)/Parametros.Gravedad ...
-                 + Geometria.LateralVertical(Arco);
+    GArribaHeartline  = VelocidadCuadrado*Geometria.CurvaturaSobreArriba(Arco) /Parametros.Gravedad ...
+                      + Geometria.ArribaVertical(Arco);
+    GLateralHeartline = VelocidadCuadrado*Geometria.CurvaturaSobreLateral(Arco)/Parametros.Gravedad ...
+                      + Geometria.LateralVertical(Arco);
 
-    [FuerzaResistencia, Rodadura, Arrastre] = ResistenciaAlAvance(Velocidad, GArribaRiel, GLateralRiel, Parametros);
+    [FuerzaResistencia, Rodadura, Arrastre] = ResistenciaAlAvance(Velocidad, GArribaHeartline, GLateralHeartline, Parametros);
 end
 
 function Objeto = Interpolante(Arco, Valores)

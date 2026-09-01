@@ -27,10 +27,10 @@ function [Derivada, Punto] = DerivadaDeVia(Arco, y, Contexto)
     VectorCurvatura = CurvaturaArriba*Punto.VersorArribaTransporte ...
                     + CurvaturaLateral*Punto.VersorLateralTransporte;
 
-    [GArribaRiel, GLateralRiel] = CargasEnLaVia(Punto.VersorArribaCarro, Punto.VersorLateral, ...
+    [GArribaHeartline, GLateralHeartline] = CargasEnLaVia(Punto.VersorArribaCarro, Punto.VersorLateral, ...
                                                 VectorCurvatura, Punto.Velocidad, Parametros.Gravedad);
     [FuerzaResistencia, Rodadura, Arrastre] = ResistenciaAlAvance(Punto.Velocidad, ...
-                                                GArribaRiel, GLateralRiel, Parametros);
+                                                GArribaHeartline, GLateralHeartline, Parametros);
 
     AceleracionTangencial = -Parametros.Gravedad*Punto.VersorTangente(3) - FuerzaResistencia/Parametros.Masa;
 
@@ -39,8 +39,8 @@ function [Derivada, Punto] = DerivadaDeVia(Arco, y, Contexto)
     Punto.VectorCurvatura       = VectorCurvatura;
     Punto.Curvatura             = hypot(CurvaturaArriba, CurvaturaLateral);
     Punto.VelocidadRoll         = Punto.VelocidadRoll + Contexto.InclinacionHelicoidal*Punto.Curvatura;
-    Punto.GArribaRiel           = GArribaRiel;
-    Punto.GLateralRiel          = GLateralRiel;
+    Punto.GArribaHeartline      = GArribaHeartline;
+    Punto.GLateralHeartline     = GLateralHeartline;
     Punto.AceleracionTangencial = AceleracionTangencial;
     Punto.PerdidaRodadura       = Rodadura;
     Punto.PerdidaArrastre       = Arrastre;
