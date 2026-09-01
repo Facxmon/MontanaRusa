@@ -7,7 +7,7 @@
 % analisis energetico previo en documentacion_analisis_energia.md.
 
 clear; close all; clc
-addpath(fullfile(fileparts(mfilename('fullpath')), 'GeneradorDeElementos'));
+addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'GeneradorDeElementos')));
 
 %% ===================== PARAMETROS DE ENTRADA =========================
 % El bloque completo, con las unidades y las marcas de "sin cerrar", vive en

@@ -4,7 +4,7 @@
 % automatica.
 
 clear; clc
-addpath(fullfile(fileparts(mfilename('fullpath')), 'GeneradorDeElementos'));
+addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'GeneradorDeElementos')));
 
 Resultados = struct('Nombre', {}, 'Pasa', {}, 'Detalle', {});
 
