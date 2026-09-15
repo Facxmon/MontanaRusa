@@ -131,7 +131,9 @@ Esta es la desambiguación adoptada; se aplica en todo el texto reescrito.
 | $a_n^{obj}$ | `Parametros.AceleracionNormalObjetivo` | aceleración normal objetivo del modo 1 | m/s² | generador §5 | 20 |
 | $G_{obj}$ | `Parametros.FuerzaGObjetivo` | G neta objetivo (incl. gravedad) del modo `FuerzaGConstante` | G | generador §5 | 3.0; corresponde al modo 3 de la tabla de curvatura |
 | — | `Receta.CurvaLimiteGz` | qué curva normativa de $+G_z$ persigue el elemento en modo `GNormativaMaxima` | — (enum, ver bloque 7) | generador §5 | `'MasGzTodas'` en los cuatro elementos; la arma cada `ElementoXxx.m`, no es un parámetro global (antes `Parametros.CurvaLimiteGMaximas`) |
-| — | `Parametros.TolObjetivoDeG` | desvío admitido entre la $G_z$ del pasajero y la que pidió el modo, en el arco | G | generador §5 | 0.05 |
+| — | `Parametros.TolObjetivoDeG` | desvío admitido entre la $G_z$ (y $G_y$) del pasajero y la que pidió el modo, en el arco; se descuenta también del $G_y$ objetivo del dive loop | G | generador §5 | 0.05 |
+| — | `Receta.CurvaLimiteGy`, `Receta.SentidoDeGy` | curva de $G_y$ que persigue el dive loop en modo normativo (acotada por la elipse de 7.1.5.1) y hacia qué lado (+1 = hacia $\mathbf L$) | — (enum), — (±1) | generador §5.1, memoria §5.8 | `'GyBase'`; el sentido sale de `SentidoDelGiro` |
+| $\psi$ | `Track.AnguloCurvaturaDesdeArriba` | ángulo de la curvatura del riel medido desde $\mathbf U$ hacia $\mathbf L$ en el marco del carro | rad | generador §5.1 | 0 en loop y dive loop salvo el sub-peralte; complemento del peralte en los giros |
 | $G_{min,cúspide}$ | `Parametros.GMinimaCuspide` | margen mínimo de G en la cúspide (criterio ≠ $F_N=0$) | G | generador §8 | 0.50 |
 | $J_{x,max},J_{y,max},J_{z,max}$ (real) | `Parametros.OnsetNormativoPorEje` | presupuesto de onset por eje, en la norma (prototipo) | G/s | memoria §6.7 | `[5, 5, 15]`; $G_y$ **SIN CERRAR** (sin valor normativo propio, se adopta el más restrictivo) |
 | $J_{max}$ (modelo, override) | `Parametros.OnsetMaximoModelo` | override directo del presupuesto de onset del modelo; vacío = derivar de Froude | G/s | generador §7 | `[]` por defecto |

@@ -108,7 +108,9 @@ Parametros.AnguloDelGiro  = deg2rad(120);  % [rad] cambio de rumbo
 Parametros.PeralteDelGiro = deg2rad(110);  % [rad] mas de 90 = over-banked
 Parametros.AvanceDelGiro  = 0;             % [m] 0 = giro a nivel
 
-% Sentido comun a helice, over-banked turn y cualquier giro futuro.
+% Sentido comun a helice, over-banked turn y cualquier giro futuro. El dive
+% loop lo usa para elegir hacia que lado desalinea la curvatura cuando
+% persigue un Gy en modo GNormativaMaxima.
 Parametros.SentidoDelGiro = 'Derecha';   % 'Derecha' | 'Izquierda'
 
 % Modo de curvatura del arco:

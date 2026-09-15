@@ -63,7 +63,7 @@ Ver la tabla completa en [`NOMENCLATURA.md`](NOMENCLATURA.md).
 ```matlab
 run('DemoElemento.m')         % un elemento en detalle: reporte y gráficos
 run('DemoLayout.m')           % los cuatro elementos encadenados en un circuito
-run('TestsValidacion.m')      % once tests, termina con error si alguno falla
+run('TestsValidacion.m')      % trece tests, termina con error si alguno falla
 ```
 
 Todos los parámetros de entrada están agrupados en [`ParametrosPorDefecto.m`](GeneradorDeElementos/ParametrosPorDefecto.m). Los que dependen de investigación pendiente (disponibilidad de rodamientos en Argentina, tolerancia de la impresora) están marcados como **SIN CERRAR** ahí mismo. La tabla completa de esos parámetros, con símbolo, unidad y sección donde se usan, está en [`NOMENCLATURA.md` bloque 3](NOMENCLATURA.md#3-parámetros-de-entrada-del-generador-parametrospordefectom).
@@ -291,6 +291,24 @@ El modo sigue el tiempo desde el comienzo del arco, lo convierte a duración equ
 
 **Dos definiciones de duración, cuantificadas y no corregidas.** El modo trata el arco como un único evento sostenido que empieza al arrancar el arco; `VerificarLimitesNormativos` mide la duración de cada evento sostenido por nivel, y ese evento empieza **en la clotoide de entrada**, cuando la G ya cruzó el nivel. Sobre el loop vertical en modo normativo (v₀ = 4.6 m/s, defaults) el modo produce un perfil decreciente de 6.00 a 3.98 G en 4.02 s reales; al nivel 4.3 G el evento sostenido dura 1.96 s en vez de los 1.85 s que el modo supuso, y en la pendiente de −2 G/s de la Fig. 10 eso vale **+0.22 G de exceso** medido sobre la misma G que el modo impuso. En el dive loop no aparece porque el arco dura menos de 1 s y la curva es plana ahí. Corregirlo sería arrancar el reloj del modo en la clotoide de entrada (o descontar la duración de la clotoide); queda como decisión pendiente.
 
+### 5.1 El dive loop persigue además un $G_y$: sub-peralte de la curvatura
+
+Es el único elemento con dos objetivos a la vez. Se descartó conseguir el $G_y$ con un roll violento (el término de Euler $b\,v^2\phi''$ depende de un brazo cuya parte $e$ está sin cerrar); el mecanismo es **desalinear la curvatura del riel respecto de $\mathbf U$** un ángulo $\psi$ dentro del plano $\mathbf U$–$\mathbf L$, de modo que parte de la aceleración normal caiga sobre el eje lateral. Con las componentes cerradas de [`memoria_de_calculo.md` §3.4](memoria_de_calculo.md#34-componentes-cerradas-en-el-plano-normal):
+
+$$G_z = \frac{v^2\kappa_u(1-b\kappa_u)}{g} + U_z - \frac{v^2 b\phi'^2}{g}, \qquad G_y = \frac{v^2\kappa_l(1-b\kappa_u)}{g} + L_z + \frac{b\,(a_t\phi' + v^2\phi'')}{g}$$
+
+Dos ecuaciones, dos incógnitas ($\kappa_u$, $\kappa_l$), resueltas punto a punto en `CurvaturaDelModo`: $\kappa_u$ sale de la misma cuadrática del caso de un objetivo (con $c = 1$) y, con $\kappa_u$ conocido, la ecuación de $G_y$ es lineal en $\kappa_l$. El ángulo $\psi = \operatorname{atan2}(\kappa_l, \kappa_u)$ queda **resuelto, no prescripto**, y es un perfil a lo largo del arco (`Track.AnguloCurvaturaDesdeArriba`). El signo de $G_y$ es el de `CargasEnLaVia`: $\kappa_l = \kappa\sin\psi$ empuja hacia $+\mathbf L$; el lado lo fija `SentidoDelGiro` a través de `Receta.SentidoDeGy`.
+
+**Qué $G_y$ se persigue — decisión documentada.** Apuntar a la vez al $+G_z$ máximo de la Fig. 10 y al $|G_y|$ máximo de la Fig. 8 viola la elipse de dos ejes de §7.1.5.1 por construcción: $(3.0/3.3)^2 + (6.0/6.6)^2 = 1.65 > 1$. Se prioriza el $G_z$ al máximo y el $G_y$ objetivo es **lo que deja la elipse** dado ese $G_z$, con la Fig. 8 como tope si fuera más restrictiva:
+
+$$G_{y,obj} = \min\!\Big(G_{y,lim}(\text{dur}),\; 1.1\,G_{y,lim}(0.2)\,\sqrt{1 - \big(G_{z,lim}(\text{dur})/1.1\,G_{z,lim}(0.2)\big)^2}\Big) - \text{TolObjetivoDeG}$$
+
+Con $G_z = 6.0$ eso da $3.3\sqrt{1-0.826} - 0.05 = 1.33$ G. El descuento de `TolObjetivoDeG` es para que el error admitido del transporte inverso no saque el punto de la elipse, cuyo chequeo es estricto. Derivación y tabla en [`memoria_de_calculo.md` §5.8](memoria_de_calculo.md#58-gy-objetivo-del-dive-loop-prioridad-al-gz-y-elipse-de-7151).
+
+**Onset lateral y compatibilidad.** El $\psi$ resuelto se superpone al roll de $\pi$ del dive loop: el sub-tramo de acondicionamiento (medio tonel, smoothstep quíntico) no se toca, y $\psi$ sólo actúa en el arco y sus clotoides. Para que el perfil no viole el presupuesto de onset lateral, las clotoides de entrada y salida se dimensionan ahora **por los dos ejes del carro** —cada componente de la curvatura con su presupuesto, manda la que pida más longitud— y la clotoide de salida conserva el desvío $\psi$ final del arco en vez de volver de golpe a la dirección de la Receta ([§7](#7-presupuesto-de-onset-y-longitudes-de-transición)). Si aun así el onset lateral se pasa, el chequeo posterior "Onset máximo de Gy" lo reporta. El giro sigue cerrando: `ResidualCierrePitch` contra `TolCierrePitch` es criterio como siempre. Si el sistema no tiene solución (objetivo de $G_z$ inalcanzable a esa velocidad), el criterio "Gz objetivo del modo alcanzado" falla con el motivo; el de $G_y$ tiene su propio criterio, "Gy objetivo del modo alcanzado", que además informa el sub-peralte máximo.
+
+Medido en el test 13 (v₀ = 6 m/s, defaults): $G_y$ objetivo 1.32 G alcanzado dentro de $10^{-4}$ G, sub-peralte hasta 10.7°, residual de cierre $10^{-5}$ rad, elipse en 0.988, onset lateral 17.8 de 21.1 G/s.
+
 ---
 
 ## 6. Los dos métodos de acoplamiento
@@ -322,7 +340,9 @@ $$L_{roll} = \left(\frac{60\,b\,v^3\,|\Delta\phi|}{g\,J_{y,max}}\right)^{1/3}$$
 
 **El eje de roll es el riel y el brazo de palanca es $b$ (`BrazoDeVerificacion`): la distancia del riel al punto donde se aplica la norma** — $d$ para la heartline, $d+e$ si se pide verificar en la cabeza. Es el mismo $b$ con el que se transporta la G reportada ([`memoria_de_calculo.md` §3.5](memoria_de_calculo.md#35-resultado-la-expresión-que-se-implementa)), y tiene que serlo: dimensionar la transición con un brazo y después verificarla con otro no cierra.
 
-**La fórmula supone $v$ constante dentro de la transición y por eso el onset resultante se pasa alrededor de un 1.5 %.** El generador cierra ese hueco con un punto fijo sobre un factor de longitud, y el reporte informa el margen que quedó. El punto fijo es sobre el factor y no un corte al primer valor que cumple: cortar por cumplimiento haría que la geometría dependiera de forma **discontinua** de los datos de entrada, y ahí los dos métodos dejan de coincidir aunque los dos estén bien.
+**Las clotoides se dimensionan por los dos ejes del carro.** El cambio de la componente de curvatura sobre $\mathbf U$ produce onset de $G_z$ y el de la componente sobre $\mathbf L$, onset de $G_y$; cada uno tiene su presupuesto ($J_{z,max}$ y $J_{y,max}$) y manda el que pida más longitud (`LongitudDeClotoidePorEjes`). Con la curvatura alineada con $\mathbf U$ (loop) se reduce a la fórmula de un eje; en los giros peraltados y en el sub-peralte del dive loop es el eje lateral el que suele mandar, porque su presupuesto es tres veces menor. Antes sólo se dimensionaba por el vertical y el chequeo posterior de onset lateral fallaba en la hélice.
+
+**La fórmula supone $v$ constante dentro de la transición y por eso el onset resultante se pasa alrededor de un 1.5 %.** El generador cierra ese hueco con un punto fijo sobre un factor de longitud, realimentado por **el eje que peor está respecto de su presupuesto** (vertical o lateral), y el reporte informa el margen que quedó en cada uno. El punto fijo es sobre el factor y no un corte al primer valor que cumple: cortar por cumplimiento haría que la geometría dependiera de forma **discontinua** de los datos de entrada, y ahí los dos métodos dejan de coincidir aunque los dos estén bien.
 
 Las longitudes de transición se dimensionan con la **velocidad real de la marcha**, no con el perfil supuesto del método B. Son decisiones geométricas de diseño; lo que el perfil supuesto rompe es el lazo de la *ley de curvatura*.
 
@@ -379,7 +399,7 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 
 ## 11. Tests de validación
 
-`TestsValidacion.m` implementa **once** tests y termina con error si alguno falla. Todos pasan por la API pública de los elementos, para que lo que se verifica sea el mismo camino que usa el usuario.
+`TestsValidacion.m` implementa **trece** tests y termina con error si alguno falla. Todos pasan por la API pública de los elementos, para que lo que se verifica sea el mismo camino que usa el usuario.
 
 | # | Test | Resultado típico |
 |---|---|---|
@@ -394,8 +414,10 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 | 9 | Derivación de la heartline desde el riel: separación constante y $R_h=R_{riel}-d$ | separación exacta a $6\times10^{-16}$ m; diferencia de radios dentro del 0.7 % de $d$ |
 | 10 | Transporte de cuerpo rígido desde el riel | con $d=e=0$ se reduce a la G del punto del riel con error $2\times10^{-16}$ G; con $d$ real la rotación y el cambio de radio aportan hasta 0.49 G |
 | 11 | El riel es el eje de roll | en la transición de roll del dive loop el riel queda exactamente recto, la heartline sale con la curvatura de la hélice $d\phi'^2/(1+d^2\phi'^2)$ (0.0 % de desvío) y la $G_y$ de rotación en la cabeza es exactamente el doble que en la heartline |
+| 12 | El modo normativo pone el $+G_z$ límite en el pasajero, en los cuatro elementos | desvío máximo $\lvert G_z - G_{lim}(t)\rvert$ sobre el arco: 0.003 G (loop), 0.002 G (hélice), 0.000 G (over-banked turn, dive loop) |
+| 13 | El dive loop alcanza su $G_y$ objetivo por sub-peralte | $\lvert G_y - \text{objetivo}\rvert < 10^{-4}$ G; sub-peralte hasta 10.7°; cierre $10^{-5}$ rad; elipse 7.1.5.1 en 0.988 y onset lateral pasan |
 
-**Nota de discrepancia doc↔código corregida.** Una versión anterior de este documento decía en prosa "los ocho son ejecutables" pero la tabla sólo listaba siete filas, sin el test de encadenamiento. Se corrigió agregando la fila que faltaba. Hoy son **once**: los tests 9 y 10 se agregaron junto con el modelo de heartline de [§14](#14-el-modelo-de-heartline-tres-curvas), y el 11 fija la hipótesis del eje de roll.
+**Nota de discrepancia doc↔código corregida.** Una versión anterior de este documento decía en prosa "los ocho son ejecutables" pero la tabla sólo listaba siete filas, sin el test de encadenamiento. Se corrigió agregando la fila que faltaba. Hoy son **trece**: los tests 9 y 10 se agregaron junto con el modelo de heartline de [§14](#14-el-modelo-de-heartline-tres-curvas), el 11 fija la hipótesis del eje de roll, el 12 es el que hubiera cazado el error de proyección de la hélice y el 13 cubre el $G_y$ del dive loop.
 
 **Test 2 excluye los nodos cuyo esquema de tres puntos cruza una frontera de sub-tramo.** Ahí $d\kappa/ds$ salta y la circunferencia por tres puntos devuelve un promedio de dos curvaturas distintas: el error sube a $4.6\times10^{-3}$. Es una limitación del estimador discreto, no de la geometría generada — y es exactamente la fragilidad que ya documenta [`documentacion_analisis_energia.md` §4](documentacion_analisis_energia.md#4-radio-de-giro-curvatura-local).
 

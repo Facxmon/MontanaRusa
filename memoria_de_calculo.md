@@ -537,6 +537,25 @@ Para cada nivel $G^*$, medir la duración acumulada del evento sostenido en que 
 
 En la práctica, para cada tramo del recorrido en que la G supera un umbral, se calcula la duración del tramo y se evalúa la curva límite en esa duración. Un pico de 6 G durante 0.5 s es admisible; el mismo 6 G durante 3 s no lo es.
 
+### 5.8 $G_y$ objetivo del dive loop: prioridad al $G_z$ y elipse de 7.1.5.1
+
+El dive loop, en modo `GNormativaMaxima`, persigue a la vez el $+G_z$ de la Fig. 10 y un $G_y$ lateral. **Los dos máximos juntos no son admisibles**: la cláusula 7.1.5.1 limita la combinación de dos ejes a una elipse con semiejes iguales a los límites de 200 ms multiplicados por 1.1, y
+
+$$\left(\frac{3.0}{3.3}\right)^2 + \left(\frac{6.0}{6.6}\right)^2 = 0.826 + 0.826 = 1.65 > 1.$$
+
+**Decisión adoptada:** se prioriza el $G_z$ al máximo de la Fig. 10 y el $G_y$ objetivo es el máximo que deja la elipse dado ese $G_z$, con la Fig. 8 como tope si resultara más restrictiva:
+
+$$G_{y,obj}(\text{dur}) = \min\!\Big(G_{y,lim}(\text{dur}),\; 3.3\sqrt{1 - \big(G_{z,lim}(\text{dur})/6.6\big)^2}\Big) - \text{TolObjetivoDeG}$$
+
+| $G_{z,lim}$ [G] | $G_y$ que deja la elipse [G] | Fig. 8 [G] | $G_{y,obj}$ (con 0.05 de tolerancia) [G] |
+|---|---|---|---|
+| 6.0 (dur < 1 s) | 1.375 | 3.0 | 1.33 |
+| 5.0 (1.5 s) | 2.154 | 2.5 | 2.10 |
+| 4.0 (2–4 s) | 2.625 | 2.0 | 1.95 |
+| 3.0 (5–11.8 s) | 2.939 | 2.0 | 1.95 |
+
+La alternativa de perseguir los dos máximos y aceptar que la elipse falle, o la de escalar los dos hasta la elipse ($G_z \approx 4.7$, $G_y \approx 2.3$), quedaron descartadas. El mecanismo geométrico es el sub-peralte de la curvatura (generador §5.1).
+
 ---
 
 ## 6. Política de continuidad por eje

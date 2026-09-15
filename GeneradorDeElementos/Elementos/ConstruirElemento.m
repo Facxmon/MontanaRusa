@@ -204,6 +204,24 @@ function Criterios = CriterioDeObjetivoDeG(Criterios, Track, Sim, Diagnostico, R
         sprintf(['%s; medido en el punto de verificacion (brazo %.3f m). Si falla, el objetivo era ' ...
                  'inalcanzable a esa velocidad con ese brazo, o el arco es demasiado corto.'], ...
                 Detalle, Sim.BrazoDeVerificacion));
+
+    % Dive loop en modo normativo: ademas persigue un Gy, desalineando la
+    % curvatura respecto de U. Se verifica que lo alcanzo y se informa cuanto
+    % hubo que desalinear.
+    if strcmp(Parametros.ModoCurvatura, 'GNormativaMaxima') && isfield(Receta, 'CurvaLimiteGy') && ~isempty(Receta.CurvaLimiteGy)
+        SemiejeGz = 1.1*abs(LimiteNormativo(Receta.CurvaLimiteGz, 0.2));
+        SemiejeGy = 1.1*abs(LimiteNormativo(Receta.CurvaLimiteGy, 0.2));
+        GyDeLaCurva  = arrayfun(@(D) abs(LimiteNormativo(Receta.CurvaLimiteGy, D)), DuracionReal);
+        GyDeLaElipse = SemiejeGy*sqrt(max(1 - (Objetivo/SemiejeGz).^2, 0));
+        ObjetivoGy = Receta.SentidoDeGy * max(min(GyDeLaCurva, GyDeLaElipse) - Parametros.TolObjetivoDeG, 0);
+        DesvioGy = max(abs(Sim.Gy(Rango) - ObjetivoGy));
+        Criterios = AgregarCriterio(Criterios, 'Gy objetivo del modo alcanzado', 'MenorOIgual', ...
+            DesvioGy, Parametros.TolObjetivoDeG, 'G', ...
+            sprintf(['Gy objetivo %.2f a %.2f G: el maximo que deja la elipse de 7.1.5.1 con ese Gz ' ...
+                     '(curva %s como tope), menos TolObjetivoDeG. Sub-peralte de la curvatura: hasta %.1f grados.'], ...
+                    ObjetivoGy(1), ObjetivoGy(end), Receta.CurvaLimiteGy, ...
+                    rad2deg(max(abs(Track.AnguloCurvaturaDesdeArriba(Rango))))));
+    end
 end
 
 function Tabla = TablaDeResultados(Track, Sim)

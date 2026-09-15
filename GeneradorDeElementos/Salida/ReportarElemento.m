@@ -61,6 +61,8 @@ function ReportarElemento(Reporte, Elemento)
     % derecho aunque el angulo de roll no valga cero.
     fprintf('  Roll final contra el marco    : %8.2f grados\n', rad2deg(Elemento.EstadoSalida.AnguloRoll));
     fprintf('  Peralte final contra vertical : %8.2f grados\n', rad2deg(Resumen.PeralteFinal));
+    fprintf('  Curvatura respecto de U       : %8.2f grados maximo   (0 = alineada; distinto de 0 en giros peraltados y en el sub-peralte)\n', ...
+            rad2deg(max(abs(Elemento.Track.AnguloCurvaturaDesdeArriba))));
 
     fprintf('\n--- Escalado (modelo distorsionado) ---\n');
     fprintf('  lambda del loop               : %8.3f\n', Resumen.LambdaLoop);
@@ -68,6 +70,8 @@ function ReportarElemento(Reporte, Elemento)
     fprintf('  Distorsion (lambda_c/lambda_l): %8.3f\n', Resumen.Distorsion);
     fprintf('  Equivalente en carros reales  : %8.3f\n', Resumen.CarrosEquivalentes);
     fprintf('  Presupuesto de onset [Gx Gy Gz]: %.1f  %.1f  %.1f G/s\n', Resumen.OnsetMaximoModelo);
+    fprintf('  Onset generado Gy / Gz        : %.1f / %.1f G/s   (realimentan la longitud de las transiciones)\n', ...
+            Elemento.Diagnostico.OnsetLateralGenerado, Elemento.Diagnostico.OnsetVerticalGenerado);
 
     if isfield(Reporte, 'Comparacion') && ~isempty(Reporte.Comparacion)
         Comparacion = Reporte.Comparacion;

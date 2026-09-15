@@ -9,7 +9,10 @@ function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Es
 %   Que parametros consume cada modo lo declara ParametrosDelModo, y tiene
 %   que coincidir con lo que se lee aca. El modo normativo lee ademas la
 %   curva limite de la Receta del elemento (Receta.CurvaLimiteGz): cada
-%   elemento persigue la suya, no hay una curva global.
+%   elemento persigue la suya, no hay una curva global. Si la Receta trae
+%   ademas Receta.CurvaLimiteGy (el dive loop), el modo persigue un Gy a la
+%   vez que el Gz desalineando la curvatura respecto de U (sub-peralte): en
+%   ese caso el angulo que devuelve es el resuelto, no el que pide la Receta.
 %
 %   Todos los objetivos de G son del PASAJERO, no del riel. El riel es el eje
 %   de roll y el pasajero va a distancia Brazo sobre U, asi que su Gz vale
@@ -82,6 +85,15 @@ function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Es
             GLimite = LimiteNormativo(Receta.CurvaLimiteGz, DuracionReal);
             ObjetivoSinGravedad = g*(GLimite - ArribaVertical) / VelocidadCentroDeMasa^2;
 
+            if isfield(Receta, 'CurvaLimiteGy') && ~isempty(Receta.CurvaLimiteGy)
+                GyObjetivo = ObjetivoDeGyDentroDeLaElipse(GLimite, DuracionReal, Receta, Parametros.TolObjetivoDeG);
+                [Curvatura, AnguloDesdeArriba] = CurvaturaDelRielParaGzYGyObjetivo( ...
+                    ObjetivoSinGravedad, (GyObjetivo - Punto.VersorLateral(3))*g/VelocidadCentroDeMasa^2, ...
+                    Brazo, d, VelocidadCentroDeMasa, Punto.VelocidadRoll, Punto.AceleracionRoll, ...
+                    -g*Punto.VersorTangente(3), Punto.InclinacionHelicoidal);
+                return
+            end
+
         otherwise
             error('CurvaturaDelModo:ModoDesconocido', 'Modo de curvatura no reconocido: %s', Parametros.ModoCurvatura);
     end
@@ -100,6 +112,56 @@ function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Es
 end
 
 %% ========================= auxiliares =====================================
+function GyObjetivo = ObjetivoDeGyDentroDeLaElipse(GzLimite, DuracionReal, Receta, Tolerancia)
+%OBJETIVODEGYDENTRODELAELIPSE Gy maximo admisible dado el Gz que ya se pide.
+%   Apuntar a la vez al +Gz maximo de la Fig. 10 y al |Gy| maximo de la
+%   Fig. 8 viola la elipse de dos ejes de 7.1.5.1 por construccion:
+%   (3.0/3.3)^2 + (6.0/6.6)^2 = 1.65 > 1. Decision del usuario: se prioriza
+%   el Gz al maximo y el Gy es lo que deja la elipse, o la curva de la
+%   Fig. 8 si es mas restrictiva. Los semiejes son los limites de 200 ms
+%   multiplicados por 1.1, igual que en VerificarLimitesNormativos. El lado
+%   lo fija Receta.SentidoDeGy (+1 hacia el versor lateral del carro).
+%
+%   Se le descuenta al objetivo la tolerancia con la que el chequeo posterior
+%   admite que el transporte inverso erre (TolObjetivoDeG): un objetivo
+%   exactamente sobre la elipse la viola con el ruido numerico de la
+%   simulacion, y el chequeo de 7.1.5.1 es estricto.
+    SemiejeGz = 1.1*abs(LimiteNormativo(Receta.CurvaLimiteGz, 0.2));
+    SemiejeGy = 1.1*abs(LimiteNormativo(Receta.CurvaLimiteGy, 0.2));
+    GyDeLaElipse = SemiejeGy*sqrt(max(1 - (GzLimite/SemiejeGz)^2, 0));
+    GyDeLaCurva  = abs(LimiteNormativo(Receta.CurvaLimiteGy, DuracionReal));
+    GyObjetivo   = Receta.SentidoDeGy * max(min(GyDeLaElipse, GyDeLaCurva) - Tolerancia, 0);
+end
+
+function [Curvatura, AnguloDesdeArriba] = CurvaturaDelRielParaGzYGyObjetivo(ObjetivoZ, ObjetivoY, Brazo, d, ...
+        VelocidadCentroDeMasa, VelocidadRollBase, AceleracionRoll, AceleracionTangencial, Inclinacion)
+%CURVATURADELRIELPARAGZYGYOBJETIVO Dos objetivos, dos incognitas: ku y kl.
+%   ObjetivoZ = (Gz_obj - Uz)*g/v_cm^2 y ObjetivoY = (Gy_obj - Lz)*g/v_cm^2.
+%   Gz depende solo de ku (CargasEnLaVia), asi que ku sale de la misma
+%   cuadratica del caso de un objetivo con c = 1. Con ku conocido, la
+%   ecuacion de Gy es lineal en kl:
+%       kl*(1 - Brazo*ku) = J^2*(ObjetivoY - Brazo*a_t*phi'/v_cm^2) - Brazo*phi''
+%   con J^2 = (1 - d*ku)^2 + d^2*phi'^2. El angulo de la curvatura respecto
+%   de U queda resuelto, no prescripto: es el sub-peralte. Si hay helice,
+%   phi' lleva Inclinacion*kappa y se cierra por punto fijo.
+
+    Curvatura = 0;
+    for Iteracion = 1:4
+        VelocidadRoll = VelocidadRollBase + Inclinacion*Curvatura;
+        CurvaturaArribaCarro = CurvaturaDelRielParaGzObjetivo(ObjetivoZ, 1, Brazo, d, VelocidadRoll, 0);
+        FactorJ2 = (1 - d*CurvaturaArribaCarro)^2 + (d*VelocidadRoll)^2;
+        CurvaturaLateralCarro = (FactorJ2*(ObjetivoY - Brazo*AceleracionTangencial*VelocidadRoll/VelocidadCentroDeMasa^2) ...
+                                 - Brazo*AceleracionRoll) / (1 - Brazo*CurvaturaArribaCarro);
+        CurvaturaNueva = hypot(CurvaturaArribaCarro, CurvaturaLateralCarro);
+        if Inclinacion == 0 || abs(CurvaturaNueva - Curvatura) < 1e-10
+            Curvatura = CurvaturaNueva;
+            break
+        end
+        Curvatura = CurvaturaNueva;
+    end
+    AnguloDesdeArriba = atan2(CurvaturaLateralCarro, CurvaturaArribaCarro);
+end
+
 function Curvatura = CurvaturaDelRielParaGzObjetivo(Objetivo, Coseno, Brazo, d, VelocidadRollBase, Inclinacion)
 %CURVATURADELRIELPARAGZOBJETIVO Cuadratica del transporte inverso.
 %   Objetivo = (Gz_objetivo - Uz)*g/v_cm^2, o sea la centripeta que hay que

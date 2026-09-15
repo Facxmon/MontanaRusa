@@ -351,6 +351,45 @@ Resultados = Anotar(Resultados, 'El modo normativo pone el +Gz limite en el pasa
     sprintf('desvio maximo |Gz - GLimite(t)| sobre el arco: %s (limite 0.02 G); criterio posterior pasa en los cuatro', ...
             strjoin(Detalles, ', ')));
 
+%% --- Test 13: el dive loop alcanza su Gy objetivo por sub-peralte -------
+% En modo normativo el dive loop persigue ademas un Gy lateral, desalineando
+% la curvatura del riel respecto de U. Se verifica que sobre el arco el Gy
+% del pasajero coincide con el objetivo (el maximo que deja la elipse de
+% 7.1.5.1 dado el Gz de la Fig. 10, o la Fig. 8 si es mas restrictiva), que
+% el sub-peralte no es trivial, que el giro sigue cerrando y que los chequeos
+% de elipse y de onset lateral pasan: el perfil resuelto no viola el
+% presupuesto porque las clotoides se dimensionan tambien por el eje lateral.
+Parametros = ParametrosBase;
+Parametros.ModoCurvatura = 'GNormativaMaxima';
+Estado = EstadoInicial([0 0 1.0], [1 0 0], [0 0 1], 6.0, Parametros);
+[~, ElementoGy, ReporteGy] = ElementoDiveLoop(Estado, Parametros);
+TrackGy = ElementoGy.Track;  SimGy = ElementoGy.Sim;  RecetaGy = ElementoGy.Receta;
+
+IndiceArco = find(strcmp({TrackGy.SubTramos.Nombre}, 'ArcoPrincipal'), 1);
+RangoArco  = TrackGy.SubTramos(IndiceArco).IndiceInicio : TrackGy.SubTramos(IndiceArco).IndiceFin;
+DuracionReal = (SimGy.Tiempo(RangoArco) - SimGy.Tiempo(RangoArco(1))) * ElementoGy.Diagnostico.Escala.RaizLambdaLoop;
+GzLimite = arrayfun(@(D) LimiteNormativo(RecetaGy.CurvaLimiteGz, D), DuracionReal);
+SemiejeGz = 1.1*LimiteNormativo(RecetaGy.CurvaLimiteGz, 0.2);
+SemiejeGy = 1.1*LimiteNormativo(RecetaGy.CurvaLimiteGy, 0.2);
+GyObjetivo = RecetaGy.SentidoDeGy * (min(arrayfun(@(D) LimiteNormativo(RecetaGy.CurvaLimiteGy, D), DuracionReal), ...
+                                         SemiejeGy*sqrt(max(1 - (GzLimite/SemiejeGz).^2, 0))) - Parametros.TolObjetivoDeG);
+DesvioGy = max(abs(SimGy.Gy(RangoArco) - GyObjetivo));
+SubPeralteMaximo = max(abs(TrackGy.AnguloCurvaturaDesdeArriba(RangoArco)));
+
+Nombres = {ReporteGy.Posteriores.Nombre};
+Pasa = @(Nombre) ReporteGy.Posteriores(strcmp(Nombres, Nombre)).Pasa;
+ChequeosQueImportan = Pasa('Gy objetivo del modo alcanzado') && Pasa('Gz objetivo del modo alcanzado') ...
+                   && Pasa('Elipse de dos ejes Gy-Gz (7.1.5.1)') && Pasa('Onset maximo de Gy') ...
+                   && Pasa('Giro objetivo alcanzado');
+
+Resultados = Anotar(Resultados, 'El dive loop alcanza su Gy objetivo por sub-peralte', ...
+    DesvioGy < 0.02 && SubPeralteMaximo > deg2rad(5) && ChequeosQueImportan, ...
+    sprintf(['|Gy - objetivo| max %.4f G sobre el arco (objetivo %.2f G, limite 0.02); sub-peralte hasta %.1f grados; ' ...
+             'residual de cierre %.2e rad; elipse 7.1.5.1 = %.3f; onset Gy %.1f de %.1f G/s'], ...
+            DesvioGy, abs(GyObjetivo(1)), rad2deg(SubPeralteMaximo), ReporteGy.Resumen.ResidualCierrePitch, ...
+            ReporteGy.Normativo.Elipse.ValorMaximoGyGz, ReporteGy.Normativo.OnsetMaximoPorEje(2), ...
+            ReporteGy.Resumen.OnsetMaximoModelo(2)));
+
 %% --- Resumen ----------------------------------------------------------
 fprintf('\n');
 NoPasan = 0;

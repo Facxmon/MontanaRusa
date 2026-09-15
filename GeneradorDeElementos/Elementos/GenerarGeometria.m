@@ -143,7 +143,7 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
             AjusteCierre = AjusteCierre + ResidualCierre;
         end
 
-        OnsetMedido = OnsetVerticalDelRecorrido(Recorrido.Registro);
+        [OnsetMedido, OnsetLateralMedido] = OnsetDelRecorrido(Recorrido.Registro);
         if ~isempty(Recorrido.Aviso)
             break
         end
@@ -151,9 +151,11 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
         % Puntos fijos, NO cortes al primer valor que cumple. Cortar por
         % cumplimiento haria que la geometria dependiera de forma discontinua
         % de los datos de entrada, y ahi los metodos A y B dejan de coincidir
-        % aunque los dos esten bien.
-        FactorSiguiente = (1 + Parametros.MargenDeOnset) * FactorLongitud ...
-                          * OnsetMedido / Escala.OnsetMaximo(3);
+        % aunque los dos esten bien. Realimenta el eje que peor esta respecto
+        % de su presupuesto: el vertical (clotoides) o el lateral (transicion
+        % de roll y sub-peralte).
+        OnsetRelativo = max(OnsetMedido / Escala.OnsetMaximo(3), OnsetLateralMedido / Escala.OnsetMaximo(2));
+        FactorSiguiente = (1 + Parametros.MargenDeOnset) * FactorLongitud * OnsetRelativo;
 
         InclinacionSiguiente = Inclinacion;
         if AjustarInclinacion && Recorrido.LongitudDelGiro > 0
@@ -199,6 +201,11 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
     Track.NormalDelPlano          = NormalEnPlano;
     Track.InclinacionHelicoidal   = Inclinacion;
     Track.AnguloPeralte           = AnguloDePeralte(Registro.VersorTangente, Registro.VersorArribaCarro);
+    % Angulo de la curvatura del riel medido desde U hacia L en el marco del
+    % carro. En loop y dive loop es 0 salvo donde el modo lo desalinea a
+    % proposito (sub-peralte); en los giros es el complemento del peralte.
+    Track.AnguloCurvaturaDesdeArriba = atan2(Registro.CurvaturaLateralCarro, Registro.CurvaturaArribaCarro);
+    Track.AnguloCurvaturaDesdeArriba(Registro.Curvatura < 1e-9) = 0;
     Track.DerivadaCurvatura       = gradient(Registro.Curvatura, Registro.Arco);
 
     % --- Heartline: la curva integrada es el riel, la heartline se deriva ----
@@ -232,6 +239,7 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
     Diagnostico.Escala                     = Escala;
     Diagnostico.FactorLongitudTransicion   = FactorLongitud;
     Diagnostico.OnsetVerticalGenerado      = OnsetMedido;
+    Diagnostico.OnsetLateralGenerado       = OnsetLateralMedido;
 
     % Perfil de velocidad que salio de la marcha acoplada. Es lo que el
     % metodo B realimenta en la iteracion siguiente.
@@ -380,9 +388,15 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     % porque la velocidad del riel, que es la que dimensiona la clotoide,
     % recien se conoce con la curvatura (la del estado de entrada, aca).
     [~, PuntoInicial] = DerivadaDeVia(Arco, y, Contexto);
-    CurvaturaObjetivo = CurvaturaDelModo(PuntoInicial, Parametros, Plan.Escala, PuntoInicial.Tiempo, Plan.Receta);
-    LongitudEntrada = LongitudDeClotoide(PuntoInicial.Velocidad, ...
-                                         CurvaturaObjetivo - CurvaturaInicialArco, Plan.Onset(3), Parametros);
+    [CurvaturaObjetivo, AnguloObjetivo] = CurvaturaDelModo(PuntoInicial, Parametros, Plan.Escala, ...
+                                                           PuntoInicial.Tiempo, Plan.Receta);
+    % La rampa va del vector de entrada al vector objetivo, y cada componente
+    % en el marco del carro tiene su propio presupuesto de onset: manda la
+    % que pida mas longitud.
+    AnguloInicial = PuntoInicial.AnguloCurvaturaDesdeArriba;
+    LongitudEntrada = LongitudDeClotoidePorEjes(PuntoInicial.Velocidad, ...
+        CurvaturaObjetivo*cos(AnguloObjetivo) - CurvaturaInicialArco*cos(AnguloInicial), ...
+        CurvaturaObjetivo*sin(AnguloObjetivo) - CurvaturaInicialArco*sin(AnguloInicial), Plan.Onset, Parametros);
     Recorrido.LongitudClotoideEntrada = LongitudEntrada;
 
     ArcoInicio = Arco;
@@ -421,13 +435,19 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     %% --- ClotoideSalida ---
     [~, PuntoFinArco] = DerivadaDeVia(Arco, y, Contexto);
     CurvaturaFinArco = PuntoFinArco.Curvatura;
-    LongitudSalida = LongitudDeClotoide(PuntoFinArco.Velocidad, CurvaturaFinArco, ...
-                                        Plan.Onset(3), Parametros);
+    LongitudSalida = LongitudDeClotoidePorEjes(PuntoFinArco.Velocidad, PuntoFinArco.CurvaturaArribaCarro, ...
+                                               PuntoFinArco.CurvaturaLateralCarro, Plan.Onset, Parametros);
     Recorrido.LongitudClotoideSalida = LongitudSalida;
 
+    % Si el modo desalineo la curvatura respecto de la direccion de la
+    % Receta (sub-peralte), la rampa de salida conserva ese desvio: cambiar
+    % la direccion de golpe al salir del arco seria un salto de Gy.
+    DesvioFinArco = atan2(PuntoFinArco.CurvaturaLateralCarro, PuntoFinArco.CurvaturaArribaCarro) ...
+                  - PuntoFinArco.AnguloCurvaturaDesdeArriba;
     ArcoInicio = Arco;
     Contexto.FuncionCurvatura = @(Punto) ProyectarCurvatura( ...
-        CurvaturaFinArco * (1 - FraccionDeTramo(Punto.Arco, ArcoInicio, LongitudSalida)), AnguloDeCurvatura(Punto));
+        CurvaturaFinArco * (1 - FraccionDeTramo(Punto.Arco, ArcoInicio, LongitudSalida)), ...
+        AnguloDeCurvatura(Punto) + DesvioFinArco);
 
     Indice = Recorrido.Registro.NumeroDeNodos + 1;
     [Recorrido.Registro, y, Arco] = IntegrarTramo(Recorrido.Registro, y, Arco, Contexto, LongitudSalida, []);
@@ -512,9 +532,19 @@ function Giro = GiroDeLaClotoideDeSalida(Punto, Plan)
 %GIRODELACLOTOIDEDESALIDA Angulo que va a girar la clotoide de salida si el
 %   arco terminara en este punto. Con la rampa lineal es el area del
 %   triangulo: kappa/2 * L.
-    Longitud = LongitudDeClotoide(Punto.Velocidad, Punto.Curvatura, ...
-                                  Plan.Onset(3), Plan.Parametros);
+    Longitud = LongitudDeClotoidePorEjes(Punto.Velocidad, Punto.CurvaturaArribaCarro, ...
+                                         Punto.CurvaturaLateralCarro, Plan.Onset, Plan.Parametros);
     Giro = 0.5 * Punto.Curvatura * Longitud;
+end
+
+function Longitud = LongitudDeClotoidePorEjes(Velocidad, DeltaCurvaturaArriba, DeltaCurvaturaLateral, Onset, Parametros)
+%LONGITUDDECLOTOIDEPOREJES Longitud de rampa que respeta el presupuesto de
+%   onset de cada eje del carro. El cambio de la componente sobre U produce
+%   onset de Gz y el de la componente sobre L, onset de Gy; cada uno tiene su
+%   presupuesto (Onset(3) y Onset(2)) y manda el que pida mas longitud. Con
+%   la curvatura alineada con U se reduce a la formula de un solo eje.
+    Longitud = max(LongitudDeClotoide(Velocidad, DeltaCurvaturaArriba,  Onset(3), Parametros), ...
+                   LongitudDeClotoide(Velocidad, DeltaCurvaturaLateral, Onset(2), Parametros));
 end
 
 function Fraccion = FraccionDeTramo(Arco, ArcoInicio, Longitud)
@@ -579,19 +609,22 @@ function Peralte = AnguloDePeralte(VersorTangente, VersorArribaCarro)
     Peralte(NormaHorizontal < 1e-9) = NaN;   % tangente vertical: no esta definido
 end
 
-function Onset = OnsetVerticalDelRecorrido(Registro)
-%ONSETVERTICALDELRECORRIDO Tasa de aparicion de la G vertical en el punto de
-%   verificacion, medida sobre el recorrido recien generado. Se usa para
-%   realimentar la longitud de las transiciones. Es la G que la norma limita,
-%   ya transportada desde el riel con el brazo de verificacion; dG/dt sale de
-%   dG/ds por la velocidad del punto del riel, que es la que marca el tiempo.
+function [OnsetVertical, OnsetLateral] = OnsetDelRecorrido(Registro)
+%ONSETDELRECORRIDO Tasa de aparicion de la G vertical y de la lateral en el
+%   punto de verificacion, medidas sobre el recorrido recien generado. Se
+%   usan para realimentar la longitud de las transiciones. Son las G que la
+%   norma limita, ya transportadas desde el riel con el brazo de
+%   verificacion; dG/dt sale de dG/ds por la velocidad del punto del riel,
+%   que es la que marca el tiempo.
     n = Registro.NumeroDeNodos;
     if n < 3
-        Onset = 0;
+        OnsetVertical = 0;
+        OnsetLateral  = 0;
         return
     end
     Arco = Registro.Arco(1:n);
-    Onset = max(abs(gradient(Registro.GArribaVerificacion(1:n), Arco) .* Registro.Velocidad(1:n)));
+    OnsetVertical = max(abs(gradient(Registro.GArribaVerificacion(1:n),  Arco) .* Registro.Velocidad(1:n)));
+    OnsetLateral  = max(abs(gradient(Registro.GLateralVerificacion(1:n), Arco) .* Registro.Velocidad(1:n)));
 end
 
 function Longitud = LongitudDeClotoide(Velocidad, DeltaCurvatura, Onset, Parametros)

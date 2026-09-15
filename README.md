@@ -51,7 +51,7 @@ Detalle completo en [`documentacion_generador_elementos.md` §2](documentacion_g
 run('analisis_energia.m')     % modelo preliminar sobre una trayectoria de prueba (no es geometría de diseño)
 run('DemoElemento.m')         % un elemento del generador en detalle: reporte y gráficos
 run('DemoLayout.m')           % los cuatro elementos encadenados en un circuito
-run('TestsValidacion.m')      % once tests del generador, termina con error si alguno falla
+run('TestsValidacion.m')      % trece tests del generador, termina con error si alguno falla
 ```
 
 Los parámetros del generador de elementos se configuran en un único lugar:
@@ -62,7 +62,7 @@ Los parámetros del generador de elementos se configuran en un único lugar:
 
 | Área | Estado |
 |---|---|
-| Generador de geometría (loop, hélice, over-banked turn, dive loop) | Implementado y con 10 tests pasando (ver [`documentacion_generador_elementos.md` §11](documentacion_generador_elementos.md#11-tests-de-validación)) |
+| Generador de geometría (loop, hélice, over-banked turn, dive loop) | Implementado y con 13 tests pasando (ver [`documentacion_generador_elementos.md` §11](documentacion_generador_elementos.md#11-tests-de-validación)) |
 | Modelo de heartline (tres curvas: riel, heartline, cabeza) | Implementado; el riel es la curva integrada y el eje de roll, la heartline se deriva y la G se impone en el pasajero por transporte inverso (ver [`documentacion_generador_elementos.md` §14](documentacion_generador_elementos.md#14-el-modelo-de-heartline-tres-curvas)) |
 | Verificación normativa contra ASTM F2291 | Implementada; valores de la norma sin verificar contra el texto original (ver [`memoria_de_calculo.md` §11](memoria_de_calculo.md#11-datos-pendientes-de-verificación)) |
 | Análisis energético (`analisis_energia.m`) | Modelo preliminar, corre sobre trayectoria de prueba; falta importar geometría real y pasar a RK4 (ver [`documentacion_analisis_energia.md` §15](documentacion_analisis_energia.md#15-limitaciones-actuales--próximos-pasos)) |
