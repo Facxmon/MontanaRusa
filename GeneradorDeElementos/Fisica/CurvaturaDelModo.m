@@ -1,9 +1,15 @@
-function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Escala, ArcoTiempoDeReferencia)
+function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Escala, ArcoTiempoDeReferencia, Receta)
 %CURVATURADELMODO Curvatura del RIEL que pide el modo elegido en un punto del arco.
 %   Devuelve el modulo de la curvatura del riel y el angulo, medido desde U
 %   hacia L en el plano normal del carro, en el que hay que ponerla. Los modos
-%   1, 3 y 4 dependen de v: ahi esta el origen del acoplamiento entre
-%   geometria y dinamica que obliga a los dos metodos de resolucion.
+%   AceleracionNormalConstante, FuerzaGConstante y GNormativaMaxima dependen
+%   de v: ahi esta el origen del acoplamiento entre geometria y dinamica que
+%   obliga a los dos metodos de resolucion.
+%
+%   Que parametros consume cada modo lo declara ParametrosDelModo, y tiene
+%   que coincidir con lo que se lee aca. El modo normativo lee ademas la
+%   curva limite de la Receta del elemento (Receta.CurvaLimiteGz): cada
+%   elemento persigue la suya, no hay una curva global.
 %
 %   Todos los objetivos de G son del PASAJERO, no del riel. El riel es el eje
 %   de roll y el pasajero va a distancia Brazo sobre U, asi que su Gz vale
@@ -28,11 +34,19 @@ function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Es
 %       devuelve la curvatura de ese maximo y el chequeo posterior de "Gz
 %       objetivo alcanzado" lo reporta con el motivo.
 %
-%   En los modos 3 y 4 aparece Uz, la componente vertical del versor "arriba
-%   del carro", que en un loop plano vale cos(theta): en la cuspide es -1 y
-%   ahi la velocidad es minima, asi que la curvatura es maxima. Eso es lo que
-%   da la forma de lagrima del loop clotoide real. Si sale un circulo, hay
-%   error.
+%   En FuerzaGConstante y GNormativaMaxima aparece Uz, la componente vertical
+%   del versor "arriba del carro", que en un loop plano vale cos(theta): en la
+%   cuspide es -1 y ahi la velocidad es minima, asi que la curvatura es
+%   maxima. Eso es lo que da la forma de lagrima del loop clotoide real. Si
+%   sale un circulo, hay error.
+%
+%   GNormativaMaxima sigue el tiempo desde el comienzo del arco, lo convierte
+%   a duracion del prototipo (x sqrt(lambda)) y pide en cada punto el +Gz de
+%   la curva limite para esa duracion: el arco entero se trata como un unico
+%   evento sostenido que empieza al arrancar el arco. La verificacion
+%   posterior mide en cambio la duracion de cada evento sostenido por nivel,
+%   que arranca en la clotoide de entrada: la diferencia esta cuantificada en
+%   documentacion_generador_elementos.md, seccion 5, y no se corrige aca.
 
     g = Parametros.Gravedad;
     d = Parametros.DistanciaHeartline;
@@ -57,10 +71,15 @@ function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Es
         case 'FuerzaGConstante'
             ObjetivoSinGravedad = g*(Parametros.FuerzaGObjetivo - ArribaVertical) / VelocidadCentroDeMasa^2;
 
-        case 'GMaximas'
+        case 'GNormativaMaxima'
+            if nargin < 5 || ~isfield(Receta, 'CurvaLimiteGz') || isempty(Receta.CurvaLimiteGz)
+                error('CurvaturaDelModo:SinCurvaLimite', ...
+                     ['El modo GNormativaMaxima necesita Receta.CurvaLimiteGz: cada elemento ' ...
+                      'declara que curva de la norma persigue (ver ElementoLoopVertical y companeros).']);
+            end
             DuracionModelo = max(Punto.Tiempo - ArcoTiempoDeReferencia, 0);
             DuracionReal   = DuracionModelo * Escala.RaizLambdaLoop;
-            GLimite = LimiteNormativo(Parametros.CurvaLimiteGMaximas, DuracionReal);
+            GLimite = LimiteNormativo(Receta.CurvaLimiteGz, DuracionReal);
             ObjetivoSinGravedad = g*(GLimite - ArribaVertical) / VelocidadCentroDeMasa^2;
 
         otherwise

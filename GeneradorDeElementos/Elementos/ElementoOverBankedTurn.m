@@ -23,6 +23,7 @@ function [EstadoSalida, Elemento, Reporte] = ElementoOverBankedTurn(EstadoEntrad
     Receta.DesfasajeDeCurvatura   = Sentido * pi/2;
     Receta.RollDelElemento        = Sentido * Parametros.PeralteDelGiro;
     Receta.DesplazamientoObjetivo = -Sentido * Parametros.AvanceDelGiro;
+    Receta.CurvaLimiteGz          = 'MasGzTodas';   % Fig. 10: lo que persigue el modo normativo
 
     [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Parametros, Receta, Layout);
 end

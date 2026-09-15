@@ -112,7 +112,8 @@ Parametros.AvanceDelGiro  = 0;             % [m] 0 = giro a nivel
 Parametros.SentidoDelGiro = 'Derecha';   % 'Derecha' | 'Izquierda'
 
 % Modo de curvatura del arco:
-%   'AceleracionNormalConstante' | 'Clotoide' | 'FuerzaGConstante' | 'GMaximas'
+%   'AceleracionNormalConstante' | 'Clotoide' | 'FuerzaGConstante' | 'GNormativaMaxima'
+% Que parametros consume cada uno lo declara ParametrosDelModo.
 Parametros.ModoCurvatura              = 'Clotoide';
 
 % Metodo de acoplamiento geometria-dinamica:
@@ -122,9 +123,10 @@ Parametros.ModoCurvatura              = 'Clotoide';
 %            la geometria que queda es la del metodo A.
 Parametros.MetodoDeAcoplamiento = 'A';
 Parametros.CalcularVelocidadMinima = true;
-Parametros.AceleracionNormalObjetivo  = 20;    % [m/s^2] modo 1
-Parametros.FuerzaGObjetivo            = 3.0;   % [G] modo 3, G neta incluida la gravedad
-Parametros.CurvaLimiteGMaximas        = 'MasGzTodas';   % modo 4
+Parametros.AceleracionNormalObjetivo  = 20;    % [m/s^2] modo AceleracionNormalConstante
+Parametros.FuerzaGObjetivo            = 3.0;   % [G] modo FuerzaGConstante, G neta incluida la gravedad
+% El modo GNormativaMaxima no tiene parametro global: la curva de la norma que
+% persigue es parte de la Receta de cada elemento (Receta.CurvaLimiteGz).
 
 %% ------------------- Criterios de aceptacion --------------------------
 Parametros.GMinimaCuspide = 0.50;   % [G] margen en la cuspide; N = 0 no sirve como criterio
@@ -168,6 +170,7 @@ Parametros.PasoBusquedaVelocidad = 0.010;   % [m] paso grueso para la biseccion 
 %% ------------------------- Tolerancias --------------------------------
 Parametros.TolNorma            = 1e-12;
 Parametros.TolCierrePitch      = 1e-4;    % [rad]
+Parametros.TolObjetivoDeG      = 0.05;    % [G] desvio admitido entre la G del pasajero y la que pidio el modo
 Parametros.TolPuntoFijo        = 1e-8;    % [m/s] cambio maximo de v entre iteraciones
 Parametros.MaxIteracionesPuntoFijo = 60;
 Parametros.MaxIteracionesCierre    = 6;

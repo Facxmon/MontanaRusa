@@ -26,6 +26,7 @@ function [EstadoSalida, Elemento, Reporte] = ElementoHelice(EstadoEntrada, Param
     % izquierda. Se le pone el signo para que AvanceDeLaHelice signifique
     % siempre "sube" cuando es positivo.
     Receta.DesplazamientoObjetivo = -Sentido * Parametros.AvanceDeLaHelice;
+    Receta.CurvaLimiteGz          = 'MasGzTodas';   % Fig. 10: lo que persigue el modo normativo
 
     [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Parametros, Receta, Layout);
 end

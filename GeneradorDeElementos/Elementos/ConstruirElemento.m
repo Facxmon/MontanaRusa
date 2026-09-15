@@ -57,6 +57,8 @@ function [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Pa
         ['Si falla, las transiciones consumen mas giro que el que pide el elemento: ' ...
          'hay que agrandar el radio o entrar mas lento.']);
 
+    Reporte.Posteriores = CriterioDeObjetivoDeG(Reporte.Posteriores, Track, Sim, Diagnostico, Receta, Parametros);
+
     %% ---------------- Estado de salida -------------------------------------
     % El estado que se encadena viaja sobre el RIEL: es la curva que integra
     % el elemento siguiente. La heartline se deriva de el, nunca al reves. La
@@ -157,6 +159,51 @@ end
 %% ========================= auxiliares =====================================
 function Longitud = LongitudDePolilinea(Puntos)
     Longitud = sum(vecnorm(diff(Puntos, 1, 1), 2, 2));
+end
+
+function Criterios = CriterioDeObjetivoDeG(Criterios, Track, Sim, Diagnostico, Receta, Parametros)
+%CRITERIODEOBJETIVODEG El pasajero recibio en el arco la G que pidio el modo.
+%   Es el chequeo que cierra el transporte inverso: el modo resuelve la
+%   curvatura del riel para que el punto de verificacion reciba la G
+%   objetivo, y aca se mide, sobre la simulacion ya hecha, cuanto se aparto.
+%   Falla si el objetivo era inalcanzable a esa velocidad (la cuadratica del
+%   transporte inverso no tiene raiz real y devuelve la curvatura del maximo)
+%   o si alguna aproximacion dentro del paso pesa mas de lo que deberia.
+%   Solo aplica a los modos que persiguen una G; en Clotoide y
+%   AceleracionNormalConstante es informativo y no se evalua.
+
+    Indice = find(strcmp({Track.SubTramos.Nombre}, 'ArcoPrincipal'), 1);
+    if isempty(Indice)
+        return
+    end
+    Rango = Track.SubTramos(Indice).IndiceInicio : Track.SubTramos(Indice).IndiceFin;
+    Rango = Rango(~isnan(Sim.Gz(Rango)));
+    if isempty(Rango)
+        Criterios = AgregarCriterio(Criterios, 'Gz objetivo del modo alcanzado', 'Informativo', NaN, NaN, 'G', ...
+            'El arco principal quedo vacio: las clotoides consumieron todo el giro.');
+        return
+    end
+
+    switch Parametros.ModoCurvatura
+        case 'FuerzaGConstante'
+            Objetivo = Parametros.FuerzaGObjetivo * ones(numel(Rango), 1);
+            Detalle  = sprintf('FuerzaGObjetivo = %.2f G', Parametros.FuerzaGObjetivo);
+        case 'GNormativaMaxima'
+            % Misma definicion de duracion que el modo: desde el inicio del arco.
+            DuracionReal = (Sim.Tiempo(Rango) - Sim.Tiempo(Rango(1))) * Diagnostico.Escala.RaizLambdaLoop;
+            Objetivo = arrayfun(@(D) LimiteNormativo(Receta.CurvaLimiteGz, D), DuracionReal);
+            Detalle  = sprintf('curva %s, de %.2f a %.2f G a lo largo del arco (%.2f s reales)', ...
+                               Receta.CurvaLimiteGz, Objetivo(1), Objetivo(end), DuracionReal(end));
+        otherwise
+            return
+    end
+
+    Desvio = max(abs(Sim.Gz(Rango) - Objetivo));
+    Criterios = AgregarCriterio(Criterios, 'Gz objetivo del modo alcanzado', 'MenorOIgual', ...
+        Desvio, Parametros.TolObjetivoDeG, 'G', ...
+        sprintf(['%s; medido en el punto de verificacion (brazo %.3f m). Si falla, el objetivo era ' ...
+                 'inalcanzable a esa velocidad con ese brazo, o el arco es demasiado corto.'], ...
+                Detalle, Sim.BrazoDeVerificacion));
 end
 
 function Tabla = TablaDeResultados(Track, Sim)

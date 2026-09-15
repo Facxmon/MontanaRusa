@@ -130,7 +130,8 @@ Esta es la desambiguación adoptada; se aplica en todo el texto reescrito.
 | — | `Parametros.CalcularVelocidadMinima` | booleano: si se corre la búsqueda de velocidad inicial mínima | — (lógico) | generador §8 | `true` |
 | $a_n^{obj}$ | `Parametros.AceleracionNormalObjetivo` | aceleración normal objetivo del modo 1 | m/s² | generador §5 | 20 |
 | $G_{obj}$ | `Parametros.FuerzaGObjetivo` | G neta objetivo (incl. gravedad) del modo `FuerzaGConstante` | G | generador §5 | 3.0; corresponde al modo 3 de la tabla de curvatura |
-| — | `Parametros.CurvaLimiteGMaximas` | qué curva normativa sigue el modo `GMaximas` | — (enum, ver bloque 7) | generador §5 | `'MasGzTodas'` |
+| — | `Receta.CurvaLimiteGz` | qué curva normativa de $+G_z$ persigue el elemento en modo `GNormativaMaxima` | — (enum, ver bloque 7) | generador §5 | `'MasGzTodas'` en los cuatro elementos; la arma cada `ElementoXxx.m`, no es un parámetro global (antes `Parametros.CurvaLimiteGMaximas`) |
+| — | `Parametros.TolObjetivoDeG` | desvío admitido entre la $G_z$ del pasajero y la que pidió el modo, en el arco | G | generador §5 | 0.05 |
 | $G_{min,cúspide}$ | `Parametros.GMinimaCuspide` | margen mínimo de G en la cúspide (criterio ≠ $F_N=0$) | G | generador §8 | 0.50 |
 | $J_{x,max},J_{y,max},J_{z,max}$ (real) | `Parametros.OnsetNormativoPorEje` | presupuesto de onset por eje, en la norma (prototipo) | G/s | memoria §6.7 | `[5, 5, 15]`; $G_y$ **SIN CERRAR** (sin valor normativo propio, se adopta el más restrictivo) |
 | $J_{max}$ (modelo, override) | `Parametros.OnsetMaximoModelo` | override directo del presupuesto de onset del modelo; vacío = derivar de Froude | G/s | generador §7 | `[]` por defecto |
@@ -280,7 +281,7 @@ Esta es la desambiguación adoptada; se aplica en todo el texto reescrito.
 | Símbolo / campo | Nombre en código | Significado | Unidad | Definido en | Notas |
 |---|---|---|---|---|---|
 | $G_{lim}(\text{dur})$ | `LimiteNormativo(Curva, Duracion)` | límite de G admisible en función de la duración del evento sostenido | G | memoria §5.7 | interpolación lineal por tramos; ver curvas abajo |
-| — | `'MasGzTodas'` | Fig. 10, todas las sujeciones (+Gz, eyes down) | G | memoria §5.6 | curva por defecto de `CurvaLimiteGMaximas` |
+| — | `'MasGzTodas'` | Fig. 10, todas las sujeciones (+Gz, eyes down) | G | memoria §5.6 | curva que persiguen los cuatro elementos (`Receta.CurvaLimiteGz`) |
 | — | `'MasGzReducido'` | Fig. 10, columna reducida (precedido por ≥3 s de −Gz, §7.1.7.1) | G | memoria §5.6 | se activa automáticamente si hubo airtime sostenido >3 s |
 | — | `'MenosGzBase'` / `'MenosGzExtendido'` | Fig. 9, −Gz (airtime), base case / extended | G | memoria §5.5 | — |
 | — | `'GyBase'` | Fig. 8, ±Gy lateral | G | memoria §5.4 | — |

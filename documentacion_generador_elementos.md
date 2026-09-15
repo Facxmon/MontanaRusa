@@ -272,16 +272,24 @@ El arco se corta cuando el ángulo ya girado más lo que va a girar la clotoide 
 
 ## 5. Los cuatro modos de curvatura
 
-| Modo | $\kappa$ | ¿Depende de $v$? |
-|---|---|---|
-| `AceleracionNormalConstante` | $a_n / v^2$ | sí |
-| `Clotoide` | $1/R_{loop}$ (constante en el arco) | no |
-| `FuerzaGConstante` | $g\,(G_{obj} - U_z)/v^2$ | sí |
-| `GMaximas` | $g\,(G_{lim}(\text{duración}) - U_z)/v^2$ | sí |
+Cada modo fija qué G quiere en el **pasajero** (punto de verificación, brazo $b$ del riel) y `CurvaturaDelModo` devuelve la curvatura **del riel** que la produce, por transporte inverso ([`memoria_de_calculo.md` §3.6](memoria_de_calculo.md#36-transporte-inverso-la-curvatura-del-riel-para-una-g-del-pasajero)). Qué parámetros consume cada modo lo declara `ParametrosDelModo`, en el código.
+
+| Modo | Objetivo en el pasajero | ¿Depende de $v$? | Parámetros |
+|---|---|---|---|
+| `AceleracionNormalConstante` | centrípeta sobre $\mathbf U$ igual a $a_n$ | sí | `AceleracionNormalObjetivo` |
+| `Clotoide` | radio de la heartline igual a $R_{ref}$ (el riel va a $R_{ref}+d\cos\psi$) | no | `RadioDeReferencia` (lo pisa cada elemento con su radio) |
+| `FuerzaGConstante` | $G_z = G_{obj}$, constante en el arco | sí | `FuerzaGObjetivo` |
+| `GNormativaMaxima` | $G_z = G_{lim}(\text{duración})$, la curva de la norma que declara la **Receta** del elemento | sí | ninguno global: `Receta.CurvaLimiteGz` (y `Receta.CurvaLimiteGy` en el dive loop, §5.1) |
+
+En el caso plano sin roll el transporte inverso se reduce a $\kappa_{riel} = g(G_{obj}-U_z)\,/\,[v^2\cos\psi\,(1 - b\kappa\cos\psi)]$, con $\psi$ el ángulo entre la curvatura y $\mathbf U$: la proyección $\cos\psi$ es la que hace que una hélice peraltada 55° necesite $1/\sin 55° = 1.22$ veces más curvatura que un loop para la misma $G_z$, y que una curva sin peraltar no pueda generar $+G_z$ (hay una guarda explícita).
 
 $U_z$ (ver definición en [§3](#3-marco-de-referencia)) es la componente vertical del versor "arriba del carro", que en un loop plano vale $\cos\theta$. En la cúspide vale $-1$ y ahí $v$ es mínima, así que $\kappa$ es máxima: de ahí sale la **forma de lágrima** del loop clotoide real. Con el modo `Clotoide` sale un círculo, que es lo correcto para ese modo.
 
-El modo `GMaximas` sigue el tiempo de exposición desde el comienzo del arco, lo convierte a duración equivalente del prototipo multiplicando por $\sqrt\lambda_{loop}$ y evalúa la curva límite ahí (fórmula de conversión de duración: [`memoria_de_calculo.md` §5.1](memoria_de_calculo.md#51-definiciones-normativas-aplicables)). La interfaz está completa; la lógica de seguimiento de exposición es la simplificación de tratar el arco como un único evento sostenido.
+**Qué curva persigue cada elemento en `GNormativaMaxima`.** Loop vertical, hélice y over-banked turn apuntan al $+G_z$ máximo de la Fig. 10 (`'MasGzTodas'`). El dive loop apunta además a un $G_y$ objetivo (§5.1). La curva es parte de la Receta que arma cada `ElementoXxx.m`, no un parámetro global: un elemento solo no puede perseguir "todas las G máximas", y el nombre anterior del modo (`GMaximas`) sugería eso.
+
+El modo sigue el tiempo desde el comienzo del arco, lo convierte a duración equivalente del prototipo multiplicando por $\sqrt\lambda_{loop}$ y evalúa la curva límite ahí (fórmula de conversión de duración: [`memoria_de_calculo.md` §5.1](memoria_de_calculo.md#51-definiciones-normativas-aplicables)). El chequeo posterior **"Gz objetivo del modo alcanzado"** mide sobre la simulación cuánto se apartó la $G_z$ del pasajero de esa curva en el arco (tolerancia `TolObjetivoDeG`); falla si el objetivo era inalcanzable a esa velocidad —la cuadrática del transporte inverso no tiene raíz real— y lo dice.
+
+**Dos definiciones de duración, cuantificadas y no corregidas.** El modo trata el arco como un único evento sostenido que empieza al arrancar el arco; `VerificarLimitesNormativos` mide la duración de cada evento sostenido por nivel, y ese evento empieza **en la clotoide de entrada**, cuando la G ya cruzó el nivel. Sobre el loop vertical en modo normativo (v₀ = 4.6 m/s, defaults) el modo produce un perfil decreciente de 6.00 a 3.98 G en 4.02 s reales; al nivel 4.3 G el evento sostenido dura 1.96 s en vez de los 1.85 s que el modo supuso, y en la pendiente de −2 G/s de la Fig. 10 eso vale **+0.22 G de exceso** medido sobre la misma G que el modo impuso. En el dive loop no aparece porque el arco dura menos de 1 s y la curva es plana ahí. Corregirlo sería arrancar el reloj del modo en la clotoide de entrada (o descontar la duración de la clotoide); queda como decisión pendiente.
 
 ---
 
@@ -508,4 +516,4 @@ Para la rotación pura, el criterio normativo propio es un límite de **velocida
 - **Criterio de rotación por offset equivalente.** La rotación entra en la G del pasajero y en la longitud de transición de roll a través del brazo $b$. El criterio normativo propio de la rotación pura es un límite de velocidad angular (ASTM F2291 §7.1.6). Ver [§14.5](#145-lo-que-queda-abierto).
 - **Reparto entre juegos de ruedas — específico de este script.** En el generador de elementos (`Fisica/CargasEnLaVia.m` y `Fisica/ResistenciaAlAvance.m`) el reparto **ya se hace correctamente**, proyectando la normal sobre $\mathbf{U}$ y $\mathbf{L}$ del marco del carro: la componente sobre $\mathbf{U}$ va a las portantes si es positiva y a las de retención si es negativa, y la componente sobre $\mathbf{L}$ va a las de guía (código verificado: `ResistenciaAlAvance.m` líneas 10–12). Esto es distinto de lo que hace el script `analisis_energia.m` de la raíz del repo, que todavía asume peralte perfecto (ver [`documentacion_analisis_energia.md` §8](documentacion_analisis_energia.md#8-modelo-de-resistencia-al-avance)) — son dos scripts separados y esta sección se refiere únicamente al generador. Los tres $C_{rr}$ y el $C_d$ siguen siendo provisorios y **requieren calibración experimental**.
 - **Modo inverso**, elemento conector y tren de $n_{carros}>1$ quedan fuera de alcance, igual que el backend web.
-- **Modo `GMaximas`**: la interfaz está completa pero el seguimiento de duración de exposición trata el arco como un único evento sostenido.
+- **Modo `GNormativaMaxima`**: trata el arco como un único evento sostenido que empieza al arrancar el arco, mientras la verificación mide eventos que empiezan en la clotoide de entrada; la diferencia (+0.22 G en el loop de referencia) está cuantificada en [§5](#5-los-cuatro-modos-de-curvatura) y no corregida.

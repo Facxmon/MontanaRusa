@@ -24,6 +24,7 @@ function [EstadoSalida, Elemento, Reporte] = ElementoDiveLoop(EstadoEntrada, Par
     Receta.DesfasajeDeCurvatura   = pi;    % curvatura hacia abajo: el carro se zambulle
     Receta.RollDelElemento        = pi;    % entra invertido
     Receta.DesplazamientoObjetivo = Parametros.SeparacionDelDiveLoop;
+    Receta.CurvaLimiteGz          = 'MasGzTodas';   % Fig. 10: lo que persigue el modo normativo
 
     [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Parametros, Receta, Layout);
 end

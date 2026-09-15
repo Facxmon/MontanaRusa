@@ -176,6 +176,7 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
 
     Track.Nombre                  = Receta.Nombre;
     Track.ModoCurvatura           = Parametros.ModoCurvatura;
+    Track.Receta                  = Receta;
     Track.PuntosRiel              = Registro.Posicion;
     Track.LongitudArco            = Registro.Arco;       % arco del RIEL
     Track.VersorTangente          = Registro.VersorTangente;
@@ -379,7 +380,7 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     % porque la velocidad del riel, que es la que dimensiona la clotoide,
     % recien se conoce con la curvatura (la del estado de entrada, aca).
     [~, PuntoInicial] = DerivadaDeVia(Arco, y, Contexto);
-    CurvaturaObjetivo = CurvaturaDelModo(PuntoInicial, Parametros, Plan.Escala, PuntoInicial.Tiempo);
+    CurvaturaObjetivo = CurvaturaDelModo(PuntoInicial, Parametros, Plan.Escala, PuntoInicial.Tiempo, Plan.Receta);
     LongitudEntrada = LongitudDeClotoide(PuntoInicial.Velocidad, ...
                                          CurvaturaObjetivo - CurvaturaInicialArco, Plan.Onset(3), Parametros);
     Recorrido.LongitudClotoideEntrada = LongitudEntrada;
@@ -387,7 +388,7 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     ArcoInicio = Arco;
     TiempoReferencia = y(15);
     Contexto.FuncionCurvatura = @(Punto) MezclaDeClotoide(Punto, ArcoInicio, LongitudEntrada, ...
-                                    CurvaturaInicialArco, Parametros, Plan.Escala, TiempoReferencia);
+                                    CurvaturaInicialArco, Plan, TiempoReferencia);
 
     Indice = Recorrido.Registro.NumeroDeNodos + 1;
     [Recorrido.Registro, y, Arco] = IntegrarTramo(Recorrido.Registro, y, Arco, Contexto, LongitudEntrada, []);
@@ -401,8 +402,7 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
 
     %% --- ArcoLoop ---
     TiempoReferenciaArco = y(15);
-    Contexto.FuncionCurvatura = @(Punto) CurvaturaDelModoProyectada(Punto, Parametros, Plan.Escala, ...
-                                                                    TiempoReferenciaArco);
+    Contexto.FuncionCurvatura = @(Punto) CurvaturaDelModoProyectada(Punto, Plan, TiempoReferenciaArco);
 
     ArcoQueFalta = @(Punto) (Plan.Receta.GiroObjetivo - AjusteCierre ...
                              - (Punto.AnguloGirado - AnguloGiradoInicio) ...
@@ -485,15 +485,15 @@ function [CurvaturaArriba, CurvaturaLateral] = CurvaturaDeAcondicionamiento(Punt
     CurvaturaLateral = Plan.CurvaturaParalela*sin(Angulo) + CurvaturaPerpendicular*cos(Angulo);
 end
 
-function [CurvaturaArriba, CurvaturaLateral] = CurvaturaDelModoProyectada(Punto, Parametros, Escala, TiempoReferencia)
+function [CurvaturaArriba, CurvaturaLateral] = CurvaturaDelModoProyectada(Punto, Plan, TiempoReferencia)
 %CURVATURADELMODOPROYECTADA Curvatura del modo repartida sobre el marco de
 %   transporte. El modo devuelve el modulo y el angulo medido desde U del
 %   carro; sumarle el roll lo lleva al marco de transporte.
-    [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Escala, TiempoReferencia);
+    [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Plan.Parametros, Plan.Escala, TiempoReferencia, Plan.Receta);
     [CurvaturaArriba, CurvaturaLateral] = ProyectarCurvatura(Curvatura, Punto.AnguloRoll + AnguloDesdeArriba);
 end
 
-function [CurvaturaArriba, CurvaturaLateral] = MezclaDeClotoide(Punto, ArcoInicio, Longitud, CurvaturaInicial, Parametros, Escala, TiempoReferencia)
+function [CurvaturaArriba, CurvaturaLateral] = MezclaDeClotoide(Punto, ArcoInicio, Longitud, CurvaturaInicial, Plan, TiempoReferencia)
 %MEZCLADECLOTOIDE Rampa lineal entre la curvatura de entrada y la que pide el
 %   modo. Con el modo Clotoide la curvatura objetivo es constante y esto es
 %   exactamente una clotoide: dkappa/ds constante. Se mezclan las dos
@@ -501,7 +501,7 @@ function [CurvaturaArriba, CurvaturaLateral] = MezclaDeClotoide(Punto, ArcoInici
 %   respecto de U la direccion tambien entre en rampa y no salte al arrancar
 %   el arco.
     Fraccion = FraccionDeTramo(Punto.Arco, ArcoInicio, Longitud);
-    [ArribaObjetivo, LateralObjetivo] = CurvaturaDelModoProyectada(Punto, Parametros, Escala, TiempoReferencia);
+    [ArribaObjetivo, LateralObjetivo] = CurvaturaDelModoProyectada(Punto, Plan, TiempoReferencia);
     AnguloEntrada = Punto.AnguloRoll + Punto.AnguloCurvaturaDesdeArriba;
     [ArribaInicial, LateralInicial]   = ProyectarCurvatura(CurvaturaInicial, AnguloEntrada);
     CurvaturaArriba  = (1 - Fraccion)*ArribaInicial  + Fraccion*ArribaObjetivo;

@@ -19,7 +19,7 @@ Parametros = ParametrosPorDefecto();
 Elegido = @ElementoDiveLoop;   % @ElementoLoopVertical | @ElementoHelice
                                    % @ElementoOverBankedTurn | @ElementoDiveLoop
 
-Parametros.ModoCurvatura          = 'GMaximas';   % 'Clotoide' | 'FuerzaGConstante' | 'AceleracionNormalConstante' | 'GMaximas'
+Parametros.ModoCurvatura          = 'GNormativaMaxima';   % 'Clotoide' | 'FuerzaGConstante' | 'AceleracionNormalConstante' | 'GNormativaMaxima'
 % 'A' marcha acoplada (rapido) | 'B' punto fijo (~3 veces mas lento) |
 % 'Ambos' corre los dos y reporta la comparacion, para el reporte del proyecto.
 Parametros.MetodoDeAcoplamiento   = 'A';

@@ -315,6 +315,42 @@ Resultados = Anotar(Resultados, 'El riel es el eje de roll', ...
             CurvaturaRielEnElRoll, TrackRoll.CurvaturaHeartline(Medio), CurvaturaHelice, 100*ErrorHelice, ...
             RazonDeBrazos, GyRotacionHeartline(Pico)));
 
+%% --- Test 12: el modo normativo pone el +Gz limite en el pasajero -------
+% En los cuatro elementos, sobre el arco principal, la Gz del punto de
+% verificacion tiene que coincidir con la curva limite de la Receta evaluada
+% en la duracion desde el inicio del arco (x sqrt(lambda)). Es el test que
+% hubiera cazado el error de proyeccion de la helice: con la curvatura
+% horizontal y el carro peraltado beta, imponer la G sobre el eje de la
+% curvatura en vez de sobre U le erraba al objetivo por 1/sin(beta).
+Parametros = ParametrosBase;
+Parametros.ModoCurvatura = 'GNormativaMaxima';
+Parametros.AnguloDelGiro = deg2rad(180);   % con 120 grados las clotoides consumen todo el giro a esta v
+Constructores = {@ElementoLoopVertical, @ElementoOverBankedTurn, @ElementoHelice, @ElementoDiveLoop};
+Estado = EstadoInicial([0 0 1.0], [1 0 0], [0 0 1], 6.0, Parametros);
+
+PeorDesvio = 0;
+Detalles   = {};
+CriteriosDeObjetivo = true;
+for i = 1:numel(Constructores)
+    [~, ElementoNormativo, ReporteNormativo] = Constructores{i}(Estado, Parametros);
+    TrackN = ElementoNormativo.Track;  SimN = ElementoNormativo.Sim;
+    IndiceArco = find(strcmp({TrackN.SubTramos.Nombre}, 'ArcoPrincipal'), 1);
+    RangoArco  = TrackN.SubTramos(IndiceArco).IndiceInicio : TrackN.SubTramos(IndiceArco).IndiceFin;
+    DuracionReal = (SimN.Tiempo(RangoArco) - SimN.Tiempo(RangoArco(1))) * ElementoNormativo.Diagnostico.Escala.RaizLambdaLoop;
+    Objetivo = arrayfun(@(D) LimiteNormativo(ElementoNormativo.Receta.CurvaLimiteGz, D), DuracionReal);
+    Desvio = max(abs(SimN.Gz(RangoArco) - Objetivo));
+    PeorDesvio = max(PeorDesvio, Desvio);
+    Criterio = ReporteNormativo.Posteriores(strcmp({ReporteNormativo.Posteriores.Nombre}, 'Gz objetivo del modo alcanzado'));
+    CriteriosDeObjetivo = CriteriosDeObjetivo && ~isempty(Criterio) && Criterio.Pasa;
+    Detalles{end+1} = sprintf('%s %.4f G (%d nodos, %.2f s reales)', ElementoNormativo.Nombre, Desvio, ...
+                              numel(RangoArco), DuracionReal(end)); %#ok<SAGROW>
+end
+
+Resultados = Anotar(Resultados, 'El modo normativo pone el +Gz limite en el pasajero', ...
+    PeorDesvio < 0.02 && CriteriosDeObjetivo, ...
+    sprintf('desvio maximo |Gz - GLimite(t)| sobre el arco: %s (limite 0.02 G); criterio posterior pasa en los cuatro', ...
+            strjoin(Detalles, ', ')));
+
 %% --- Resumen ----------------------------------------------------------
 fprintf('\n');
 NoPasan = 0;

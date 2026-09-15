@@ -19,6 +19,7 @@ function [EstadoSalida, Elemento, Reporte] = ElementoLoopVertical(EstadoEntrada,
     Receta.DesfasajeDeCurvatura   = 0;              % curvatura en el plano vertical
     Receta.RollDelElemento        = Parametros.RollExtraDelLoop;
     Receta.DesplazamientoObjetivo = Parametros.SeparacionDePatas;
+    Receta.CurvaLimiteGz          = 'MasGzTodas';   % Fig. 10: lo que persigue el modo normativo
 
     [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Parametros, Receta, Layout);
 end
