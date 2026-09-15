@@ -9,13 +9,15 @@ function Limite = LimiteNormativo(Curva, Duracion)
 %
 %   Criterios autoimpuestos: una maqueta sin pasajeros no esta sujeta a la
 %   norma. Se adoptan como criterio de diseno. Valores leidos de las Figs. 6
-%   a 10 de la edicion 06a; la version vigente es la 25c.
+%   a 10 de la edicion 06a; la version vigente es la 25c. Las tablas de aca
+%   tienen que coincidir fila por fila con memoria_de_calculo.md, seccion 5:
+%   ese documento es la fuente y este archivo la transcribe.
 
     switch Curva
         case 'MasGzTodas'        % Fig. 10, todas las sujeciones
-            Tabla = [0.2 6.0; 1.0 6.0; 2.0 4.0; 2.5 4.0; 4.0 4.0; 5.0 3.0; 11.8 3.0; 12.0 2.0; 40 2.0];
+            Tabla = [0.2 6.0; 1.0 6.0; 1.5 5.0; 2.0 4.0; 2.5 4.0; 4.0 4.0; 5.0 3.0; 11.8 3.0; 12.0 2.0; 40 2.0];
         case 'MasGzReducido'     % Fig. 10, precedido por >= 3 s de -Gz (7.1.7.1)
-            Tabla = [0.2 5.0; 1.0 5.0; 2.0 2.6; 2.5 2.0; 4.0 2.0; 5.0 2.0; 11.8 2.0; 12.0 2.0; 40 2.0];
+            Tabla = [0.2 5.0; 1.0 5.0; 1.5 5.0; 2.0 4.0; 2.5 2.0; 4.0 2.0; 5.0 2.0; 11.8 2.0; 12.0 2.0; 40 2.0];
         case 'MenosGzBase'       % Fig. 9, base case
             Tabla = [0.2 -2.0; 0.5 -1.5; 1.0 -1.5; 3.0 -1.5; 4.0 -1.5; 7.0 -1.1; 40 -1.1];
         case 'MenosGzExtendido'  % Fig. 9, extended
@@ -23,7 +25,7 @@ function Limite = LimiteNormativo(Curva, Duracion)
         case 'GyBase'            % Fig. 8, lateral
             Tabla = [0.2 3.0; 1.0 3.0; 2.0 2.0; 40 2.0];
         case 'MasGxBase'         % Fig. 6, eyes back
-            Tabla = [0.2 6.0; 1.0 6.0; 2.0 4.0; 3.0 4.0; 5.0 3.0; 11.8 3.0; 12.0 2.5; 40 2.5];
+            Tabla = [0.2 6.0; 1.0 6.0; 2.0 4.0; 4.0 4.0; 5.0 3.0; 11.8 3.0; 12.0 2.5; 40 2.5];
         case 'MenosGxBase'       % Fig. 7, eyes front
             Tabla = [0.2 -2.0; 0.5 -1.5; 12.0 -1.5; 40 -1.5];
         case 'MenosGxOTS'        % Fig. 7, over-the-shoulder
