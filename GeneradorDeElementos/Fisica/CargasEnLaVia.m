@@ -1,25 +1,39 @@
-function [GArribaHeartline, GLateralHeartline] = CargasEnLaVia(VersorArribaCarro, VersorLateral, VectorCurvatura, Velocidad, Gravedad)
-%CARGASENLAVIA G neta sobre los ejes U y L, evaluada en el heartline.
-%   Aceleracion especifica: f = a - g_vec, con a = v^2*VectorCurvatura en el
-%   plano normal. Incluye la gravedad, que es exactamente lo que limita la
-%   ASTM F2291 7.1.4.5: un cuerpo en reposo sobre via a nivel mide 1 G.
+function [GArriba, GLateral] = CargasEnLaVia(CurvaturaArribaCarro, CurvaturaLateralCarro, VelocidadRiel, ...
+                                             VelocidadRoll, AceleracionRoll, AceleracionTangencial, ...
+                                             ArribaVertical, LateralVertical, Brazo, Gravedad)
+%CARGASENLAVIA G neta sobre los ejes U y L en un punto a distancia Brazo del riel.
+%   Aceleracion especifica f = a - g_vec, con la gravedad incluida: es
+%   exactamente lo que limita la ASTM F2291 7.1.4.5 (un cuerpo en reposo
+%   sobre via a nivel mide 1 G).
 %
-%   La curva que integra el generador es el HEARTLINE, asi que esta es
-%   directamente la G que siente el pasajero: no lleva ninguna correccion de
-%   offset. El heartline es ademas el eje de roll, de modo que el pasajero
-%   esta sobre el eje de rotacion y el roll no le aporta aceleracion.
+%   La curva integrada es el RIEL, que es el eje de roll. El pasajero va a
+%   distancia Brazo sobre U y su aceleracion sale por transporte de cuerpo
+%   rigido desde el punto del riel, con la velocidad angular completa del
+%   marco del carro, w = v*(T x kappa_vec + phi'*T). Escrito en componentes
+%   del carro (ku = kappa_vec.U, kl = kappa_vec.L, phi' por unidad de arco):
 %
-%   El riel va desplazado -d*U respecto de esta curva, pero ese offset es
-%   puramente geometrico: no cambia ninguna fuerza. El carro se modela como
-%   masa puntual y la fuerza que el riel le hace vale m*(a_cm - g_vec), o sea
-%   que la fija la aceleracion del centro de masa -- que aca se asume en el
-%   heartline -- y no la del punto geometrico del riel. Por eso estas mismas
-%   dos componentes son las que alimentan el reparto entre juegos de ruedas.
+%       Gz = v^2*ku*(1 - Brazo*ku)/g + Uz - v^2*Brazo*phi'^2/g
+%       Gy = v^2*kl*(1 - Brazo*ku)/g + Lz + Brazo*(a_t*phi' + v^2*phi'')/g
 %
-%   No dependen de la aceleracion tangencial (es perpendicular a U y a L),
-%   asi que se pueden calcular antes que la resistencia al avance y no hay
+%   El factor (1 - Brazo*ku) es el pasajero recorriendo un radio distinto al
+%   del riel: a R = 0.11 m y Brazo = 0.03 m son 27 %. El termino en phi'^2 es
+%   la centripeta de girar alrededor del riel, y el de (a_t*phi' + v^2*phi'')
+%   es el de Euler: la G lateral que produce una transicion de roll. Ninguno
+%   de los dos necesita dkappa/ds, asi que la formula es cerrada y sirve
+%   dentro del paso de integracion. La componente longitudinal si necesita
+%   dkappa/ds y se calcula aparte, sobre la polilinea ya construida.
+%
+%   Con Brazo = DistanciaHeartline son las cargas del centro de masa: lo que
+%   alimenta la fuerza normal y el reparto entre juegos de ruedas. Derivacion
+%   completa en memoria_de_calculo.md, seccion 3.
+%
+%   No dependen de dkappa/ds ni (salvo el termino chico de Euler) de la
+%   resistencia al avance, asi que se pueden calcular antes que ella y no hay
 %   circularidad.
 
-    GArribaHeartline  = Velocidad^2 * dot(VectorCurvatura, VersorArribaCarro) / Gravedad + VersorArribaCarro(3);
-    GLateralHeartline = Velocidad^2 * dot(VectorCurvatura, VersorLateral)     / Gravedad + VersorLateral(3);
+    Reduccion = 1 - Brazo*CurvaturaArribaCarro;
+    GArriba  = VelocidadRiel^2*(CurvaturaArribaCarro*Reduccion - Brazo*VelocidadRoll^2)/Gravedad ...
+             + ArribaVertical;
+    GLateral = VelocidadRiel^2*CurvaturaLateralCarro*Reduccion/Gravedad + LateralVertical ...
+             + Brazo*(AceleracionTangencial*VelocidadRoll + VelocidadRiel^2*AceleracionRoll)/Gravedad;
 end

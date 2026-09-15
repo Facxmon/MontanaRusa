@@ -60,9 +60,11 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     Figuras(end+1) = figure('Name', 'Velocidad y aceleracion tangencial');
 
     subplot(2,1,1)
-    plot(Arco, Sim.Velocidad, 'LineWidth', 2); grid on; hold on
+    plot(Arco, Sim.VelocidadCentroDeMasa, 'LineWidth', 2); grid on; hold on
+    plot(Arco, Sim.Velocidad, '--', 'LineWidth', 1);
     MarcarSubTramos(Track);
-    xlabel('Longitud recorrida [m]'); ylabel('Velocidad [m/s]')
+    legend('Centro de masa (heartline)', 'Punto del riel', 'Location', 'best')
+    xlabel('Longitud recorrida sobre el riel [m]'); ylabel('Velocidad [m/s]')
     title('Velocidad sobre el elemento')
 
     subplot(2,1,2)
@@ -125,18 +127,18 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     legend('d\phi/ds [grados/m]', 'd^2\phi/ds^2 [grados/m^2]', 'Location', 'best')
     xlabel('Longitud recorrida [m]')
     title(['Derivadas del roll -- entran en la G del pasajero por el brazo ' ...
-           'respecto del eje de roll, y dimensionan la transicion'])
+           'respecto del riel (eje de roll), y dimensionan la transicion'])
 
     %% --- Radio de curvatura ------------------------------------------------
     % Las dos curvas tienen radios distintos y la diferencia es el punto de
-    % todo el modelo de heartline: el que hay que comparar contra el limite de
-    % la impresora es el del riel, y el que fija la G del pasajero es el del
-    % heartline.
+    % todo el modelo de heartline: el del riel es el impuesto (curva
+    % integrada) y se compara contra el limite de la impresora; el de la
+    % heartline es el que recorre el pasajero y se compara contra el nominal.
     Figuras(end+1) = figure('Name', 'Radio de curvatura');
-    Radio = 1 ./ max(Track.Curvatura, eps);
-    Radio(Track.Curvatura < 1e-9) = NaN;   % tramo recto: radio infinito, no se dibuja
-    RadioRiel = 1 ./ max(Track.CurvaturaRiel, eps);
-    RadioRiel(Track.CurvaturaRiel < 1e-9) = NaN;
+    Radio = 1 ./ max(Track.CurvaturaHeartline, eps);
+    Radio(Track.CurvaturaHeartline < 1e-9) = NaN;   % tramo recto: radio infinito, no se dibuja
+    RadioRiel = 1 ./ max(Track.Curvatura, eps);
+    RadioRiel(Track.Curvatura < 1e-9) = NaN;
     semilogy(Arco, RadioRiel, 'LineWidth', 2); grid on; hold on
     semilogy(Arco, Radio, '--', 'LineWidth', 1.5);
     yline(Parametros.RadioMinimoFabricable, 'r--', 'LineWidth', 2);
@@ -173,8 +175,8 @@ end
 
 function DibujarMarcoDelCarro(Track, Parametros)
 %DIBUJARMARCODELCARRO Flechas del marco del carro sobre la trayectoria.
-%   Nacen en el RIEL. La flecha de U se dibuja con la longitud real del offset
-%   de heartline, asi que su punta cae exactamente sobre el heartline: es la
+%   Nacen en el RIEL, que es el eje de roll. La flecha de U se dibuja con la
+%   longitud real d, asi que su punta cae exactamente sobre la heartline: es la
 %   forma de ver de un vistazo cuanto se separan las dos curvas y por que en
 %   los radios chicos esa separacion deja de ser despreciable. La de L va a
 %   escala del dibujo, que si no queda invisible.

@@ -58,10 +58,11 @@ function [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Pa
          'hay que agrandar el radio o entrar mas lento.']);
 
     %% ---------------- Estado de salida -------------------------------------
-    % El estado que se encadena viaja sobre el HEARTLINE: es la curva que
-    % integra el elemento siguiente. El riel se deriva de ella, nunca al reves.
-    Ultimo = size(Track.PuntosHeartline, 1);
-    EstadoSalida.Posicion          = Track.PuntosHeartline(Ultimo, :);
+    % El estado que se encadena viaja sobre el RIEL: es la curva que integra
+    % el elemento siguiente. La heartline se deriva de el, nunca al reves. La
+    % velocidad es la del centro de masa, que es la que conserva energia.
+    Ultimo = size(Track.PuntosRiel, 1);
+    EstadoSalida.Posicion          = Track.PuntosRiel(Ultimo, :);
     EstadoSalida.VersorTangente    = Track.VersorTangente(Ultimo, :);
     EstadoSalida.VersorArribaCarro = Track.VersorArribaCarro(Ultimo, :);
     EstadoSalida.VersorLateral     = Track.VersorLateral(Ultimo, :);
@@ -71,7 +72,7 @@ function [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Pa
     EstadoSalida.VelocidadRoll     = Track.VelocidadRoll(Ultimo);
     EstadoSalida.AceleracionRoll   = Track.AceleracionRoll(Ultimo);
     EstadoSalida.LongitudAcumulada = Track.LongitudArco(Ultimo);
-    EstadoSalida.Velocidad         = Sim.Velocidad(Ultimo);
+    EstadoSalida.Velocidad         = Sim.VelocidadCentroDeMasa(Ultimo);
     EstadoSalida.EnergiaTotal      = Sim.EnergiaTotal(Ultimo);
 
     %% ---------------- Numeros de salida ------------------------------------
@@ -83,16 +84,21 @@ function [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Pa
     % Lo que se imprime es el riel, asi que el material se mide sobre el riel.
     Resumen.LongitudDeMaterial     = LongitudDePolilinea(Track.PuntosRiel);
     Resumen.AlturaMaxima           = max(AlturaRelativa);
-    Resumen.RadioMinimo            = 1/max(max(Track.Curvatura),     eps);
-    Resumen.RadioMinimoRiel        = 1/max(max(Track.CurvaturaRiel), eps);
+    % El radio del riel es exacto (curvatura impuesta); el de la heartline se
+    % recupera numericamente de la curva derivada.
+    Resumen.RadioMinimoRiel        = 1/max(max(Track.Curvatura),          eps);
+    Resumen.RadioMinimo            = 1/max(max(Track.CurvaturaHeartline), eps);
     Resumen.FuerzaNormalMaxima     = max(Sim.FuerzaNormal);
-    Resumen.VelocidadMinima        = min(Sim.Velocidad);
+    Resumen.VelocidadMinima        = min(Sim.VelocidadCentroDeMasa);
     Resumen.TiempoDeRecorrido      = Sim.Tiempo(end);
     Resumen.EnergiaDisipadaRodadura = Sim.EnergiaDisipadaRodadura(end);
     Resumen.EnergiaDisipadaArrastre = Sim.EnergiaDisipadaArrastre(end);
     Resumen.GzMaxima               = max(Sim.Gz);
     Resumen.GzMinima               = min(Sim.Gz);
     Resumen.GyMaximaAbsoluta       = max(abs(Sim.Gy));
+    Resumen.GzMaximaCabeza         = max(Sim.GzCabeza);
+    Resumen.GyMaximaAbsolutaCabeza = max(abs(Sim.GyCabeza));
+    Resumen.BrazoDeVerificacion    = Sim.BrazoDeVerificacion;
     Resumen.PeralteFinal           = Track.AnguloPeralte(end);
     Resumen.PeralteMaximo          = max(abs(Track.AnguloPeralte));
 
@@ -102,7 +108,7 @@ function [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Pa
     % de la tangente dentro del plano del loop tras 2*pi.
     Resumen.ResidualCierrePitch    = Diagnostico.ResidualCierrePitch;
     Resumen.ResidualCierreTangente = norm(Track.VersorTangente(end,:) - Track.VersorTangente(1,:));
-    Resumen.PosicionFinal          = Track.PuntosHeartline(end,:);
+    Resumen.PosicionFinal          = Track.PuntosRiel(end,:);
 
     % Avance sobre el eje de la helice. En el loop es la separacion entre la
     % pata de entrada y la de salida, que es lo que evita que se choque consigo
@@ -115,7 +121,7 @@ function [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Pa
     % Continuidad en el empalme con el estado de entrada.
     Resumen.SaltoDeTangente  = norm(Track.VersorTangente(1,:) - EstadoEntrada.VersorTangente);
     Resumen.SaltoDeCurvatura = norm(Track.VectorCurvatura(1,:) - EstadoEntrada.VectorCurvatura);
-    Resumen.SaltoDePosicion  = norm(Track.PuntosHeartline(1,:) - EstadoEntrada.Posicion);
+    Resumen.SaltoDePosicion  = norm(Track.PuntosRiel(1,:) - EstadoEntrada.Posicion);
 
     % Escalado del modelo distorsionado.
     Resumen.LambdaLoop         = Escala.LambdaLoop;
@@ -155,25 +161,28 @@ end
 
 function Tabla = TablaDeResultados(Track, Sim)
 %TABLADERESULTADOS Matriz de resultados por paso, con columnas nombradas.
-%   Lleva las dos curvas: X,Y,Z es el heartline -- donde va el pasajero y
-%   donde se evaluan las G -- y XRiel,YRiel,ZRiel es la via que se fabrica.
-    Radio = 1 ./ max(Track.Curvatura, eps);
-    Radio(Track.Curvatura < eps) = Inf;
+%   Lleva las dos curvas: X,Y,Z es la heartline -- donde va el pasajero y
+%   donde se evaluan las G -- y XRiel,YRiel,ZRiel es la via que se fabrica y
+%   sobre la que se mide el arco. Velocidad es la del centro de masa.
+    RadioHeartline = 1 ./ max(Track.CurvaturaHeartline, eps);
+    RadioHeartline(Track.CurvaturaHeartline < eps) = Inf;
 
-    RadioRiel = 1 ./ max(Track.CurvaturaRiel, eps);
-    RadioRiel(Track.CurvaturaRiel < eps) = Inf;
+    RadioRiel = 1 ./ max(Track.Curvatura, eps);
+    RadioRiel(Track.Curvatura < eps) = Inf;
 
     Tabla = table(Track.LongitudArco, ...
                   Track.PuntosHeartline(:,1), Track.PuntosHeartline(:,2), Track.PuntosHeartline(:,3), ...
                   Track.PuntosRiel(:,1), Track.PuntosRiel(:,2), Track.PuntosRiel(:,3), ...
-                  Sim.Tiempo, Sim.Velocidad, Sim.AceleracionTangencial, ...
+                  Sim.Tiempo, Sim.VelocidadCentroDeMasa, Sim.AceleracionTangencial, ...
                   Sim.Gx, Sim.Gy, Sim.Gz, Sim.JerkGx, Sim.JerkGy, Sim.JerkGz, ...
-                  Track.Curvatura, Radio, Track.CurvaturaRiel, RadioRiel, ...
+                  Sim.GyCabeza, Sim.GzCabeza, ...
+                  Track.CurvaturaHeartline, RadioHeartline, Track.Curvatura, RadioRiel, ...
                   rad2deg(Track.AnguloRoll), ...
                   rad2deg(Track.AnguloPeralte), Sim.FuerzaNormal, ...
         'VariableNames', {'Arco','X','Y','Z','XRiel','YRiel','ZRiel', ...
                           'Tiempo','Velocidad','AceleracionTangencial', ...
                           'Gx','Gy','Gz','JerkGx','JerkGy','JerkGz', ...
+                          'GyCabeza','GzCabeza', ...
                           'Curvatura','Radio','CurvaturaRiel','RadioRiel', ...
                           'RollGrados','PeralteGrados','FuerzaNormal'});
 end

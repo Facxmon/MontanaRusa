@@ -5,10 +5,11 @@ function [Criterios, Normativo] = ChequeosPosteriores(Track, Sim, Parametros, La
 %
 %   Que curva usa cada chequeo NO es intercambiable:
 %     riel       todo lo fisico -- interferencia, bounding box, altura sobre
-%                el suelo, radio minimo fabricable. Es la pieza que se imprime.
+%                el suelo, radio minimo fabricable. Es la pieza que se imprime
+%                y la curva integrada, asi que su curvatura es exacta.
 %     heartline  todo lo de intencion de diseno y de confort -- limites
 %                normativos, radio nominal, altura del elemento. Es donde va
-%                el pasajero.
+%                el pasajero; se deriva del riel sumando d*U.
 
     Criterios = CriteriosVacios();
     Escala = EscalasDeFroude(Parametros);
@@ -23,13 +24,15 @@ function [Criterios, Normativo] = ChequeosPosteriores(Track, Sim, Parametros, La
 
     Criterios = AgregarCriterio(Criterios, 'G minima sobre el eje vertical del carro', 'MayorOIgual', ...
         min(Sim.Gz(Valido)), Parametros.GMinimaCuspide, 'G', ...
-        'Margen en la cuspide. N = 0 no sirve como criterio: no tolera variacion de friccion.');
+        sprintf(['Margen en la cuspide, en el punto de verificacion (%s, brazo %.3f m). ' ...
+                 'N = 0 no sirve como criterio: no tolera variacion de friccion.'], ...
+                Parametros.PuntoDeVerificacionNormativa, Sim.BrazoDeVerificacion));
 
     %% --- Fabricacion y espacio ---------------------------------------------
-    % El radio que limita la impresora es el DEL RIEL, que no es el del
-    % heartline: el riel va desplazado -d*U y su curvatura es otra.
-    RadioMinimoRiel = 1/max(max(Track.CurvaturaRiel), eps);
-    RadioMinimo     = 1/max(max(Track.Curvatura),     eps);
+    % El radio que limita la impresora es el DEL RIEL, que no es el de la
+    % heartline: la heartline va desplazada +d*U y su curvatura es otra.
+    RadioMinimoRiel = 1/max(max(Track.Curvatura),          eps);
+    RadioMinimo     = 1/max(max(Track.CurvaturaHeartline), eps);
     Criterios = AgregarCriterio(Criterios, 'Radio de curvatura minimo del riel', 'MayorOIgual', ...
         RadioMinimoRiel, Parametros.RadioMinimoFabricable, 'm', ...
         sprintf(['Lo limita la impresora 3D. Es el radio del riel (%.4f m), no el del ' ...
@@ -78,7 +81,7 @@ function [Criterios, Normativo] = ChequeosPosteriores(Track, Sim, Parametros, La
     % puede chocar con otra. El heartline es un lugar geometrico y no ocupa
     % lugar.
     [DistanciaPropia, IndicePropioA, IndicePropioB] = DistanciaMinimaEntrePolilineas( ...
-        Track.PuntosRiel, Track.PuntosRiel, Track.LongitudArcoRiel, Track.LongitudArcoRiel, ...
+        Track.PuntosRiel, Track.PuntosRiel, Track.LongitudArco, Track.LongitudArco, ...
         Parametros.ArcoMinimoAutointerferencia);
 
     DetalleOrientado = '';
@@ -97,7 +100,7 @@ function [Criterios, Normativo] = ChequeosPosteriores(Track, Sim, Parametros, La
     % construccion, no por interferencia.
     if ~isempty(Layout) && ~isempty(Layout.PuntosRiel)
         DistanciaLayout = DistanciaMinimaEntrePolilineas(Track.PuntosRiel, Layout.PuntosRiel, ...
-                                                         Track.LongitudArcoRiel, Layout.LongitudArcoRiel, ...
+                                                         Track.LongitudArco, Layout.LongitudArcoRiel, ...
                                                          Parametros.ArcoMinimoAutointerferencia);
     else
         DistanciaLayout = Inf;
@@ -136,6 +139,17 @@ function [Criterios, Normativo] = ChequeosPosteriores(Track, Sim, Parametros, La
         Normativo.Elipse.ValorMaximoGxGz, 1, '-');
     Criterios = AgregarCriterio(Criterios, 'Elipse de dos ejes Gx-Gy (7.1.5.1)', 'MenorOIgual', ...
         Normativo.Elipse.ValorMaximoGxGy, 1, '-');
+
+    %% --- Cabeza: informativo -----------------------------------------------
+    % La norma no se aplica en la cabeza, pero es la parte mas sensible a las
+    % rotaciones y el disenador debe incluirlas (Rohde 2024, 7.6.2). Si
+    % PuntoDeVerificacionNormativa es 'Cabeza' estas son las mismas que arriba.
+    Criterios = AgregarCriterio(Criterios, 'Gz maxima en la cabeza', 'Informativo', ...
+        max(Sim.GzCabeza(Valido)), NaN, 'G', ...
+        sprintf('A %.3f m del riel (d + e). Las verificadas arriba estan a %.3f m.', ...
+                Parametros.DistanciaHeartline + Parametros.DistanciaHeartlineACabeza, Sim.BrazoDeVerificacion));
+    Criterios = AgregarCriterio(Criterios, '|Gy| maxima en la cabeza', 'Informativo', ...
+        max(abs(Sim.GyCabeza(Valido))), NaN, 'G', '');
 end
 
 %% ========================= auxiliares =====================================

@@ -9,13 +9,13 @@ function ReportarElemento(Reporte, Elemento)
     fprintf('=====================================================================\n');
 
     fprintf('\n--- Geometria y recorrido ---\n');
-    fprintf('  Longitud recorrida (heartline): %8.4f m\n', Resumen.LongitudRecorrida);
+    fprintf('  Longitud recorrida (riel)     : %8.4f m\n', Resumen.LongitudRecorrida);
     fprintf('  Longitud de material de via   : %8.4f m   (riel)\n', Resumen.LongitudDeMaterial);
-    fprintf('  Altura maxima sobre la entrada: %8.4f m\n', Resumen.AlturaMaxima);
-    fprintf('  Radio minimo del heartline    : %8.4f m   (lo que fija la G del pasajero)\n', ...
-            Resumen.RadioMinimo);
-    fprintf('  Radio minimo del riel         : %8.4f m   (lo que tiene que imprimirse)\n', ...
+    fprintf('  Altura maxima sobre la entrada: %8.4f m   (heartline)\n', Resumen.AlturaMaxima);
+    fprintf('  Radio minimo del riel         : %8.4f m   (curva integrada; lo que se imprime)\n', ...
             Resumen.RadioMinimoRiel);
+    fprintf('  Radio minimo de la heartline  : %8.4f m   (derivada; lo que recorre el pasajero)\n', ...
+            Resumen.RadioMinimo);
     fprintf('  Tiempo de recorrido           : %8.4f s\n', Resumen.TiempoDeRecorrido);
 
     fprintf('\n--- Sub-tramos ---\n');
@@ -33,8 +33,11 @@ function ReportarElemento(Reporte, Elemento)
     fprintf('  Velocidad de salida           : %8.4f m/s\n', Elemento.EstadoSalida.Velocidad);
     fprintf('  Velocidad inicial minima      : %8.4f m/s   (%s)\n', ...
             Resumen.VelocidadInicialMinima, Resumen.BusquedaVelocidad.Motivo);
-    fprintf('  Gz maxima / minima            : %8.4f / %.4f G\n', Resumen.GzMaxima, Resumen.GzMinima);
+    fprintf('  Gz maxima / minima            : %8.4f / %.4f G   (a %.3f m del riel)\n', ...
+            Resumen.GzMaxima, Resumen.GzMinima, Resumen.BrazoDeVerificacion);
     fprintf('  |Gy| maxima                   : %8.4f G\n', Resumen.GyMaximaAbsoluta);
+    fprintf('  Gz maxima / |Gy| max en cabeza: %8.4f / %.4f G   (informativo)\n', ...
+            Resumen.GzMaximaCabeza, Resumen.GyMaximaAbsolutaCabeza);
     fprintf('  Fuerza normal maxima sobre via: %8.4f N\n', Resumen.FuerzaNormalMaxima);
     fprintf('  Energia disipada rodadura     : %8.5f J\n', Resumen.EnergiaDisipadaRodadura);
     fprintf('  Energia disipada arrastre     : %8.5f J\n', Resumen.EnergiaDisipadaArrastre);

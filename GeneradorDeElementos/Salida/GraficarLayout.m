@@ -55,7 +55,7 @@ function Figuras = GraficarLayout(Layout)
         Track = Layout.Elementos{i}.Elemento.Track;
         Sim   = Layout.Elementos{i}.Elemento.Sim;
         subplot(2,1,1)
-        plot(Track.LongitudArco, Sim.Velocidad, 'Color', Colores(i,:), 'LineWidth', 2)
+        plot(Track.LongitudArco, Sim.VelocidadCentroDeMasa, 'Color', Colores(i,:), 'LineWidth', 2)
         subplot(2,1,2)
         plot(Track.LongitudArco, Sim.Gz, 'Color', Colores(i,:), 'LineWidth', 2)
     end

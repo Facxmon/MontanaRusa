@@ -7,9 +7,10 @@ el script de análisis energético preliminar); acá va la fundamentación de lo
 tienen que respetar. Ver [`NOMENCLATURA.md`](NOMENCLATURA.md) para la tabla completa de símbolos.
 
 **Glosario rápido de términos en inglés** usados en este documento: *heartline* (línea imaginaria a la altura del
-torso del pasajero; en este modelo es la curva de diseño y el eje alrededor del cual rola el carro, y la vía se
-deriva de ella), *heartlining* (diseñar haciendo que el eje de roll pase por el pasajero en vez de por el riel,
-para que rolar no lo latiguee), *airtime* (sensación de ingravidez, $G_z<1$),
+torso del pasajero; en este modelo es la curva que recorre su centro de masa, derivada del riel a distancia $d$ sobre
+$\mathbf{U}$, y donde se aplica la norma), *heartlining* (práctica de diseñar haciendo que el eje de roll pase por el
+pasajero en vez de por el riel, para que rolar no lo latiguee; en este modelo el eje de roll es el riel y la heartline
+rota alrededor de él, que es lo que ocurre en un vehículo real sobre un riel dado), *airtime* (sensación de ingravidez, $G_z<1$),
 *over-banked turn* (curva peraltada más de 90°), *dive loop* (media vuelta que invierte al pasajero de cabeza
 hacia abajo), *up-stop* (rueda de retención que evita que el carro se despegue de la vía), *Force Vector Design*
 (metodología de diseño que parte del perfil de fuerzas deseado y deriva la geometría, en vez de al revés),
@@ -26,11 +27,13 @@ hacia abajo), *up-stop* (rueda de retención que evita que el carro se despegue 
 | $\mathbf{T},\mathbf{U}_{pt},\mathbf{L}_{pt}$ | marco de transporte paralelo (tangente, arriba, lateral) | — (versores) |
 | $\mathbf{U},\mathbf{L}$ | marco del carro (arriba, lateral) | — (versores) |
 | $\phi(s)$ | ángulo de roll, $\phi',\phi''$ sus derivadas | rad, rad/m, rad/m² |
-| $\mathbf{r}(s)$ | heartline: la curva que integra el generador, y eje de roll | m |
-| $\mathbf{r}_{riel}(s)$ | riel, $\mathbf{r} - d\,\mathbf{U}$: la pieza que se fabrica | m |
-| $\mathbf{p}(s)$ | punto de evaluación del pasajero, $\mathbf{r} + e\,\mathbf{U}$ | m |
-| $d$ | offset riel → heartline (geometría de la vía) | m |
-| $e$ | offset heartline → cuerpo del pasajero (confort) | m |
+| $\mathbf{r}(s)$ | riel: la curva que integra el generador, eje de roll y pieza que se fabrica | m |
+| $\mathbf{r}_h(s)$ | heartline, $\mathbf{r} + d\,\mathbf{U}$: centro de masa del pasajero, donde se aplica la norma | m |
+| $\mathbf{p}(s)$ | cabeza del pasajero, $\mathbf{r} + (d+e)\,\mathbf{U}$ | m |
+| $d$ | offset riel → heartline (centro de masa del pasajero) | m |
+| $e$ | offset heartline → cabeza (chequeo de rotaciones) | m |
+| $b$ | brazo de verificación: $d$, o $d+e$ si la norma se verifica en la cabeza | m |
+| $J$ | $\lVert d\mathbf{r}_h/ds\rVert$, razón entre la velocidad del centro de masa y la del punto del riel | — |
 | $\boldsymbol\omega,\dot{\boldsymbol\omega}$ | velocidad y aceleración angular del marco del carro | rad/s, rad/s² |
 | $\Omega_T$ | componente de $\boldsymbol\omega$ sobre $\mathbf{T}$ (roll) | rad/s |
 | $\kappa_u,\kappa_l$ | componentes de $\boldsymbol\kappa$ sobre $\mathbf{U}$ y $\mathbf{L}$ | 1/m |
@@ -177,19 +180,19 @@ El error conceptual que hay que evitar acá es tratar "la vía" como una sola cu
 
 | Curva | Definición | Qué gobierna |
 |---|---|---|
-| **Heartline** $\mathbf{r}(s)$ | La curva que integra el generador | Es la curva de diseño, el eje de roll y el centro de masa supuesto. Fija energía, rodadura y fuerza normal |
-| **Punto de evaluación** $\mathbf{p}(s)$ | $\mathbf{r}(s) + e\,\mathbf{U}(s)$ | Dónde se evalúa al pasajero. Fija la G reportada y verificada contra la norma |
-| **Riel** $\mathbf{r}_{riel}(s)$ | $\mathbf{r}(s) - d\,\mathbf{U}(s)$ | La pieza física. Fija fabricación, interferencia, bounding box y radio mínimo imprimible |
+| **Riel** $\mathbf{r}(s)$ | La curva que integra el generador, unit-speed en $s$ | Es la curva de diseño, el **eje de roll** y la pieza física. Fija fabricación, interferencia, bounding box y radio mínimo imprimible |
+| **Heartline** $\mathbf{r}_h(s)$ | $\mathbf{r}(s) + d\,\mathbf{U}(s)$ | Dónde va el centro de masa del pasajero. Fija energía, rodadura y fuerza normal. Es donde se diseña y donde se aplica la norma (punto de verificación por defecto) |
+| **Cabeza** $\mathbf{p}(s)$ | $\mathbf{r}(s) + (d+e)\,\mathbf{U}(s)$ | Chequeo adicional por rotaciones; G informativa, o punto de verificación si se lo pide |
 
-**La jerarquía importa y es la contraria a la intuitiva.** No se diseña el riel y después se calcula qué siente el pasajero: se diseña el heartline —dónde va el pasajero— y el riel se deriva de él. La razón es que los modos de curvatura resuelven
+**Hipótesis del eje de roll.** El carro va montado sobre el riel y es el riel el que lo vincula: cuando rola, gira alrededor de la tangente del riel. Por eso el riel es la curva que se prescribe y se integra, y la heartline se despeja de él. La consecuencia visible es que **sobre un riel recto que rola, el riel sigue recto y es la heartline la que hace una hélice** de radio $d$: el pasajero rota respecto de la vía, describiendo un arco $d\,\Delta\phi$ en el plano transversal, y siente la centrípeta y el Euler de esa rotación. La alternativa —prescribir la heartline y despejar el riel, que es lo que hacía una versión anterior del generador— es autoconsistente pero produce la geometría inversa: la heartline recta y el riel helicoidal. Se descartó porque no corresponde al vehículo real sobre un riel dado.
 
-$$\kappa = \frac{g\,(G_{obj} - U_z)}{v^2}$$
+**Dónde se impone la G.** Los modos de curvatura no resuelven $\kappa = g(G_{obj}-U_z)/v^2$ sobre la curva integrada, porque esa curva es el riel y el pasajero no está ahí: recorre otro radio y además rota. Resuelven la curvatura **del riel** para que el **pasajero**, transportado por cuerpo rígido con brazo $b$ (§3.5), reciba $G_{obj}$. Es una cuadrática cerrada por punto (§3.6).
 
-y esa $\kappa$ es la de la curva que se está integrando. Si la curva integrada es el riel, el radio queda dimensionado para que el **riel** reciba $G_{obj}$, y el pasajero —que recorre otro radio— recibe otra cosa. Integrando el heartline, la misma fórmula sin tocar un signo dimensiona el radio para el **pasajero**.
+**Cuánto importa.** La heartline está del lado del centro de curvatura respecto del riel, así que $R_h = R - d$. La diferencia relativa vale $d/R$: con $d = 3$ cm y el radio de cúspide de 0.11 m del loop, **27 %**. No es una corrección de segundo orden. Imponer la G sobre el riel dejaría al pasajero recorriendo un radio 27 % más chico que el dimensionado.
 
-**Cuánto importa.** El heartline está del lado del centro de curvatura respecto del riel, así que $R_{riel} = R + d$. La diferencia relativa vale $d/R$: con $d = 3$ cm y el radio de cúspide de 0.11 m del loop, **27 %**. No es una corrección de segundo orden.
+**$d$ y $e$ son parámetros distintos y no hay que colapsarlos.** $d$ (`DistanciaHeartline`) va del riel al centro de masa del pasajero y es geometría de la vía. $e$ (`DistanciaHeartlineACabeza`) va de la heartline a la cabeza y es un chequeo de rotaciones. Que hoy tengan el mismo valor por defecto es una coincidencia de arranque, no una identidad — ver [`NOMENCLATURA.md`](NOMENCLATURA.md#3-parámetros-de-entrada-del-generador-parametrospordefectom).
 
-**$d$ y $e$ son parámetros distintos y no hay que colapsarlos.** $d$ (`DistanciaHeartline`) va del riel al heartline y es geometría de la vía. $e$ (`DistanciaEvaluacionPasajero`) va del heartline al cuerpo del pasajero y es confort. Que hoy tengan el mismo valor por defecto es una coincidencia de arranque, no una identidad — ver [`NOMENCLATURA.md`](NOMENCLATURA.md#3-parámetros-de-entrada-del-generador-parametrospordefectom).
+**Dónde se aplica la norma en la práctica real.** El diseño se hace sobre la heart line del pasajero, y las mediciones de verificación se toman sobre el asiento: ASTM F2137 §12.1.5.2 monta el acelerómetro a 28–36 cm (niños) / 30–41 cm (adultos) sobre el nivel del asiento, y el ensayo SARC de EN 13814 a 50 ± 5 cm / 56–66 cm, que es la heart line. La cabeza no es el punto de la norma, pero es la parte más sensible a las rotaciones y "the designers must include the rotations into their calculations" (Rohde, *Some Details about the Development of Acceleration Limits for Amusement Rides*, VDV, 2.ª ed., 2024, §7.6.2 y §9). Por eso el punto de verificación por defecto es la heartline (`PuntoDeVerificacionNormativa = 'Heartline'`), la G de la cabeza se reporta siempre como informativa, y `'Cabeza'` es la opción conservadora.
 
 ### 3.2 Transferencia de aceleraciones
 
@@ -197,15 +200,15 @@ El carro es un cuerpo rígido, así que aplica la fórmula de transferencia entr
 
 $$\mathbf{a}_P = \mathbf{a}_O + \dot{\boldsymbol{\omega}}\times\mathbf{r}_{P/O} + \boldsymbol{\omega}\times(\boldsymbol{\omega}\times\mathbf{r}_{P/O})$$
 
-con $O$ sobre el heartline, $P$ el punto de evaluación, $\mathbf{r}_{P/O} = e\,\mathbf{U}$, y $\dot{\boldsymbol\omega}$ la aceleración angular del marco del carro (antes notada $\boldsymbol\alpha$; se renombra para no chocar con $\alpha$, el ángulo de hélice del loop de generador §4.1 — colisión #5 en [`NOMENCLATURA.md`](NOMENCLATURA.md#0-colisiones-resueltas)).
+con $O$ sobre el riel, $P$ el punto transportado, $\mathbf{r}_{P/O} = b\,\mathbf{U}$ (con $b = d$ para el centro de masa, $b = d+e$ para la cabeza), y $\dot{\boldsymbol\omega}$ la aceleración angular del marco del carro (antes notada $\boldsymbol\alpha$; se renombra para no chocar con $\alpha$, el ángulo de hélice del loop de generador §4.1 — colisión #5 en [`NOMENCLATURA.md`](NOMENCLATURA.md#0-colisiones-resueltas)).
 
 | Término | Nombre | Origen |
 |---|---|---|
-| $\mathbf{a}_O$ | Aceleración del heartline | $a_t\mathbf{T} + v^2\boldsymbol{\kappa}$ |
-| $\boldsymbol{\omega}\times(\boldsymbol{\omega}\times\mathbf{r})$ | Centrípeta del punto desplazado | El cuerpo gira alrededor del eje de roll |
+| $\mathbf{a}_O$ | Aceleración del punto del riel | $a_t\mathbf{T} + v^2\boldsymbol{\kappa}$, con $v = ds/dt$ |
+| $\boldsymbol{\omega}\times(\boldsymbol{\omega}\times\mathbf{r})$ | Centrípeta del punto desplazado | El cuerpo gira alrededor del eje de roll y el pasajero recorre un radio distinto |
 | $\dot{\boldsymbol{\omega}}\times\mathbf{r}$ | Euler (tangencial de rotación) | El giro está acelerando |
 
-**Por qué el término de rotación no desaparece.** El heartline es el eje de roll, y un punto *matemático* sobre un eje de rotación no recibe aporte de esa rotación. Pero el pasajero no es un punto: la cabeza y los hombros quedan fuera del eje, con brazo $e$, y sí la sienten. Anular el término de rotación equivaldría a afirmar que rolear no se siente, que es falso. Lo que el heartlineado logra no es eliminar el efecto sino **minimizarlo**, poniendo al pasajero lo más cerca posible del eje en vez de hacerlo orbitar alrededor del riel.
+Como $\boldsymbol\omega$ es la misma para todos los puntos de un cuerpo rígido, el punto de referencia $O$ es una elección de conveniencia: se toma el riel porque es la curva integrada, cuya aceleración se conoce exacta.
 
 ### 3.3 Velocidad angular — completa
 
@@ -222,28 +225,31 @@ $$\boldsymbol{\omega} = v\,\big(-\kappa_l\,\mathbf{U} + \kappa_u\,\mathbf{L} + \
 
 De acá sale $\Omega_T = v\phi'$, que ya dice algo importante: **la misma geometría de roll gira más rápido en el tiempo a mayor velocidad.**
 
-### 3.4 Los dos términos de roll
+### 3.4 Componentes cerradas en el plano normal
 
-Quedándose sólo con el aporte de roll, $\boldsymbol{\omega}\approx\Omega_T\mathbf{T}$, y con $\mathbf{r}_{P/O} = e\mathbf{U} \perp \mathbf{T}$:
+Desarrollando §3.2 con la $\boldsymbol\omega$ de §3.3 y $\mathbf{r}_{P/O} = b\,\mathbf{U}$, las componentes sobre $\mathbf{U}$ y $\mathbf{L}$ **no dependen de $d\boldsymbol\kappa/ds$**, así que tienen forma cerrada y se pueden evaluar dentro del paso de integración:
 
-**Centrípeto** (apunta hacia el eje de roll, o sea $-\mathbf{U}$):
-$$a_{U,\text{roll}} = -\Omega_T^2\,e = -v^2\phi'^2\,e$$
+$$G_z = \frac{v^2\kappa_u\,(1 - b\,\kappa_u)}{g} + U_z - \frac{v^2\,b\,\phi'^2}{g}$$
 
-**Euler** (perpendicular a $\mathbf{T}$ y a $\mathbf{U}$, o sea **lateral**):
-$$a_{L,\text{roll}} = \dot{\Omega}_T\,e$$
+$$G_y = \frac{v^2\kappa_l\,(1 - b\,\kappa_u)}{g} + L_z + \frac{b\,(a_t\,\phi' + v^2\phi'')}{g}$$
 
-Expandiendo por regla de la cadena:
-$$\dot{\Omega}_T = \frac{d}{dt}(v\phi') = \frac{dv}{dt}\phi' + v\frac{d\phi'}{ds}\frac{ds}{dt} = a_t\,\phi' + v^2\,\phi''$$
+Cada término tiene nombre:
 
-$$a_{\text{lateral, roll}} = e\,\big(a_t\,\phi' + v^2\,\phi''\big) \qquad a_{\text{vertical, roll}} = -e\,v^2\,\phi'^2$$
+| Término | Qué es |
+|---|---|
+| $(1 - b\kappa_u)$ | El pasajero recorre un radio $R - b$ en vez de $R$: es el 27 % de §3.1 |
+| $-v^2 b\phi'^2$ (sobre $\mathbf{U}$) | Centrípeta de girar alrededor del riel: apunta hacia el eje de roll |
+| $b\,(a_t\phi' + v^2\phi'')$ (sobre $\mathbf{L}$) | Euler de la rotación: la G lateral que produce una transición de roll |
 
-Estas dos expresiones son las que dimensionan la longitud de la transición de roll (§7), y son las únicas que se pueden despejar a mano. **No son las que se implementan.**
+Sólo la componente longitudinal $G_x$ arrastra un término en $d\boldsymbol\kappa/ds$ (a través de $\dot{\boldsymbol\omega}\cdot\mathbf{L}$), y por eso se evalúa numéricamente sobre la polilínea ya construida (§3.5). Los dos términos de roll son los que dimensionan la longitud de la transición de roll (§7): con $\phi''$ del smoothstep quíntico, $\max|\phi'''| = 60|\Delta\phi|/L^3$ y la tasa de aparición de $G_y$ vale $b\,v^3\phi'''/g$.
+
+**Signo de $G_y$.** Con $\mathbf{L} = \mathbf{T}\times\mathbf{U}$ y $\psi$ el ángulo de $\boldsymbol\kappa$ medido desde $\mathbf{U}$ hacia $\mathbf{L}$, $\kappa_l = \kappa\sin\psi$ y el aporte de la curvatura a $G_y$ es $+\kappa v^2\sin\psi/g$: una curvatura desalineada hacia $+\mathbf{L}$ empuja al pasajero hacia $+\mathbf{L}$. Es la convención que usa `CargasEnLaVia`.
 
 ### 3.5 Resultado: la expresión que se implementa
 
-El código no usa la aproximación de §3.4 sino la fórmula completa de §3.2 con la $\boldsymbol\omega$ entera de §3.3, evaluada numéricamente sobre la polilínea ya construida:
+Dentro del paso de integración (`DerivadaDeVia`, `CurvaturaDelModo`) se usan las componentes cerradas de §3.4. Sobre la polilínea ya construida (`SimularSobreTrack`) se usa la fórmula completa de §3.2 con la $\boldsymbol\omega$ entera de §3.3, evaluada numéricamente, a tres brazos —$d$ para la fuerza normal, $b$ para la verificación normativa y $d+e$ para la cabeza—:
 
-$$\boxed{\;\mathbf{a}_P = a_t\mathbf{T} + v^2\boldsymbol{\kappa} + \dot{\boldsymbol{\omega}}\times e\mathbf{U} + \boldsymbol{\omega}\times(\boldsymbol{\omega}\times e\mathbf{U})\;}$$
+$$\boxed{\;\mathbf{a}_P = a_t\mathbf{T} + v^2\boldsymbol{\kappa} + \dot{\boldsymbol{\omega}}\times b\,\mathbf{U} + \boldsymbol{\omega}\times(\boldsymbol{\omega}\times b\,\mathbf{U})\;}$$
 
 y la G por eje sale de la fuerza específica $\mathbf{f} = \mathbf{a}_P - \mathbf{g}$, con $\mathbf{g} = -g\hat{z}$:
 
@@ -251,20 +257,49 @@ $$G_x = \frac{\mathbf{f}\cdot\mathbf{T}}{g} \qquad G_y = \frac{\mathbf{f}\cdot\m
 
 Restar $\mathbf{g}$ y no ignorarla es lo que hace que un cuerpo en reposo sobre vía a nivel mida 1 G, que es como la norma define la magnitud que limita (§5.1, cláusula 7.1.4.5).
 
-**Por qué la fórmula completa y no la aproximación.** Quedarse con $\boldsymbol\omega\approx\Omega_T\mathbf{T}$ pierde los términos cruzados entre curvatura y roll, que son los que dominan justo donde la vía curva y rola *a la vez* — que es todo el interés de un over-banked turn o un dive loop. Medido sobre el over-banked turn de 120° con peralte de 110°, el aporte total de rotación llega a **0.49 G**, y desaparecería entero si se lo despreciara.
+**Por qué la fórmula completa y no la aproximación de roll puro.** Quedarse con $\boldsymbol\omega\approx\Omega_T\mathbf{T}$ pierde los términos cruzados entre curvatura y roll, que son los que dominan justo donde la vía curva y rola *a la vez* — que es todo el interés de un over-banked turn o un dive loop. Medido sobre el over-banked turn de 120° con peralte de 110°, el aporte total de rotación más el cambio de radio llega a **0.49 G**, y desaparecería entero si se lo despreciara.
 
-**Verificación.** Con $e = 0$ la expresión tiene que reducirse exactamente a la G del heartline pelado. El test 10 de `TestsValidacion.m` lo comprueba y da $2\times10^{-16}$ G de diferencia; el mismo test verifica que con $e$ real el aporte de rotación es estrictamente positivo.
+**Verificación.** Con $b = 0$ la expresión tiene que reducirse exactamente a la G del punto del riel, $v^2\kappa_u/g + U_z$. El test 10 de `TestsValidacion.m` lo comprueba y da $2\times10^{-16}$ G de diferencia; el mismo test verifica que con $d$ real el aporte es estrictamente positivo. El test 11 fija la hipótesis del eje de roll: en la transición de roll del dive loop el riel queda exactamente recto, la heartline sale con la curvatura de la hélice $d\phi'^2/(1+d^2\phi'^2)$, y la $G_y$ de rotación en la cabeza es exactamente el doble que en la heartline.
 
-### 3.6 Consecuencias
+### 3.6 Transporte inverso: la curvatura del riel para una G del pasajero
+
+Los modos de curvatura conocen la G que quieren en el pasajero y tienen que devolver la curvatura del riel. Con $c = \cos\psi$ la proyección de la curvatura sobre $\mathbf{U}$ (§3.4, $\kappa_u = \kappa c$), la ecuación de $G_z$ de §3.4 se resuelve para $\kappa$. Hay un matiz: la velocidad que se integra es la del centro de masa, $v_{cm}$, porque es la que conserva energía (§3.7), y la del punto del riel es $v = v_{cm}/J$ con
+
+$$J = \left\lVert\frac{d\mathbf{r}_h}{ds}\right\rVert = \sqrt{(1 - d\kappa_u)^2 + d^2\phi'^2}$$
+
+que depende de la misma $\kappa$. Sustituyendo, con $A = (G_{obj} - U_z)\,g/v_{cm}^2$ y $\phi'$ dado:
+
+$$\kappa c\,(1 - b\kappa c) - b\phi'^2 = A\,J^2 \quad\Longrightarrow\quad a_2\kappa^2 + a_1\kappa + a_0 = 0$$
+
+$$a_2 = -c^2\,(b + A d^2), \qquad a_1 = c\,(1 + 2Ad), \qquad a_0 = -\big(A\,(1 + d^2\phi'^2) + b\phi'^2\big)$$
+
+Es cerrada por punto. Se toma la raíz que tiende a $A/c$ cuando los brazos van a cero, escrita como $2a_0/(-a_1 - \sqrt{a_1^2 - 4a_2a_0})$ para no restar números parecidos. $\phi'$ lleva el término helicoidal $\kappa\tan\alpha$ del loop, que se cierra por punto fijo en dos o tres pasadas (exacto sin hélice).
+
+Dos consecuencias que la fórmula hace explícitas:
+
+- **La proyección $c$ importa.** Una curva peraltada un ángulo $\beta$ con la curvatura horizontal tiene $c = \sin\beta$; una curva sin peraltar ($c = 0$) no puede generar $+G_z$ por más curvatura que se le ponga: genera $G_y$. La implementación tiene una guarda explícita para ese caso. Sin esta proyección, la hélice de 55° de peralte le erraba al objetivo por un factor $1/\sin 55° = 1.22$ (≈ 1 G a 6 G de objetivo).
+- **Hay una G máxima alcanzable.** $\kappa c(1 - b\kappa c)$ tiene máximo $1/(4b)$ en $\kappa c = 1/(2b)$: más allá, acercar el pasajero al centro de giro le baja la G. Con $b = 0.03$ m eso es $R = 0.06$ m; a $v = 3$ m/s la G centrípeta máxima es 7.6 G. Si el objetivo está por encima, la cuadrática no tiene raíz real y se devuelve la curvatura del máximo; el chequeo posterior lo reporta.
+
+Comprobado sobre los cuatro elementos en los modos `FuerzaGConstante` y normativo: la $G_z$ del pasajero en el arco coincide con el objetivo dentro de 0.004 G, mientras que la del propio riel difiere entre 0.08 y 0.70 G.
+
+### 3.7 Energía del centro de masa
+
+La curva integrada es el riel pero la masa está en la heartline, que no es unit-speed en $s$: $\lVert d\mathbf{r}_h/ds\rVert = J$. La energía que se conserva es la del centro de masa, así que el estado lleva $v_{cm}^2$ y
+
+$$\frac{d(v_{cm}^2)}{ds} = -2g\,\frac{dz_h}{ds} - \frac{2F_{res}}{m}, \qquad \frac{dz_h}{ds} = (1 - d\kappa_u)\,T_z + d\phi'\,L_z, \qquad \frac{dt}{ds} = \frac{J}{v_{cm}}$$
+
+Integrar la energía como si la masa fuera con la velocidad del riel metería un error de $(1 - d\kappa_u)^2$ en la energía cinética — 47 % a $R = 0.11$ m — que es la otra cara del 27 % de §3.1. El test 1 verifica $v_{cm}^2 = v_0^2 - 2g\,\Delta z_h$ sin pérdidas con error relativo $10^{-7}$.
+
+### 3.8 Consecuencias sobre la continuidad del roll
 
 **La aceleración lateral depende de $\phi''$.** Si $\phi$ es sólo $C^1$, entonces $\phi''$ es discontinua y **hay un salto de aceleración lateral** en los extremos de la transición de roll.
 
 | Modelo | Aceleración continua | Jerk continuo |
 |---|---|---|
-| Punto sobre el eje de roll ($e=0$) | $\phi \in C^0$ | $\phi \in C^1$ |
-| **Cuerpo fuera del eje ($e>0$)** | $\phi \in C^2$ | $\phi \in C^3$ |
+| Punto sobre el eje de roll ($b=0$) | $\phi \in C^0$ | $\phi \in C^1$ |
+| **Cuerpo fuera del eje ($b>0$)** | $\phi \in C^2$ | $\phi \in C^3$ |
 
-Que la exigencia de $C^2$ sobreviva al cambio de jerarquía no es casualidad: depende de que el punto evaluado esté **fuera** del eje de roll, y lo está por $e>0$. Si se pusiera $e=0$ —evaluar en el eje mismo— la exigencia caería a $C^0$ y las transiciones de roll podrían ser arbitrariamente cortas, que es físicamente falso.
+La exigencia de $C^2$ depende de que el punto evaluado esté **fuera** del eje de roll, y lo está siempre, porque el eje es el riel y el pasajero va a $d > 0$. Si se pusiera $d = 0$ —el pasajero sobre el riel— la exigencia caería a $C^0$ y las transiciones de roll podrían ser arbitrariamente cortas, que es físicamente falso.
 
 **Perfil de roll adoptado: smoothstep quíntico.** Con $u = s/L_{trans}$ normalizado en $[0,1]$:
 
@@ -274,13 +309,13 @@ Cumple $\phi'(0)=\phi'(1)=0$ **y** $\phi''(0)=\phi''(1)=0$, de modo que empalma 
 
 **Alternativa descartada:** la rampa coseno $\phi = \phi_{total}(1-\cos\pi u)/2$ tiene $\phi'(0)=0$ pero $\phi''(0)\neq 0$, así que sí produce el salto de aceleración lateral. Es una trampa frecuente.
 
-### 3.7 Verificación de consistencia con Froude
+### 3.9 Verificación de consistencia con Froude
 
-Contando exponentes de $\lambda$ en los términos de roll de §3.4: $e\sim\lambda^{-1}$, $a_t\sim\lambda^0$, $\phi'\sim\lambda^{1}$, $v^2\sim\lambda^{-1}$, $\phi''\sim\lambda^{2}$.
+Contando exponentes de $\lambda$ en los términos de roll de §3.4: $b\sim\lambda^{-1}$, $a_t\sim\lambda^0$, $\phi'\sim\lambda^{1}$, $v^2\sim\lambda^{-1}$, $\phi''\sim\lambda^{2}$.
 
-$$e\,a_t\,\phi' \sim \lambda^{-1+0+1} = \lambda^0 \qquad e\,v^2\phi'' \sim \lambda^{-1-1+2} = \lambda^0$$
+$$b\,a_t\,\phi' \sim \lambda^{-1+0+1} = \lambda^0 \qquad b\,v^2\phi'' \sim \lambda^{-1-1+2} = \lambda^0 \qquad b\,v^2\phi'^2 \sim \lambda^{-1-1+2} = \lambda^0$$
 
-Ambos términos son invariantes de escala, consistente con que la aceleración lo sea bajo Froude. La derivación y el marco de escalado son mutuamente consistentes.
+Los tres términos son invariantes de escala, consistente con que la aceleración lo sea bajo Froude. La derivación y el marco de escalado son mutuamente consistentes.
 
 ---
 
@@ -740,7 +775,7 @@ El arco domina ampliamente: las clotoides son alrededor del 10 % del total. Esto
 | Criterio | Valor | Origen |
 |---|---|---|
 | Continuidad de la curva | $\mathcal{G}^2$ por longitud de arco | Decisión de diseño |
-| Continuidad del roll | $C^2$ vía smoothstep quíntico | Derivación de heartline, [§3.6](#36-consecuencias) |
+| Continuidad del roll | $C^2$ vía smoothstep quíntico | Derivación de heartline, [§3.8](#38-consecuencias-sobre-la-continuidad-del-roll) |
 | Marco de referencia | Transporte paralelo + $\phi(s)$ explícito | [§2.2](#22-marco-de-transporte-paralelo) |
 | Escalado | Froude, $\lambda = 22$ **[SIN VERIFICAR]** (provisorio) | [§4](#4-semejanza-de-froude) |
 | Límite $+G_z$ | Curva de Fig. 10, dependiente de duración | F2291-06a **[SIN VERIFICAR]** |
@@ -930,8 +965,8 @@ Consecuencia operativa: el generador de elementos toma $R_{loop}$ y $L_{carro}$ 
 - [ ] Volumen mínimo que requieren LSM, switch track y freno de Foucault
 - [ ] Tolerancia alcanzable por la impresora, que fija el radio mínimo de vía fabricable
 - [ ] Presupuesto de onset de $G_y$: no tiene valor normativo propio, se adopta el más restrictivo de los otros dos ejes como criterio propio (§6.7) — falta cerrar el criterio de cuál es "el más restrictivo" en cada caso
-- [ ] Offset de evaluación del pasajero $e$ (`DistanciaEvaluacionPasajero`): hoy vale 0.030 m, que reproduce la geometría previa a la corrección de heartline y **no** una medida antropométrica. Cerrarlo exige decidir qué punto del cuerpo se evalúa (cabeza, hombros) y escalarlo por $\lambda$ — a $\lambda\approx22$, un offset cabeza-corazón real de ~0.25 m daría ~0.011 m ([§3.1](#31-planteo-tres-curvas-no-una))
-- [ ] Criterio de rotación pura: hoy la rotación entra sólo por el brazo $e$. ASTM F2291 §7.1.6 tiene un límite de **velocidad angular** propio, que sería el criterio correcto y no está implementado
+- [ ] Offset heartline → cabeza $e$ (`DistanciaHeartlineACabeza`): hoy vale 0.030 m y **no** es una medida antropométrica. Cerrarlo exige escalar un offset corazón-cabeza real por $\lambda$ — a $\lambda\approx22$, ~0.25 m daría ~0.011 m ([§3.1](#31-planteo-tres-curvas-no-una)). Afecta sólo la G informativa de la cabeza, salvo que se pida `PuntoDeVerificacionNormativa = 'Cabeza'`
+- [ ] Criterio de rotación pura: hoy la rotación entra por el brazo $b$ del transporte de cuerpo rígido. ASTM F2291 §7.1.6 tiene un límite de **velocidad angular** propio, que sería el criterio correcto y no está implementado
 
 ---
 

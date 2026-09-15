@@ -32,6 +32,23 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
 %   clotoide de salida llega a GiroObjetivo. Esa prediccion no es exacta cuando
 %   la curvatura depende de v, asi que el residual de cierre se corrige con
 %   unas pocas iteraciones de secante y se reporta siempre.
+%
+%   HIPOTESIS DEL EJE DE ROLL (la misma en todo el generador):
+%     Se prescribe el RIEL: es la curva que se integra, unit-speed en s, y el
+%     eje alrededor del cual rola el carro. La heartline del pasajero se
+%     despeja de el, r_h = r + d*U, y por eso sobre un riel recto que rola la
+%     heartline hace una helice: el pasajero rota respecto de la via.
+%     Brazos de palanca, medidos desde el riel sobre U:
+%       d      = DistanciaHeartline          centro de masa; energia, fuerza
+%                                            normal y reparto entre ruedas
+%       b      = BrazoDeVerificacion         punto donde los modos imponen la
+%                                            G objetivo y donde se la verifica
+%                                            contra la norma (d, o d + e si se
+%                                            pide la cabeza)
+%       d + e  = d + DistanciaHeartlineACabeza  cabeza; G informativa
+%     Con brazo b la transicion de roll se dimensiona (LongitudTransicionDeRoll)
+%     y con el mismo b se verifica (SimularSobreTrack). Derivacion en
+%     memoria_de_calculo.md, seccion 3.
 
     if nargin < 4
         PerfilVelocidad = [];
@@ -159,8 +176,8 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
 
     Track.Nombre                  = Receta.Nombre;
     Track.ModoCurvatura           = Parametros.ModoCurvatura;
-    Track.PuntosHeartline         = Registro.Posicion;
-    Track.LongitudArco            = Registro.Arco;
+    Track.PuntosRiel              = Registro.Posicion;
+    Track.LongitudArco            = Registro.Arco;       % arco del RIEL
     Track.VersorTangente          = Registro.VersorTangente;
     Track.VersorArribaTransporte  = Registro.VersorArribaTransporte;
     Track.VersorLateralTransporte = Registro.VersorLateralTransporte;
@@ -183,15 +200,18 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
     Track.AnguloPeralte           = AnguloDePeralte(Registro.VersorTangente, Registro.VersorArribaCarro);
     Track.DerivadaCurvatura       = gradient(Registro.Curvatura, Registro.Arco);
 
-    % --- Riel: la curva integrada es el heartline, el riel se deriva ---------
-    % El riel va desplazado -d*U respecto del heartline. Es un desplazamiento
-    % puramente geometrico: define donde esta la via para fabricarla y para
-    % chequear interferencia, y no interviene en ninguna fuerza. Su curvatura
-    % NO es la del heartline -- esa es exactamente la diferencia que motiva
-    % toda esta separacion -- asi que se calcula aparte y es la que hay que
-    % contrastar contra el radio minimo fabricable.
-    [Track.PuntosRiel, Track.LongitudArcoRiel, Track.CurvaturaRiel] = ...
-        DerivarRiel(Registro.Posicion, Registro.VersorArribaCarro, Registro.Arco, Parametros);
+    % --- Heartline: la curva integrada es el riel, la heartline se deriva ----
+    % La heartline va desplazada +d*U respecto del riel y es donde va el
+    % centro de masa del pasajero. Como U gira con el roll, sobre un riel
+    % recto que rola la heartline sale helicoidal. Su curvatura NO es la del
+    % riel -- esa es exactamente la diferencia que motiva toda esta
+    % separacion -- asi que se calcula aparte: es la que hay que contrastar
+    % contra el radio nominal de diseno. La del riel (Track.Curvatura, exacta,
+    % impuesta) es la que se contrasta contra el radio minimo fabricable.
+    [Track.PuntosHeartline, Track.LongitudArcoHeartline, Track.CurvaturaHeartline] = ...
+        DerivarHeartline(Registro.Posicion, Registro.VersorArribaCarro, Registro.Arco, Parametros);
+    Track.VelocidadCentroDeMasa    = Registro.VelocidadCentroDeMasa;
+    Track.FactorVelocidadHeartline = Registro.FactorVelocidadHeartline;
 
     %% ---------------- Diagnostico -----------------------------------------
     Diagnostico.ResidualCierrePitch        = ResidualCierre;
@@ -214,35 +234,39 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
 
     % Perfil de velocidad que salio de la marcha acoplada. Es lo que el
     % metodo B realimenta en la iteracion siguiente.
-    Diagnostico.PerfilVelocidad = struct('Arco', Registro.Arco, 'Velocidad', Registro.Velocidad);
-    Diagnostico.TiempoDeRecorrido   = Registro.Tiempo;
-    Diagnostico.GArribaHeartline    = Registro.GArribaHeartline;
-    Diagnostico.GLateralHeartline   = Registro.GLateralHeartline;
+    % Es la velocidad del centro de masa: la que usan los modos de curvatura.
+    Diagnostico.PerfilVelocidad = struct('Arco', Registro.Arco, 'Velocidad', Registro.VelocidadCentroDeMasa);
+    Diagnostico.TiempoDeRecorrido    = Registro.Tiempo;
+    Diagnostico.GArribaHeartline     = Registro.GArribaHeartline;
+    Diagnostico.GLateralHeartline    = Registro.GLateralHeartline;
+    Diagnostico.GArribaVerificacion  = Registro.GArribaVerificacion;
+    Diagnostico.GLateralVerificacion = Registro.GLateralVerificacion;
 end
 
-%% ========================= derivacion del riel ============================
-function [PuntosRiel, ArcoRiel, CurvaturaRiel] = DerivarRiel(PuntosHeartline, VersorArribaCarro, Arco, Parametros)
-%DERIVARRIEL Riel a partir del heartline: r_riel = r_heartline - d*U.
-%   La curvatura del riel se saca con kappa = |r' x r''|/|r'|^3 derivando
-%   respecto del arco DEL HEARTLINE. La formula del producto vectorial vale
-%   para cualquier parametrizacion, asi que no hace falta reparametrizar el
-%   riel por su propio arco: alcanza con no suponer |r'| = 1, que es
-%   justamente lo que deja de valer al desplazar la curva.
+%% ========================= derivacion de la heartline =====================
+function [PuntosHeartline, ArcoHeartline, CurvaturaHeartline] = DerivarHeartline(PuntosRiel, VersorArribaCarro, Arco, Parametros)
+%DERIVARHEARTLINE Heartline a partir del riel: r_h = r_riel + d*U.
+%   La curvatura de la heartline se saca con kappa = |r' x r''|/|r'|^3
+%   derivando respecto del arco DEL RIEL. La formula del producto vectorial
+%   vale para cualquier parametrizacion, asi que no hace falta reparametrizar
+%   la heartline por su propio arco: alcanza con no suponer |r'| = 1, que es
+%   justamente lo que deja de valer al desplazar la curva (|r'| es el factor
+%   J de DerivadaDeVia).
 %
 %   Los nodos repetidos se filtran antes de derivar. Aparecen cuando un
 %   sub-tramo termina con un paso acortado, y sobre una segunda derivada un
 %   paso nulo no da ruido sino un infinito.
 
-    Distancia  = Parametros.DistanciaHeartline;
-    PuntosRiel = PuntosHeartline - Distancia*VersorArribaCarro;
+    Distancia       = Parametros.DistanciaHeartline;
+    PuntosHeartline = PuntosRiel + Distancia*VersorArribaCarro;
 
-    ArcoRiel = [0; cumsum(vecnorm(diff(PuntosRiel, 1, 1), 2, 2))] + Arco(1);
+    ArcoHeartline = [0; cumsum(vecnorm(diff(PuntosHeartline, 1, 1), 2, 2))] + Arco(1);
 
-    Primera = DerivadaPorArco(PuntosRiel, Arco);
-    Segunda = DerivadaPorArco(Primera,    Arco);
+    Primera = DerivadaPorArco(PuntosHeartline, Arco);
+    Segunda = DerivadaPorArco(Primera,         Arco);
 
-    NormaPrimera  = vecnorm(Primera, 2, 2);
-    CurvaturaRiel = vecnorm(cross(Primera, Segunda, 2), 2, 2) ./ max(NormaPrimera.^3, eps);
+    NormaPrimera       = vecnorm(Primera, 2, 2);
+    CurvaturaHeartline = vecnorm(cross(Primera, Segunda, 2), 2, 2) ./ max(NormaPrimera.^3, eps);
 end
 
 %% ========================= recorrido del elemento =========================
@@ -257,6 +281,10 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     Contexto.InclinacionHelicoidal      = 0;   % la fija el arco, no el acondicionamiento
     Contexto.AnguloGiradoDeReferencia   = 0;
     Contexto.FuncionCurvatura           = @(Punto) deal(0, 0);
+    % Direccion en la que el elemento pide la curvatura, en el marco de
+    % transporte. Hasta que arranca el arco es la del plano de entrada; el
+    % arco la reemplaza por la suya, que ademas gira con la helice.
+    Contexto.FuncionAnguloDeCurvatura   = @(Punto) Plan.Beta + Plan.Receta.DesfasajeDeCurvatura;
 
     y    = Plan.EstadoInicialY;
     Arco = Plan.EstadoEntrada.LongitudAcumulada;
@@ -323,7 +351,8 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     Contexto.AnguloGiradoDeReferencia = AnguloGiradoInicio;
     AnguloDeCurvatura = @(Punto) BetaArco + Plan.Receta.DesfasajeDeCurvatura ...
                                  + Plan.Inclinacion*(Punto.AnguloGirado - AnguloGiradoInicio);
-    Contexto.InclinacionHelicoidal = Plan.Inclinacion;
+    Contexto.InclinacionHelicoidal    = Plan.Inclinacion;
+    Contexto.FuncionAnguloDeCurvatura = AnguloDeCurvatura;
 
     % Base en la que se mide el giro y el avance sobre el eje de la helice:
     % e1 es la tangente al empezar el arco y e2 la direccion de la curvatura
@@ -346,7 +375,10 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     % LEY DE CURVATURA, no el dimensionamiento. Ademas, con esto la geometria
     % del modo Clotoide queda completamente independiente del perfil supuesto
     % y los dos metodos coinciden exactamente, que es lo que el test pide.
-    PuntoInicial = PuntoCinematico(Arco, y, Contexto);
+    % El punto inicial se evalua con DerivadaDeVia y no con PuntoCinematico
+    % porque la velocidad del riel, que es la que dimensiona la clotoide,
+    % recien se conoce con la curvatura (la del estado de entrada, aca).
+    [~, PuntoInicial] = DerivadaDeVia(Arco, y, Contexto);
     CurvaturaObjetivo = CurvaturaDelModo(PuntoInicial, Parametros, Plan.Escala, PuntoInicial.Tiempo);
     LongitudEntrada = LongitudDeClotoide(PuntoInicial.Velocidad, ...
                                          CurvaturaObjetivo - CurvaturaInicialArco, Plan.Onset(3), Parametros);
@@ -354,9 +386,8 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
 
     ArcoInicio = Arco;
     TiempoReferencia = y(15);
-    Contexto.FuncionCurvatura = @(Punto) ProyectarCurvatura( ...
-        MezclaDeClotoide(Punto, ArcoInicio, LongitudEntrada, CurvaturaInicialArco, ...
-                         Parametros, Plan.Escala, TiempoReferencia), AnguloDeCurvatura(Punto));
+    Contexto.FuncionCurvatura = @(Punto) MezclaDeClotoide(Punto, ArcoInicio, LongitudEntrada, ...
+                                    CurvaturaInicialArco, Parametros, Plan.Escala, TiempoReferencia);
 
     Indice = Recorrido.Registro.NumeroDeNodos + 1;
     [Recorrido.Registro, y, Arco] = IntegrarTramo(Recorrido.Registro, y, Arco, Contexto, LongitudEntrada, []);
@@ -370,8 +401,8 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
 
     %% --- ArcoLoop ---
     TiempoReferenciaArco = y(15);
-    Contexto.FuncionCurvatura = @(Punto) ProyectarCurvatura( ...
-        CurvaturaDelModo(Punto, Parametros, Plan.Escala, TiempoReferenciaArco), AnguloDeCurvatura(Punto));
+    Contexto.FuncionCurvatura = @(Punto) CurvaturaDelModoProyectada(Punto, Parametros, Plan.Escala, ...
+                                                                    TiempoReferenciaArco);
 
     ArcoQueFalta = @(Punto) (Plan.Receta.GiroObjetivo - AjusteCierre ...
                              - (Punto.AnguloGirado - AnguloGiradoInicio) ...
@@ -454,13 +485,27 @@ function [CurvaturaArriba, CurvaturaLateral] = CurvaturaDeAcondicionamiento(Punt
     CurvaturaLateral = Plan.CurvaturaParalela*sin(Angulo) + CurvaturaPerpendicular*cos(Angulo);
 end
 
-function Curvatura = MezclaDeClotoide(Punto, ArcoInicio, Longitud, CurvaturaInicial, Parametros, Escala, TiempoReferencia)
+function [CurvaturaArriba, CurvaturaLateral] = CurvaturaDelModoProyectada(Punto, Parametros, Escala, TiempoReferencia)
+%CURVATURADELMODOPROYECTADA Curvatura del modo repartida sobre el marco de
+%   transporte. El modo devuelve el modulo y el angulo medido desde U del
+%   carro; sumarle el roll lo lleva al marco de transporte.
+    [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Escala, TiempoReferencia);
+    [CurvaturaArriba, CurvaturaLateral] = ProyectarCurvatura(Curvatura, Punto.AnguloRoll + AnguloDesdeArriba);
+end
+
+function [CurvaturaArriba, CurvaturaLateral] = MezclaDeClotoide(Punto, ArcoInicio, Longitud, CurvaturaInicial, Parametros, Escala, TiempoReferencia)
 %MEZCLADECLOTOIDE Rampa lineal entre la curvatura de entrada y la que pide el
 %   modo. Con el modo Clotoide la curvatura objetivo es constante y esto es
-%   exactamente una clotoide: dkappa/ds constante.
+%   exactamente una clotoide: dkappa/ds constante. Se mezclan las dos
+%   COMPONENTES y no el modulo, para que si el modo desalinea la curvatura
+%   respecto de U la direccion tambien entre en rampa y no salte al arrancar
+%   el arco.
     Fraccion = FraccionDeTramo(Punto.Arco, ArcoInicio, Longitud);
-    CurvaturaObjetivo = CurvaturaDelModo(Punto, Parametros, Escala, TiempoReferencia);
-    Curvatura = (1 - Fraccion)*CurvaturaInicial + Fraccion*CurvaturaObjetivo;
+    [ArribaObjetivo, LateralObjetivo] = CurvaturaDelModoProyectada(Punto, Parametros, Escala, TiempoReferencia);
+    AnguloEntrada = Punto.AnguloRoll + Punto.AnguloCurvaturaDesdeArriba;
+    [ArribaInicial, LateralInicial]   = ProyectarCurvatura(CurvaturaInicial, AnguloEntrada);
+    CurvaturaArriba  = (1 - Fraccion)*ArribaInicial  + Fraccion*ArribaObjetivo;
+    CurvaturaLateral = (1 - Fraccion)*LateralInicial + Fraccion*LateralObjetivo;
 end
 
 function Giro = GiroDeLaClotoideDeSalida(Punto, Plan)
@@ -535,18 +580,18 @@ function Peralte = AnguloDePeralte(VersorTangente, VersorArribaCarro)
 end
 
 function Onset = OnsetVerticalDelRecorrido(Registro)
-%ONSETVERTICALDELRECORRIDO Tasa de aparicion de la G vertical del heartline,
-%   medida sobre el recorrido recien generado. Se usa para realimentar la
-%   longitud de las transiciones. Es la G que siente el pasajero, que es la
-%   que la norma limita: la curva integrada es el heartline y no lleva
-%   correccion de offset.
+%ONSETVERTICALDELRECORRIDO Tasa de aparicion de la G vertical en el punto de
+%   verificacion, medida sobre el recorrido recien generado. Se usa para
+%   realimentar la longitud de las transiciones. Es la G que la norma limita,
+%   ya transportada desde el riel con el brazo de verificacion; dG/dt sale de
+%   dG/ds por la velocidad del punto del riel, que es la que marca el tiempo.
     n = Registro.NumeroDeNodos;
     if n < 3
         Onset = 0;
         return
     end
     Arco = Registro.Arco(1:n);
-    Onset = max(abs(gradient(Registro.GArribaHeartline(1:n), Arco) .* Registro.Velocidad(1:n)));
+    Onset = max(abs(gradient(Registro.GArribaVerificacion(1:n), Arco) .* Registro.Velocidad(1:n)));
 end
 
 function Longitud = LongitudDeClotoide(Velocidad, DeltaCurvatura, Onset, Parametros)
@@ -560,17 +605,15 @@ end
 function Longitud = LongitudTransicionDeRoll(DeltaRoll, Velocidad, Onset, Parametros)
 %LONGITUDTRANSICIONDEROLL Dimensiona la transicion de roll por el onset lateral.
 %   Con el smoothstep quintico max|phi'''| = 60*|DeltaRoll|/L^3, y la G lateral
-%   de un punto a distancia e del eje de roll vale e*v^2*phi''/g, asi que su
-%   tasa de aparicion es e*v^3*phi'''/g. Despejando L:
-%       L = (60*e*v^3*|DeltaRoll| / (g*Onset))^(1/3)
+%   de un punto a distancia b del eje de roll vale b*v^2*phi''/g, asi que su
+%   tasa de aparicion es b*v^3*phi'''/g. Despejando L:
+%       L = (60*b*v^3*|DeltaRoll| / (g*Onset))^(1/3)
 %
-%   El brazo de palanca e es DistanciaEvaluacionPasajero y NO
-%   DistanciaHeartline. Desde que la curva integrada es el heartline, el
-%   heartline es tambien el eje de roll: un punto ahi tiene brazo cero. Lo que
-%   justifica seguir limitando esto es que el pasajero no es un punto --
-%   hombros y cabeza quedan fuera del eje. Es el mismo brazo con el que
-%   SimularSobreTrack transporta la G, y tiene que serlo: dimensionar la
-%   transicion con un offset y despues verificarla con otro no cierra.
+%   El eje de roll es el RIEL y el brazo b es BrazoDeVerificacion: la
+%   distancia del riel al punto donde la norma se aplica (la heartline, o la
+%   cabeza si se pide). Es el mismo brazo con el que SimularSobreTrack
+%   transporta la G, y tiene que serlo: dimensionar la transicion con un
+%   brazo y despues verificarla con otro no cierra.
 %
 %   SIN CERRAR: el criterio normativo propio de la rotacion pura es un limite
 %   de velocidad angular del carro (ASTM F2291 7.1.6), no un offset.
@@ -578,11 +621,11 @@ function Longitud = LongitudTransicionDeRoll(DeltaRoll, Velocidad, Onset, Parame
         Longitud = 0;
         return
     end
-    Distancia = Parametros.DistanciaEvaluacionPasajero;
-    if Distancia <= 0
+    Brazo = BrazoDeVerificacion(Parametros);
+    if Brazo <= 0
         Longitud = Parametros.LargoCarro;   % sin brazo de palanca el criterio no aplica
         return
     end
-    Longitud = (60*Distancia*Velocidad^3*abs(DeltaRoll) / (Parametros.Gravedad*Onset))^(1/3);
+    Longitud = (60*Brazo*Velocidad^3*abs(DeltaRoll) / (Parametros.Gravedad*Onset))^(1/3);
     Longitud = max(Longitud, Parametros.LargoCarro);
 end

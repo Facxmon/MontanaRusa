@@ -22,15 +22,20 @@ function [VelocidadMinima, Busqueda] = VelocidadInicialMinima(EstadoEntrada, Par
     Holgura = @(Velocidad) HolguraDeCuspide(EstadoEntrada, ParametrosBusqueda, Receta, Velocidad);
 
     %% --- Bracketing --------------------------------------------------------
+    % Se acota la busqueda: por encima de unas pocas veces la velocidad de
+    % entrada las transiciones se alargan como v^3 y cada generacion tarda
+    % minutos, y una velocidad asi no es una respuesta util de todos modos.
     VelocidadAlta = max(EstadoEntrada.Velocidad, 0.5);
+    VelocidadTope = 3*VelocidadAlta;
     Evaluaciones = 0;
     while Holgura(VelocidadAlta) < 0
         VelocidadAlta = 1.5*VelocidadAlta;
         Evaluaciones = Evaluaciones + 1;
-        if Evaluaciones > 15
+        if VelocidadAlta > VelocidadTope
             VelocidadMinima = NaN;
             Busqueda = struct('Convergio', false, 'Evaluaciones', Evaluaciones, ...
-                              'Motivo', 'No se encontro ninguna velocidad que complete el elemento.');
+                              'Motivo', sprintf(['Ninguna velocidad hasta %.1f m/s satisface la G minima ' ...
+                                                 'de cuspide y el radio fabricable a la vez.'], VelocidadTope));
             return
         end
     end
@@ -87,7 +92,19 @@ function Holgura = HolguraDeCuspide(EstadoEntrada, Parametros, Receta, Velocidad
         return
     end
 
-    HolguraDeG      = min(Diagnostico.GArribaHeartline) - Parametros.GMinimaCuspide;
+    % La G en el punto de verificacion, medida desde la clotoide de entrada en
+    % adelante: es la holgura de CUSPIDE. La transicion de roll queda afuera
+    % porque ahi la G baja por la centripeta de girar alrededor del riel
+    % (-v^2*b*phi'^2/g), que no depende de la velocidad de entrada de forma
+    % que una biseccion pueda corregir; ese valle lo reporta el chequeo
+    % posterior de G minima sobre el elemento completo. El radio es el del
+    % RIEL (curva integrada), que es el que limita la impresora.
+    Desde = 1;
+    IndiceClotoide = find(strcmp({Track.SubTramos.Nombre}, 'ClotoideEntrada'), 1);
+    if ~isempty(IndiceClotoide)
+        Desde = Track.SubTramos(IndiceClotoide).IndiceInicio;
+    end
+    HolguraDeG      = min(Diagnostico.GArribaVerificacion(Desde:end)) - Parametros.GMinimaCuspide;
     RadioAlcanzado  = 1/max(max(Track.Curvatura), eps);
     HolguraDeRadio  = (RadioAlcanzado - Parametros.RadioMinimoFabricable) / Parametros.RadioMinimoFabricable;
 

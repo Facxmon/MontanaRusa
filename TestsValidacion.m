@@ -22,7 +22,8 @@ fprintf('=====================================================================\n
 
 %% --- Test 1: conservacion de energia ---------------------------------
 % Sin resistencia y con loop circular, v^2 tiene que valer exactamente
-% v_0^2 - 2*g*h en todo punto.
+% v_0^2 - 2*g*h en todo punto. La energia es la del CENTRO DE MASA: v es la
+% velocidad del centro de masa y h la altura de la heartline, no del riel.
 Parametros = ParametrosBase;
 Parametros.CrrPortantes = 0; Parametros.CrrGuia = 0; Parametros.CrrRetencion = 0;
 Parametros.ModelarArrastre = false;
@@ -34,7 +35,7 @@ Track = Elemento.Track;  Sim = Elemento.Sim;
 
 AlturaRelativa = Track.PuntosHeartline(:,3) - Track.PuntosHeartline(1,3);
 VelocidadAnalitica = sqrt(Estado.Velocidad^2 - 2*Parametros.Gravedad*AlturaRelativa);
-ErrorRelativo = max(abs(Sim.Velocidad.^2 - VelocidadAnalitica.^2) ./ VelocidadAnalitica.^2);
+ErrorRelativo = max(abs(Sim.VelocidadCentroDeMasa.^2 - VelocidadAnalitica.^2) ./ VelocidadAnalitica.^2);
 
 Resultados = Anotar(Resultados, 'Conservacion de energia sin perdidas', ErrorRelativo < 1e-6, ...
     sprintf('error relativo maximo en v^2 = %.3e (limite 1e-6)', ErrorRelativo));
@@ -42,20 +43,22 @@ Resultados = Anotar(Resultados, 'Conservacion de energia sin perdidas', ErrorRel
 %% --- Test 2: curvatura impuesta contra curvatura recuperada -----------
 % Se recupera la curvatura de la polilinea con la circunferencia que pasa por
 % cada punto y sus dos vecinos, y se compara contra la impuesta al generar.
+% La curva integrada es el riel, asi que es sobre el riel que la curvatura
+% impuesta tiene que reaparecer.
 Parametros = ParametrosBase;
 Parametros.ModoCurvatura = 'FuerzaGConstante';
 Estado = EstadoDeEnsayo(Parametros);
 [~, Elemento] = ElementoLoopVertical(Estado, Parametros);
 Track = Elemento.Track;
 
-CurvaturaRecuperada = CurvaturaDiscretaDePolilinea(Track.PuntosHeartline);
-Interiores = (2:size(Track.PuntosHeartline,1)-1).';
+CurvaturaRecuperada = CurvaturaDiscretaDePolilinea(Track.PuntosRiel);
+Interiores = (2:size(Track.PuntosRiel,1)-1).';
 
 % Se excluyen los nodos cuyo esquema de 3 puntos cruza una frontera de
 % sub-tramo: ahi dkappa/ds salta y la circunferencia por 3 puntos devuelve un
 % promedio de dos curvaturas distintas. Es una limitacion del estimador
 % discreto, no un error de la geometria generada.
-CruzaFrontera = false(size(Track.PuntosHeartline,1), 1);
+CruzaFrontera = false(size(Track.PuntosRiel,1), 1);
 for k = 1:numel(Track.SubTramos)-1
     Frontera = Track.SubTramos(k).IndiceFin;
     CruzaFrontera(max(1,Frontera-1):min(end,Frontera+2)) = true;
@@ -89,10 +92,10 @@ Resultados = Anotar(Resultados, 'Residual del endpoint', ...
     ResidualTangente < 1e-3 && ErrorDesplazamiento < 0.05, ...
     sprintf('tangente %.3e, avance sobre el eje %.4f m contra objetivo %.4f m (%.2f %%), posicion final [%.5f %.5f %.5f]', ...
             ResidualTangente, Reporte.Resumen.DesplazamientoLateral, Parametros.SeparacionDePatas, ...
-            100*ErrorDesplazamiento, Track.PuntosHeartline(end,:)));
+            100*ErrorDesplazamiento, Track.PuntosRiel(end,:)));
 
 %% --- Test 4: continuidad en el empalme ---------------------------------
-SaltoPosicion  = norm(Track.PuntosHeartline(1,:)          - Estado.Posicion);
+SaltoPosicion  = norm(Track.PuntosRiel(1,:)              - Estado.Posicion);
 SaltoTangente  = norm(Track.VersorTangente(1,:)  - Estado.VersorTangente);
 SaltoCurvatura = norm(Track.VectorCurvatura(1,:) - Estado.VectorCurvatura);
 
@@ -177,7 +180,7 @@ for i = 1:numel(Constructores)
     [Estado, ElementoEncadenado, ReporteEncadenado] = Constructores{i}(EstadoPrevio, Parametros, LayoutDePrueba);
     LayoutDePrueba = LayoutAgregarElemento(LayoutDePrueba, ElementoEncadenado, Estado, ReporteEncadenado);
 
-    Salto = norm(ElementoEncadenado.Track.PuntosHeartline(1,:) - EstadoPrevio.Posicion) ...
+    Salto = norm(ElementoEncadenado.Track.PuntosRiel(1,:) - EstadoPrevio.Posicion) ...
           + norm(ElementoEncadenado.Track.VersorTangente(1,:) - EstadoPrevio.VersorTangente);
     PeorResidual = max(PeorResidual, abs(ReporteEncadenado.Resumen.ResidualCierrePitch));
     PeorSalto    = max(PeorSalto, Salto);
@@ -190,15 +193,16 @@ Resultados = Anotar(Resultados, 'Los cuatro elementos generan y encadenan', ...
     sprintf('%s | peor residual de cierre %.2e rad, peor salto de empalme %.2e, v final %.3f m/s', ...
             strjoin(Detalles, ', '), PeorResidual, PeorSalto, Estado.Velocidad));
 
-%% --- Test 9: derivacion del riel a partir del heartline -----------------
-% La curva que se integra es el heartline; el riel es r_h - d*U. Se verifican
-% las dos cosas que esa construccion tiene que cumplir:
+%% --- Test 9: derivacion de la heartline a partir del riel ---------------
+% La curva que se integra es el riel; la heartline es r_riel + d*U. Se
+% verifican las dos cosas que esa construccion tiene que cumplir:
 %   1. la separacion entre las dos curvas vale d en TODO nodo, exacto;
-%   2. el riel queda del lado de AFUERA de la curva, o sea con radio mayor.
-%      En el loop el centro de curvatura esta del lado de +U, el heartline
-%      esta d mas cerca de ese centro, y entonces R_riel = R_heartline + d.
-%      Ese es exactamente el efecto que antes no se modelaba: dimensionar por
-%      el riel dejaba al pasajero recorriendo un radio d mas chico.
+%   2. la heartline queda del lado de ADENTRO de la curva, o sea con radio
+%      menor. En el loop el centro de curvatura esta del lado de +U, la
+%      heartline esta d mas cerca de ese centro, y entonces
+%      R_heartline = R_riel - d. Ese es exactamente el efecto que motiva el
+%      transporte inverso de los modos de curvatura: dimensionar el riel para
+%      la G del riel dejaria al pasajero recorriendo un radio d mas chico.
 Parametros = ParametrosBase;
 Parametros.ModoCurvatura = 'Clotoide';
 Estado = EstadoDeEnsayo(Parametros);
@@ -209,61 +213,107 @@ Separacion = vecnorm(TrackRiel.PuntosHeartline - TrackRiel.PuntosRiel, 2, 2);
 ErrorSeparacion = max(abs(Separacion - Parametros.DistanciaHeartline));
 
 % Se mide sobre el arco principal y lejos de sus bordes: en las clotoides la
-% curvatura esta rampeando y el estimador por diferencias del riel arrastra el
-% mismo efecto de frontera que el test 2.
+% curvatura esta rampeando y el estimador por diferencias de la heartline
+% arrastra el mismo efecto de frontera que el test 2.
 IndiceArco = find(strcmp({TrackRiel.SubTramos.Nombre}, 'ArcoPrincipal'), 1);
 RangoArco  = TrackRiel.SubTramos(IndiceArco).IndiceInicio : TrackRiel.SubTramos(IndiceArco).IndiceFin;
 Margen     = round(0.10*numel(RangoArco));
 RangoArco  = RangoArco(1+Margen : end-Margen);
 
-RadioHeartline = 1 ./ TrackRiel.Curvatura(RangoArco);
-RadioDelRiel   = 1 ./ TrackRiel.CurvaturaRiel(RangoArco);
+RadioDelRiel   = 1 ./ TrackRiel.Curvatura(RangoArco);
+RadioHeartline = 1 ./ TrackRiel.CurvaturaHeartline(RangoArco);
 DiferenciaDeRadios = RadioDelRiel - RadioHeartline;
 ErrorDiferencia = max(abs(DiferenciaDeRadios - Parametros.DistanciaHeartline)) ...
                   / Parametros.DistanciaHeartline;
 
-Resultados = Anotar(Resultados, 'Derivacion del riel desde el heartline', ...
+Resultados = Anotar(Resultados, 'Derivacion de la heartline desde el riel', ...
     ErrorSeparacion < 1e-12 && all(DiferenciaDeRadios > 0) && ErrorDiferencia < 0.15, ...
     sprintf(['separacion constante con error %.3e m (limite 1e-12); ' ...
              'R_riel - R_heartline = %.4f m contra d = %.4f m esperado (%.1f %% de desvio)'], ...
             ErrorSeparacion, mean(DiferenciaDeRadios), Parametros.DistanciaHeartline, ...
             100*ErrorDiferencia));
 
-%% --- Test 10: transporte de cuerpo rigido al punto del pasajero ---------
+%% --- Test 10: transporte de cuerpo rigido desde el riel -----------------
 % Dos cosas en un solo test, porque son las dos caras del mismo criterio:
 %   1. con brazo nulo el transporte tiene que reducirse EXACTAMENTE a la G
-%      del heartline. Es la verificacion de que la formula general no
-%      introdujo nada espurio;
-%   2. con brazo real la rotacion tiene que aportar de verdad. El heartline es
-%      el eje de roll y un punto sobre el eje no siente la rotacion, pero el
-%      pasajero no es un punto: si el aporte diera cero, el modelo estaria
-%      diciendo que rolear no se siente, que es falso.
+%      del punto del riel, v^2*ku/g + Uz. Es la verificacion de que la
+%      formula general no introdujo nada espurio;
+%   2. con brazo real la rotacion tiene que aportar de verdad. El riel es el
+%      eje de roll y el pasajero va a distancia d: si el aporte diera cero,
+%      el modelo estaria diciendo que rolear no se siente, que es falso.
 Parametros = ParametrosBase;
 Parametros.ModoCurvatura = 'Clotoide';
 
 ParametrosSinBrazo = Parametros;
-ParametrosSinBrazo.DistanciaEvaluacionPasajero = 0;
+ParametrosSinBrazo.DistanciaHeartline        = 0;
+ParametrosSinBrazo.DistanciaHeartlineACabeza = 0;
 Estado = EstadoDeEnsayo(ParametrosSinBrazo);
 [~, ElementoSinBrazo] = ElementoOverBankedTurn(Estado, ParametrosSinBrazo);
-SimSinBrazo = ElementoSinBrazo.Sim;
+SimSinBrazo = ElementoSinBrazo.Sim;  TrackSinBrazo = ElementoSinBrazo.Track;
 
-ErrorReduccion = max([ max(abs(SimSinBrazo.Gz - SimSinBrazo.GArribaHeartline)), ...
-                       max(abs(SimSinBrazo.Gy - SimSinBrazo.GLateralHeartline)) ]);
+GzDelRiel = SimSinBrazo.Velocidad.^2 .* sum(TrackSinBrazo.VectorCurvatura .* TrackSinBrazo.VersorArribaCarro, 2) ...
+            / Parametros.Gravedad + TrackSinBrazo.VersorArribaCarro(:,3);
+GyDelRiel = SimSinBrazo.Velocidad.^2 .* sum(TrackSinBrazo.VectorCurvatura .* TrackSinBrazo.VersorLateral, 2) ...
+            / Parametros.Gravedad + TrackSinBrazo.VersorLateral(:,3);
+ErrorReduccion = max([ max(abs(SimSinBrazo.Gz - GzDelRiel)), max(abs(SimSinBrazo.Gy - GyDelRiel)) ]);
 
 % El over-banked turn rola 110 grados mientras curva: es el caso donde el
 % aporte de rotacion no puede ser despreciable.
 Estado = EstadoDeEnsayo(Parametros);
 [~, ElementoConBrazo] = ElementoOverBankedTurn(Estado, Parametros);
-SimConBrazo = ElementoConBrazo.Sim;
+SimConBrazo = ElementoConBrazo.Sim;  TrackConBrazo = ElementoConBrazo.Track;
 
-AporteRotacion = max([ max(abs(SimConBrazo.Gz - SimConBrazo.GArribaHeartline)), ...
-                       max(abs(SimConBrazo.Gy - SimConBrazo.GLateralHeartline)) ]);
+GzDelRiel = SimConBrazo.Velocidad.^2 .* sum(TrackConBrazo.VectorCurvatura .* TrackConBrazo.VersorArribaCarro, 2) ...
+            / Parametros.Gravedad + TrackConBrazo.VersorArribaCarro(:,3);
+GyDelRiel = SimConBrazo.Velocidad.^2 .* sum(TrackConBrazo.VectorCurvatura .* TrackConBrazo.VersorLateral, 2) ...
+            / Parametros.Gravedad + TrackConBrazo.VersorLateral(:,3);
+AporteRotacion = max([ max(abs(SimConBrazo.Gz - GzDelRiel)), max(abs(SimConBrazo.Gy - GyDelRiel)) ]);
 
-Resultados = Anotar(Resultados, 'Transporte de cuerpo rigido al punto del pasajero', ...
-    ErrorReduccion < 1e-12 && AporteRotacion > 1e-3, ...
-    sprintf(['con brazo nulo se reduce a la G del heartline con error %.3e G (limite 1e-12); ' ...
-             'con brazo de %.0f mm la rotacion aporta hasta %.4f G (tiene que ser > 0)'], ...
-            ErrorReduccion, 1000*Parametros.DistanciaEvaluacionPasajero, AporteRotacion));
+Resultados = Anotar(Resultados, 'Transporte de cuerpo rigido desde el riel', ...
+    ErrorReduccion < 1e-9 && AporteRotacion > 1e-3, ...
+    sprintf(['con brazo nulo se reduce a la G del punto del riel con error %.3e G (limite 1e-9); ' ...
+             'con brazo de %.0f mm la rotacion y el radio distinto aportan hasta %.4f G (tiene que ser > 0)'], ...
+            ErrorReduccion, 1000*Parametros.DistanciaHeartline, AporteRotacion));
+
+%% --- Test 11: el riel es el eje de roll --------------------------------
+% Fija la hipotesis del modelo: se prescribe el riel y el pasajero rota
+% alrededor de el. Sobre el tramo de acondicionamiento del dive loop, que
+% entra recto y rola 180 grados:
+%   1. el riel sigue recto (su curvatura impuesta es exactamente cero);
+%   2. la heartline hace una helice de radio d alrededor del riel: en el
+%      punto de maximo phi' su curvatura vale d*phi'^2/(1 + d^2*phi'^2);
+%   3. la G lateral que produce esa rotacion es lineal en el brazo: en la
+%      cabeza (2d) vale exactamente el doble que en la heartline (d).
+Parametros = ParametrosBase;
+Parametros.ModoCurvatura = 'Clotoide';
+Parametros.DistanciaHeartlineACabeza = Parametros.DistanciaHeartline;
+Estado = EstadoInicial([0 0 1.0], [1 0 0], [0 0 1], VelocidadDeEnsayo, Parametros);
+[~, ElementoRoll] = ElementoDiveLoop(Estado, Parametros);
+TrackRoll = ElementoRoll.Track;  SimRoll = ElementoRoll.Sim;
+
+IndiceRoll = find(strcmp({TrackRoll.SubTramos.Nombre}, 'AcondicionamientoEntrada'), 1);
+RangoRoll  = TrackRoll.SubTramos(IndiceRoll).IndiceInicio : TrackRoll.SubTramos(IndiceRoll).IndiceFin;
+
+CurvaturaRielEnElRoll = max(TrackRoll.Curvatura(RangoRoll));
+
+[~, Medio] = max(abs(TrackRoll.VelocidadRoll(RangoRoll)));
+Medio = RangoRoll(Medio);
+d = Parametros.DistanciaHeartline;
+CurvaturaHelice = d*TrackRoll.VelocidadRoll(Medio)^2 / (1 + d^2*TrackRoll.VelocidadRoll(Medio)^2);
+ErrorHelice = abs(TrackRoll.CurvaturaHeartline(Medio) - CurvaturaHelice) / CurvaturaHelice;
+
+GyRotacionHeartline = SimRoll.Gy(RangoRoll)       - TrackRoll.VersorLateral(RangoRoll, 3);
+GyRotacionCabeza    = SimRoll.GyCabeza(RangoRoll) - TrackRoll.VersorLateral(RangoRoll, 3);
+[~, Pico] = max(abs(GyRotacionHeartline));
+RazonDeBrazos = GyRotacionCabeza(Pico) / GyRotacionHeartline(Pico);
+
+Resultados = Anotar(Resultados, 'El riel es el eje de roll', ...
+    CurvaturaRielEnElRoll < 1e-12 && ErrorHelice < 0.05 && abs(RazonDeBrazos - 2) < 1e-6, ...
+    sprintf(['riel recto en la transicion (kappa max %.1e 1/m); heartline helicoidal con kappa %.4f 1/m ' ...
+             'contra d*phi''^2/(1+d^2*phi''^2) = %.4f (%.1f %% de desvio); Gy de rotacion en la cabeza / ' ...
+             'en la heartline = %.6f (tiene que ser 2); pico de %.3f G en la heartline'], ...
+            CurvaturaRielEnElRoll, TrackRoll.CurvaturaHeartline(Medio), CurvaturaHelice, 100*ErrorHelice, ...
+            RazonDeBrazos, GyRotacionHeartline(Pico)));
 
 %% --- Resumen ----------------------------------------------------------
 fprintf('\n');

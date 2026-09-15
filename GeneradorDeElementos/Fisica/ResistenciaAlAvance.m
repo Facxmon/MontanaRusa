@@ -5,11 +5,12 @@ function [FuerzaTotal, Rodadura, Arrastre] = ResistenciaAlAvance(Velocidad, GArr
 %   El arrastre no depende de la normal, asi que se puede evaluar incluso
 %   donde la curvatura todavia no esta definida.
 %
-%   Las dos G entran evaluadas en el heartline y no en el riel: el carro se
-%   modela como masa puntual con el centro de masa ahi, y la carga que pasa
-%   por las ruedas vale m*(a_cm - g_vec). El offset del riel es geometrico y
-%   no cambia esta cuenta. Los versores U y L son los mismos para las dos
-%   curvas, asi que el reparto entre juegos de ruedas tampoco cambia.
+%   Las dos G entran evaluadas en la heartline (a d del riel) y no en el
+%   punto del riel: el carro se modela como masa puntual con el centro de
+%   masa ahi, y la carga que pasa por las ruedas vale m*(a_cm - g_vec).
+%   CargasEnLaVia ya las transporta desde el riel con brazo d. Los versores U
+%   y L son los mismos para las dos curvas, asi que el reparto entre juegos
+%   de ruedas no depende de en cual se evalue.
 
     Peso = Parametros.Masa * Parametros.Gravedad;
 

@@ -2,7 +2,7 @@ function Layout = LayoutNuevo(EstadoInicialDelLayout, Parametros)
 %LAYOUTNUEVO Layout vacio, listo para encadenar elementos.
 %   Guarda la polilinea acumulada de toda la via ya construida, que es lo que
 %   necesita el chequeo de interferencia del elemento siguiente. Acumula el
-%   RIEL y no el heartline: la interferencia es entre piezas fisicas.
+%   RIEL y no la heartline: la interferencia es entre piezas fisicas.
 
     Layout.EstadoInicial    = EstadoInicialDelLayout;
     Layout.EstadoActual     = EstadoInicialDelLayout;

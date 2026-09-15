@@ -17,9 +17,9 @@ function Layout = LayoutAgregarElemento(Layout, Elemento, EstadoSalida, Reporte)
     % se descarta para no duplicar puntos en la polilinea.
     if isempty(Layout.PuntosRiel)
         Layout.PuntosRiel       = Elemento.Track.PuntosRiel;
-        Layout.LongitudArcoRiel = Elemento.Track.LongitudArcoRiel;
+        Layout.LongitudArcoRiel = Elemento.Track.LongitudArco;
     else
         Layout.PuntosRiel       = [Layout.PuntosRiel;       Elemento.Track.PuntosRiel(2:end, :)];
-        Layout.LongitudArcoRiel = [Layout.LongitudArcoRiel; Elemento.Track.LongitudArcoRiel(2:end)];
+        Layout.LongitudArcoRiel = [Layout.LongitudArcoRiel; Elemento.Track.LongitudArco(2:end)];
     end
 end

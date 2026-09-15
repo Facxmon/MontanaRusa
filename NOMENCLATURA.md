@@ -16,7 +16,7 @@ Esta es la desambiguación adoptada; se aplica en todo el texto reescrito.
 
 | # | Símbolo en colisión | Qué se hizo |
 |---|---|---|
-| 1 | `d` | Se conserva **d** exclusivamente para el offset **riel → heartline**. La distancia de discretización de `analisis_energia.m` pasa a llamarse **δ** (`DistanciaDeDiscretizacion`). El offset **heartline → cuerpo del pasajero**, que es una magnitud distinta y no hay que colapsar con $d$, se nota **e** (`DistanciaEvaluacionPasajero`). |
+| 1 | `d` | Se conserva **d** exclusivamente para el offset **riel → heartline** (centro de masa del pasajero). La distancia de discretización de `analisis_energia.m` pasa a llamarse **δ** (`DistanciaDeDiscretizacion`). El offset **heartline → cabeza**, que es una magnitud distinta y no hay que colapsar con $d$, se nota **e** (`DistanciaHeartlineACabeza`); el brazo con el que se verifica la norma se nota **b** (`BrazoDeVerificacion`, igual a $d$ o a $d+e$). |
 | 2 | `t` | Se conserva **t** exclusivamente para tiempo. El parámetro libre de la curva paramétrica de `analisis_energia.m` pasa a llamarse **p**, con $p\in[p_{min},p_{max}]$ (código: `TMin`, `TMax` — el nombre de código no cambia, sólo el símbolo). |
 | 3 | `L` | **L** a secas queda reservada para la longitud característica genérica de Froude ($Fr=v/\sqrt{gL}$), uso abstracto. En todo uso concreto se exige subíndice: $L_{trans}$ (longitud de transición), $L_{carro}$ (largo del carro, código `LargoCarro`), $L_{loop}$ / $R$ (radio del loop, ver colisión 8). |
 | 4 | `T` | **T** (negrita) queda exclusivamente para el versor tangente. Los extremos del parámetro libre pasan a ser $p_{min}/p_{max}$ (ver colisión 2). El torque del rodamiento, que en una versión anterior de memoria §9.2 se notaba $T_{rodamiento}$ (símbolo LaTeX, no identificador de código — no existe como variable MATLAB), pasa a notarse $M_b$. |
@@ -33,11 +33,12 @@ Esta es la desambiguación adoptada; se aplica en todo el texto reescrito.
 | Símbolo | Nombre en código | Significado | Unidad | Definido en | Notas |
 |---|---|---|---|---|---|
 | $s$ | `Arco` / `LongitudAcumulada` | longitud de arco medida sobre la vía, parámetro natural de toda la discretización | m | memoria §1.3 | siempre creciente monótonamente |
-| $\mathbf{r}(s)$ | `Track.PuntosHeartline` / `Punto.Posicion` | **heartline**: la curva que integra el generador. Es a la vez curva de diseño, eje de roll y centro de masa supuesto | m | memoria §3.1 | curva primaria: el riel se deriva de ella, nunca al revés |
-| $\mathbf{r}_{riel}(s)$ | `Track.PuntosRiel` | **riel**: $\mathbf{r}-d\,\mathbf{U}$. La pieza física que se fabrica | m | memoria §3.1 | salida derivada; gobierna fabricación, interferencia y bounding box |
-| $\mathbf{p}(s)$ | — (se evalúa al vuelo) | **punto de evaluación del pasajero**: $\mathbf{r}+e\,\mathbf{U}$ | m | memoria §3.1 | dónde se mide la G que se compara contra la norma; no confundir con el parámetro libre $p$ de energía §2 (colisión 2) |
-| $\kappa_{riel}$ | `Track.CurvaturaRiel` | curvatura del riel, $\lvert\mathbf{r}'_{riel}\times\mathbf{r}''_{riel}\rvert/\lvert\mathbf{r}'_{riel}\rvert^3$ | 1/m | generador §14.2 | **no** es igual a $\kappa$; en el loop $R_{riel}=R+d$ |
-| $s_{riel}$ | `Track.LongitudArcoRiel` | longitud de arco medida sobre el riel | m | generador §14.1 | distinta de $s$: el riel no es unit-speed en $s$ |
+| $\mathbf{r}(s)$ | `Track.PuntosRiel` / `Punto.Posicion` / `Estado.Posicion` | **riel**: la curva que integra el generador, unit-speed en $s$. Es a la vez curva de diseño, eje de roll y pieza física que se fabrica | m | memoria §3.1 | curva primaria: la heartline se deriva de ella, nunca al revés |
+| $\mathbf{r}_h(s)$ | `Track.PuntosHeartline` | **heartline**: $\mathbf{r}+d\,\mathbf{U}$. Centro de masa del pasajero y punto de verificación por defecto | m | memoria §3.1 | salida derivada; sobre un riel recto que rola sale helicoidal |
+| $\mathbf{p}(s)$ | — (se evalúa al vuelo) | **cabeza**: $\mathbf{r}+(d+e)\,\mathbf{U}$ | m | memoria §3.1 | G informativa (`Sim.GzCabeza`), o punto de verificación si `PuntoDeVerificacionNormativa = 'Cabeza'`; no confundir con el parámetro libre $p$ de energía §2 (colisión 2) |
+| $\kappa_h$ | `Track.CurvaturaHeartline` | curvatura de la heartline, $\lvert\mathbf{r}'_h\times\mathbf{r}''_h\rvert/\lvert\mathbf{r}'_h\rvert^3$ derivando respecto del arco del riel | 1/m | generador §14.2 | **no** es igual a $\kappa$; en el loop $R_h=R_{riel}-d$ |
+| $s_h$ | `Track.LongitudArcoHeartline` | longitud de arco medida sobre la heartline | m | generador §14.1 | distinta de $s$: la heartline no es unit-speed en $s$ |
+| $J$ | `FactorVelocidadHeartline` | $\lVert d\mathbf{r}_h/ds\rVert = \sqrt{(1-d\kappa_u)^2+d^2\phi'^2}$ | — | memoria §3.6 | $v_{cm} = J\,v$; vale 1 en vía recta sin roll |
 | $\mathbf{T}$ | `VersorTangente` | versor tangente a la vía, $d\mathbf{r}/ds$ | adimensional (versor unitario) | memoria §2.1 | colisión 4 resuelta |
 | $\mathbf{U}_{pt}$ | `VersorArribaTransporte` | versor "arriba" del marco de transporte paralelo (Bishop) | adimensional | memoria §2.2 | no tiene giro propio alrededor de **T** |
 | $\mathbf{L}_{pt}$ | `VersorLateralTransporte` | versor lateral del marco de transporte paralelo | adimensional | memoria §2.2 | $=\mathbf{T}\times\mathbf{U}_{pt}$ |
@@ -75,12 +76,15 @@ Esta es la desambiguación adoptada; se aplica en todo el texto reescrito.
 | $\kappa_u,\kappa_l$ | — | componentes de $\boldsymbol\kappa$ sobre **U**, **L** del marco del **carro** | 1/m | memoria §3.3 | distintas de $\kappa_U,\kappa_L$, que van sobre el marco de transporte |
 | $t$ | `Tiempo` | tiempo transcurrido desde el arranque del layout | s | memoria §3.3 | colisión 2 resuelta: **t** es siempre tiempo |
 | $G_x,G_y,G_z$ | `Gx`,`Gy`,`Gz` | fuerza G en los ejes del pasajero (longitudinal, lateral, vertical) | G (adimensional, múltiplos de $g$) | memoria §2.3 | incluyen gravedad, comparables directo contra F2291 |
-| $G_{ArribaHeartline}$ | `GArribaHeartline` | G sobre el eje $\mathbf{U}$ evaluada **en el heartline**, sin aporte de rotación | G | generador §14.1 | insumo de `ResistenciaAlAvance` y de `FuerzaNormal`: el centro de masa se supone acá. Antes se llamaba `GArribaRiel`, cuando la curva integrada era el riel |
-| $G_{LateralHeartline}$ | `GLateralHeartline` | G sobre el eje $\mathbf{L}$ evaluada en el heartline | G | generador §14.1 | ídem |
+| $G_{ArribaHeartline}$ | `GArribaHeartline` | G sobre el eje $\mathbf{U}$ en la heartline (brazo $d$), transportada desde el riel con la fórmula cerrada de memoria §3.4 | G | generador §14.1 | insumo de `ResistenciaAlAvance` y de `FuerzaNormal`: el centro de masa se supone acá |
+| $G_{LateralHeartline}$ | `GLateralHeartline` | G sobre el eje $\mathbf{L}$ en la heartline | G | generador §14.1 | ídem |
+| — | `GArribaVerificacion`, `GLateralVerificacion` | las mismas dos, en el punto de verificación (brazo $b$) | G | Nucleo/DerivadaDeVia.m | coinciden con las de heartline salvo `PuntoDeVerificacionNormativa = 'Cabeza'`; realimentan la longitud de las transiciones |
+| — | `Sim.GxCabeza`, `Sim.GyCabeza`, `Sim.GzCabeza` | G en la cabeza (brazo $d+e$) | G | Fisica/SimularSobreTrack.m | informativas |
 | $J$ | `JerkGx`,`JerkGy`,`JerkGz` (código); $J_{max}$ ≡ `OnsetMaximo` | jerk / tasa de aparición de G, $dG/dt$ | G/s | memoria §6.1 | también llamado "onset"; unificado en G/s (colisión 9) |
 | $J_{max}$ | `OnsetMaximo` (por eje, vector de 3) / `OnsetNormativoPorEje` | presupuesto máximo de onset, por eje | G/s | memoria §6.7, §7.5 | $J_{x,max},J_{y,max},J_{z,max}$ son sus componentes; antes convivían "J_max", "J_{y,max}" y "OnsetMaximo" con notación distinta — se unifica a $J_{max}$ con subíndice de eje |
-| $d$ | `DistanciaHeartline` | offset **riel → heartline**, medido a lo largo de **U**. Geometría de la vía | m | memoria §3.1 | colisión 1 resuelta. Es un offset **físico**, no un parámetro virtual de evaluación: define dónde queda el riel respecto de la curva de diseño |
-| $e$ | `DistanciaEvaluacionPasajero` | offset **heartline → cuerpo del pasajero**, medido a lo largo de **U**. Confort | m | memoria §3.1 | brazo de palanca de la rotación. NO es lo mismo que $d$ aunque hoy compartan valor por defecto |
+| $d$ | `DistanciaHeartline` | offset **riel → heartline** (centro de masa del pasajero), medido a lo largo de **U** | m | memoria §3.1 | colisión 1 resuelta. Es un offset **físico**: define dónde queda el pasajero respecto de la curva integrada, y es el brazo de la rotación alrededor del riel |
+| $e$ | `DistanciaHeartlineACabeza` | offset **heartline → cabeza**, medido a lo largo de **U** | m | memoria §3.1 | chequeo de rotaciones (Rohde 2024, §7.6.2). NO es lo mismo que $d$ aunque hoy compartan valor por defecto |
+| $b$ | `BrazoDeVerificacion(Parametros)` | brazo del riel al punto donde se aplica la norma: $d$, o $d+e$ | m | memoria §3.1 | el mismo $b$ dimensiona la transición de roll y transporta la G verificada |
 
 ## 3. Parámetros de entrada del generador (`ParametrosPorDefecto.m`)
 
@@ -103,7 +107,8 @@ Esta es la desambiguación adoptada; se aplica en todo el texto reescrito.
 | — | `Parametros.Holgura` | margen sobre la envolvente del carro para el chequeo de interferencia | m | generador §8 | 0.010 m |
 | $D_{rueda}$ | `Parametros.DiametroRueda` | diámetro de rueda, piso impuesto por el rodamiento mínimo | m | memoria §9.2 | 0.0136 m, **SIN CERRAR** |
 | $d$ | `Parametros.DistanciaHeartline` | ver bloque 2 | m | memoria §3.1 | 0.030 m; offset físico riel → heartline |
-| $e$ | `Parametros.DistanciaEvaluacionPasajero` | ver bloque 2 | m | memoria §3.1 | 0.030 m, **SIN CERRAR** — reproduce la geometría previa a la corrección de heartline, no una medida antropométrica. A $\lambda\approx22$ un offset cabeza-corazón real de ~0.25 m daría ~0.011 m |
+| $e$ | `Parametros.DistanciaHeartlineACabeza` | ver bloque 2 | m | memoria §3.1 | 0.030 m, **SIN CERRAR** — no es una medida antropométrica. A $\lambda\approx22$ un offset corazón-cabeza real de ~0.25 m daría ~0.011 m |
+| — | `Parametros.PuntoDeVerificacionNormativa` | dónde se aplica la norma: `'Heartline'` (brazo $d$) o `'Cabeza'` (brazo $d+e$) | — (enum) | memoria §3.1 | `'Heartline'` por defecto: es donde se diseña y donde mide EN 13814 |
 | $A_{ef}$ (parám. duplicado) | `Parametros.AreaFrontal` | idéntico al de energía; mismo campo, usado también por el generador | m² | generador §7 | mismo valor que en energía |
 | $H_{max}$ | `Parametros.AlturaMaximaDelElemento` | altura máxima admisible de un elemento | m | memoria §9.8 | 1.00 m, restricción dura del proyecto |
 | $R_{ref}$ | `Parametros.RadioDeReferencia` | radio de referencia genérico (longitud característica de Froude si se llama al motor a mano) | m | generador §10 | 0.21 m; cada elemento lo pisa con su propio radio antes de generar |
@@ -156,11 +161,12 @@ Esta es la desambiguación adoptada; se aplica en todo el texto reescrito.
 
 | Campo | Struct | Significado | Unidad | Definido en | Notas |
 |---|---|---|---|---|---|
-| `Posicion` | `Estado`, `Punto`, `Track.PuntosHeartline` | posición 3D, **sobre el heartline** | m | Nucleo/EstadoInicial.m | el `Estado` que se encadena entre elementos viaja sobre el heartline |
-| `PuntosHeartline` | `Track` | polilínea del heartline | m (matriz n×3) | Elementos/GenerarGeometria.m | curva integrada; antes se llamaba `Track.Puntos` |
-| `PuntosRiel` | `Track` | polilínea del riel, $\mathbf{r}-d\mathbf{U}$ | m (matriz n×3) | ídem | lo que se fabrica y sobre lo que se chequea interferencia |
-| `LongitudArcoRiel` | `Track` | arco acumulado sobre el riel | m | ídem | — |
-| `CurvaturaRiel` | `Track` | ver $\kappa_{riel}$ | 1/m | ídem | contra esto se compara `RadioMinimoFabricable` |
+| `Posicion` | `Estado`, `Punto`, `Track.PuntosRiel` | posición 3D, **sobre el riel** | m | Nucleo/EstadoInicial.m | el `Estado` que se encadena entre elementos viaja sobre el riel |
+| `PuntosRiel` | `Track` | polilínea del riel | m (matriz n×3) | Elementos/GenerarGeometria.m | curva integrada; lo que se fabrica y sobre lo que se chequea interferencia. `Track.Curvatura` es su curvatura, exacta |
+| `PuntosHeartline` | `Track` | polilínea de la heartline, $\mathbf{r}+d\mathbf{U}$ | m (matriz n×3) | ídem | derivada; donde va el pasajero |
+| `LongitudArcoHeartline` | `Track` | arco acumulado sobre la heartline | m | ídem | — |
+| `CurvaturaHeartline` | `Track` | ver $\kappa_h$ | 1/m | ídem | contra esto se compara el radio nominal; contra `Track.Curvatura` se compara `RadioMinimoFabricable` |
+| `FactorVelocidadHeartline` | `Track`, `Punto`, `Sim` | ver $J$ | — | Nucleo/DerivadaDeVia.m | — |
 | `VersorTangente` | `Estado`, `Punto`, `Track` | ver $\mathbf{T}$ | adimensional | ídem | — |
 | `VersorArribaCarro` | `Estado`, `Punto`, `Track` | ver $\mathbf{U}$ | adimensional | ídem | — |
 | `VersorLateral` | `Estado`, `Punto`, `Track` | ver $\mathbf{L}$ | adimensional | ídem | $=\mathbf{T}\times\mathbf{U}$ |
@@ -172,14 +178,16 @@ Esta es la desambiguación adoptada; se aplica en todo el texto reescrito.
 | `VelocidadRoll` | `Estado`, `Punto`, `Track` | ver $\phi'$ | rad/m | ídem | — |
 | `AceleracionRoll` | `Estado`, `Punto`, `Track` | ver $\phi''$ | rad/m² | ídem | en `Track` se recupera con `gradient` |
 | `LongitudAcumulada` | `Estado` | ver $s$ | m | ídem | — |
-| `Velocidad` | `Estado`, `Punto`, `Sim` | ver $v$ | m/s | ídem | — |
+| `Velocidad` | `Estado` | velocidad del **centro de masa** | m/s | ídem | es la que conserva energía; en vía recta sin roll coincide con la del riel |
+| `Velocidad` | `Punto`, `Sim` | velocidad del **punto del riel**, $v = v_{cm}/J$ | m/s | Nucleo/DerivadaDeVia.m | marca el tiempo, la velocidad angular del marco y el jerk |
+| `VelocidadCentroDeMasa` | `Punto`, `Track`, `Sim` | velocidad del centro de masa, $v_{cm}$ | m/s | ídem | estado que se integra (`y(13)` es $v_{cm}^2$); la que usan los modos de curvatura |
 | `EnergiaTotal` | `Estado`, `Sim` | energía mecánica total | J | ídem | $=\frac12 m v^2 + mgz$ |
 | `Arco` | `Registro`/`Track.LongitudArco`, `Punto` | ver $s$ | m | Nucleo/RegistroVacio.m | nombre de campo distinto según struct |
 | `CurvaturaArriba`, `CurvaturaLateral`, `Curvatura` | `Registro`/`Track`, `Punto` | ver $\kappa_U,\kappa_L,\kappa$ | 1/m | ídem | — |
 | `AnguloGirado` | `Registro`/`Track`, `Punto` | ver $\theta_{girado}$ | rad | ídem | — |
 | `Tiempo` | `Registro`/`Track`, `Punto` | ver $t$ | s | ídem | — |
 | `AceleracionTangencial` | `Registro`/`Track`, `Punto`, `Sim` | ver $a_t$ | m/s² | ídem | — |
-| `GArribaHeartline`, `GLateralHeartline` | `Registro`/`Track`, `Punto`, `Sim` | ver bloque 2 | G | Fisica/CargasEnLaVia.m | renombradas desde `GArribaRiel`/`GLateralRiel` al invertir la jerarquía riel/heartline |
+| `GArribaHeartline`, `GLateralHeartline` | `Registro`, `Punto`, `Sim` | ver bloque 2 | G | Fisica/CargasEnLaVia.m | transportadas desde el riel con brazo $d$ |
 | `PerdidaRodadura`, `PerdidaArrastre` | `Registro`/`Track`, `Punto`, `Sim` | pérdida de energía (nodo a nodo) por cada mecanismo | J | Fisica/ResistenciaAlAvance.m | en `Sim` van acumuladas: `EnergiaDisipadaRodadura`, `EnergiaDisipadaArrastre` |
 | `NumeroDeNodos` | `Registro` | cuántas filas del registro están efectivamente escritas | adimensional (entero) | Nucleo/RegistroVacio.m | el resto de la reserva queda en NaN hasta `RecortarRegistro` |
 | `PuntosRiel` | `Layout` | polilínea del riel acumulada de todo el layout | m (matriz n×3) | LayoutDeVia/LayoutNuevo.m | insumo del chequeo de interferencia del elemento siguiente; acumula el riel y no el heartline porque chocan las piezas físicas |

@@ -17,10 +17,12 @@ Elementos implementados: **loop vertical**, **hélice**, **over-banked turn** (g
 | $\mathbf{U},\mathbf{L}$ | marco del carro | — (versores) |
 | $\kappa,\kappa_U,\kappa_L$ | curvatura y sus componentes sobre el marco de transporte | 1/m |
 | $\phi,\phi',\phi''$ | roll y sus derivadas | rad, rad/m, rad/m² |
-| $\mathbf{r}(s)$ | heartline: curva integrada y eje de roll (`Track.PuntosHeartline`) | m |
-| $\mathbf{r}_{riel}(s)$ | riel, $\mathbf{r}-d\,\mathbf{U}$: la pieza que se fabrica (`Track.PuntosRiel`) | m |
-| $d$ | offset riel → heartline, geometría de la vía (`DistanciaHeartline`) | m |
-| $e$ | offset heartline → cuerpo del pasajero, confort (`DistanciaEvaluacionPasajero`) | m |
+| $\mathbf{r}(s)$ | riel: curva integrada, eje de roll y pieza que se fabrica (`Track.PuntosRiel`) | m |
+| $\mathbf{r}_h(s)$ | heartline, $\mathbf{r}+d\,\mathbf{U}$: centro de masa del pasajero, donde se aplica la norma (`Track.PuntosHeartline`) | m |
+| $d$ | offset riel → heartline (`DistanciaHeartline`) | m |
+| $e$ | offset heartline → cabeza (`DistanciaHeartlineACabeza`) | m |
+| $b$ | brazo de verificación: $d$, o $d+e$ si se verifica en la cabeza (`BrazoDeVerificacion`) | m |
+| $J$ | $\lVert d\mathbf{r}_h/ds\rVert$: razón entre la velocidad del centro de masa y la del punto del riel | — |
 | $\boldsymbol\omega$ | velocidad angular del marco del carro | rad/s |
 | $\beta$ | ángulo entre la normal del plano de referencia y $\mathbf{U}_{pt}$ | rad |
 | $\alpha$ | ángulo de la hélice del loop (inclinación helicoidal) | rad |
@@ -61,7 +63,7 @@ Ver la tabla completa en [`NOMENCLATURA.md`](NOMENCLATURA.md).
 ```matlab
 run('DemoElemento.m')         % un elemento en detalle: reporte y gráficos
 run('DemoLayout.m')           % los cuatro elementos encadenados en un circuito
-run('TestsValidacion.m')      % diez tests, termina con error si alguno falla
+run('TestsValidacion.m')      % once tests, termina con error si alguno falla
 ```
 
 Todos los parámetros de entrada están agrupados en [`ParametrosPorDefecto.m`](GeneradorDeElementos/ParametrosPorDefecto.m). Los que dependen de investigación pendiente (disponibilidad de rodamientos en Argentina, tolerancia de la impresora) están marcados como **SIN CERRAR** ahí mismo. La tabla completa de esos parámetros, con símbolo, unidad y sección donde se usan, está en [`NOMENCLATURA.md` bloque 3](NOMENCLATURA.md#3-parámetros-de-entrada-del-generador-parametrospordefectom).
@@ -115,7 +117,7 @@ Dos consecuencias que salieron gratis de esta unificación:
 
 Los cuatro tienen la misma firma y todos delegan en `ConstruirElemento`, que es donde vive lo común. Agregar un elemento nuevo es escribir una receta de cinco campos.
 
-`Estado` lleva posición, los tres versores del marco del carro, el vector curvatura y su derivada, el roll con sus dos derivadas, la longitud acumulada, la velocidad y la energía. El roll se mide **contra el marco de transporte paralelo**, de modo que el `Estado` no necesita arrastrar además ese marco: se recupera rotando el marco del carro por $-\phi$.
+`Estado` lleva la posición **sobre el riel**, los tres versores del marco del carro, el vector curvatura del riel y su derivada, el roll con sus dos derivadas, la longitud acumulada sobre el riel, la velocidad **del centro de masa** y la energía. El roll se mide **contra el marco de transporte paralelo**, de modo que el `Estado` no necesita arrastrar además ese marco: se recupera rotando el marco del carro por $-\phi$.
 
 **Dos ángulos de roll — la distinción se adelanta acá.** El `Track` resultante trae dos campos de roll: `Track.AnguloRoll` ($\phi(s)$, medido contra el marco de transporte paralelo, que gira por su cuenta con la torsión) y `Track.AnguloPeralte` (el mismo roll medido contra la vertical real, el que se ve mirando la vía). Pueden diferir en decenas de grados sin que el carro esté torcido: el detalle completo, con el caso numérico del loop helicoidal, está en [§12.3](#123-dos-ángulos-de-roll-distintos-y-sólo-uno-se-ve-en-la-vía).
 
@@ -306,11 +308,11 @@ $$L_{trans} = \frac{\Delta G\,v}{J_{max}} = \frac{v^3\,|\Delta\kappa|}{g\,J_{max
 
 Las dos formas son la misma relación escrita al revés. El presupuesto del modelo sale de multiplicar el de la norma por $\sqrt{\lambda_{loop}}$: un modelo fiel a Froude produce jerk **mayor** que el prototipo, no menor (derivación completa en [`memoria_de_calculo.md` §7.1](memoria_de_calculo.md#71-por-qué-el-criterio-de-onset-cambia-entre-modelo-y-prototipo)).
 
-La transición de roll se dimensiona por el onset lateral que produce la rotación sobre el cuerpo del pasajero. Con el smoothstep quíntico $\max|\phi'''| = 60|\Delta\phi|/L^3$, y la G lateral de un punto a distancia $e$ del eje de roll vale $e\,v^2\phi''/g$, así que:
+La transición de roll se dimensiona por el onset lateral que produce la rotación sobre el pasajero. Con el smoothstep quíntico $\max|\phi'''| = 60|\Delta\phi|/L^3$, y la G lateral de un punto a distancia $b$ del eje de roll vale $b\,v^2\phi''/g$, así que:
 
-$$L_{roll} = \left(\frac{60\,e\,v^3\,|\Delta\phi|}{g\,J_{y,max}}\right)^{1/3}$$
+$$L_{roll} = \left(\frac{60\,b\,v^3\,|\Delta\phi|}{g\,J_{y,max}}\right)^{1/3}$$
 
-**El brazo de palanca es $e$ (`DistanciaEvaluacionPasajero`) y no $d$ (`DistanciaHeartline`).** El heartline es el eje de roll: un punto matemático ahí tiene brazo cero. Lo que justifica seguir limitando esto es que el pasajero no es un punto — cabeza y hombros quedan fuera del eje. Es el mismo $e$ con el que se evalúa la G reportada ([`memoria_de_calculo.md` §3.5](memoria_de_calculo.md#35-resultado-la-expresión-que-se-implementa)), y tiene que serlo: dimensionar la transición con un offset y después verificarla con otro no cierra.
+**El eje de roll es el riel y el brazo de palanca es $b$ (`BrazoDeVerificacion`): la distancia del riel al punto donde se aplica la norma** — $d$ para la heartline, $d+e$ si se pide verificar en la cabeza. Es el mismo $b$ con el que se transporta la G reportada ([`memoria_de_calculo.md` §3.5](memoria_de_calculo.md#35-resultado-la-expresión-que-se-implementa)), y tiene que serlo: dimensionar la transición con un brazo y después verificarla con otro no cierra.
 
 **La fórmula supone $v$ constante dentro de la transición y por eso el onset resultante se pasa alrededor de un 1.5 %.** El generador cierra ese hueco con un punto fijo sobre un factor de longitud, y el reporte informa el margen que quedó. El punto fijo es sobre el factor y no un corte al primer valor que cumple: cortar por cumplimiento haría que la geometría dependiera de forma **discontinua** de los datos de entrada, y ahí los dos métodos dejan de coincidir aunque los dos estén bien.
 
@@ -332,9 +334,10 @@ Están separados en dos grupos, y la separación es deliberada:
 | Radio mínimo fabricable | Riel | Lo limita la impresora, y lo que se imprime es el riel |
 | Autointerferencia e interferencia con el layout | Riel | Chocan las piezas físicas; el heartline es un lugar geométrico y no ocupa lugar |
 | Bounding box y altura sobre el suelo | Riel | Es la pieza que puede tocar el piso o pasarse de la huella |
-| Radio alcanzado contra el nominal | Heartline | Es intención de diseño: los modos resuelven el radio para la G del pasajero |
-| Altura del elemento | Heartline | Se mide sobre la trayectoria de diseño, respecto de su punto de entrada |
-| Límites normativos y presupuesto de onset | Punto de evaluación | Es lo que siente el pasajero, que es lo que la norma limita |
+| Radio alcanzado contra el nominal | Heartline | Es intención de diseño: los modos resuelven la curvatura del riel para que el pasajero reciba la G objetivo, y el radio nominal es el del pasajero |
+| Altura del elemento | Heartline | Se mide sobre la trayectoria del pasajero, respecto de su punto de entrada |
+| Límites normativos y presupuesto de onset | Punto de verificación (heartline, o cabeza si se pide) | Es lo que siente el pasajero, que es lo que la norma limita |
+| G de la cabeza | Cabeza, $d+e$ | Informativa: la norma no mide ahí, pero el diseñador debe incluir las rotaciones |
 
 La consigna del proyecto pide que los chequeos corran "antes de generar". Los del segundo grupo **no se pueden evaluar sin la geometría**, y la velocidad mínima por bisección requiere generar decenas de veces. Se declara la distinción en vez de fingir lo contrario (ver también [§13](#13-discrepancias-con-la-consigna)).
 
@@ -368,7 +371,7 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 
 ## 11. Tests de validación
 
-`TestsValidacion.m` implementa **diez** tests y termina con error si alguno falla. Todos pasan por la API pública de los elementos, para que lo que se verifica sea el mismo camino que usa el usuario.
+`TestsValidacion.m` implementa **once** tests y termina con error si alguno falla. Todos pasan por la API pública de los elementos, para que lo que se verifica sea el mismo camino que usa el usuario.
 
 | # | Test | Resultado típico |
 |---|---|---|
@@ -380,10 +383,11 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 | 6 | Ortonormalidad del marco | desvío $8\times10^{-13}$ |
 | 7 | Cierre del loop de 360° | pitch final $-6\times10^{-5}$ rad; ángulo girado dentro de $6\times10^{-5}$ rad de $2\pi\cos\alpha$ |
 | 8 | Los cuatro elementos generan y encadenan (loop, over-banked turn, hélice, dive loop en secuencia) | peor residual de cierre y peor salto de empalme, ambos por debajo de tolerancia; velocidad final finita |
-| 9 | Derivación del riel desde el heartline: separación constante y $R_{riel}=R+d$ | separación exacta a $1.3\times10^{-15}$ m; diferencia de radios dentro del 0.7 % de $d$ |
-| 10 | Transporte de cuerpo rígido al punto del pasajero | con $e=0$ se reduce a la G del heartline con error $2\times10^{-16}$ G; con $e$ real la rotación aporta hasta 0.49 G |
+| 9 | Derivación de la heartline desde el riel: separación constante y $R_h=R_{riel}-d$ | separación exacta a $6\times10^{-16}$ m; diferencia de radios dentro del 0.7 % de $d$ |
+| 10 | Transporte de cuerpo rígido desde el riel | con $d=e=0$ se reduce a la G del punto del riel con error $2\times10^{-16}$ G; con $d$ real la rotación y el cambio de radio aportan hasta 0.49 G |
+| 11 | El riel es el eje de roll | en la transición de roll del dive loop el riel queda exactamente recto, la heartline sale con la curvatura de la hélice $d\phi'^2/(1+d^2\phi'^2)$ (0.0 % de desvío) y la $G_y$ de rotación en la cabeza es exactamente el doble que en la heartline |
 
-**Nota de discrepancia doc↔código corregida.** Una versión anterior de este documento decía en prosa "los ocho son ejecutables" pero la tabla sólo listaba siete filas, sin el test de encadenamiento. Se corrigió agregando la fila que faltaba. Hoy son **diez**: los tests 9 y 10 se agregaron junto con el modelo de heartline de [§14](#14-el-modelo-de-heartline-tres-curvas).
+**Nota de discrepancia doc↔código corregida.** Una versión anterior de este documento decía en prosa "los ocho son ejecutables" pero la tabla sólo listaba siete filas, sin el test de encadenamiento. Se corrigió agregando la fila que faltaba. Hoy son **once**: los tests 9 y 10 se agregaron junto con el modelo de heartline de [§14](#14-el-modelo-de-heartline-tres-curvas), y el 11 fija la hipótesis del eje de roll.
 
 **Test 2 excluye los nodos cuyo esquema de tres puntos cruza una frontera de sub-tramo.** Ahí $d\kappa/ds$ salta y la circunferencia por tres puntos devuelve un promedio de dos curvaturas distintas: el error sube a $4.6\times10^{-3}$. Es una limitación del estimador discreto, no de la geometría generada — y es exactamente la fragilidad que ya documenta [`documentacion_analisis_energia.md` §4](documentacion_analisis_energia.md#4-radio-de-giro-curvatura-local).
 
@@ -391,7 +395,7 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 
 **Test 8** verifica específicamente el contrato de encadenamiento: cada elemento consume el `EstadoSalida` del anterior sin salto de posición ni de tangente, que es lo que sostiene todo `DemoLayout.m` y, a futuro, cualquier layout con más elementos.
 
-**Tests 9 y 10 cubren el modelo de heartline** ([§14](#14-el-modelo-de-heartline-tres-curvas)). El 9 verifica que el riel sale del heartline con la separación y el **signo** correctos: $R_{riel}=R+d$ y no $R-d$, que es lo que distingue diseñar para el pasajero de diseñar para el riel. El 10 verifica las dos caras del transporte de cuerpo rígido: que con brazo nulo se reduzca exactamente a la G del heartline —o sea que la fórmula general no introdujo nada espurio— y que con brazo real la rotación aporte de verdad. Si ese segundo aporte diera cero, el modelo estaría afirmando que rolear no se siente.
+**Tests 9, 10 y 11 cubren el modelo de heartline** ([§14](#14-el-modelo-de-heartline-tres-curvas)). El 9 verifica que la heartline sale del riel con la separación y el **signo** correctos: $R_h=R_{riel}-d$ y no $R+d$, que es lo que obliga a los modos a hacer el transporte inverso en vez de imponer la G sobre la curva integrada. El 10 verifica las dos caras del transporte de cuerpo rígido: que con brazo nulo se reduzca exactamente a la G del punto del riel —o sea que la fórmula general no introdujo nada espurio— y que con brazo real la rotación aporte de verdad. Si ese segundo aporte diera cero, el modelo estaría afirmando que rolear no se siente. El 11 fija la hipótesis del eje de roll con el caso más visible: un riel recto que rola 180° sigue recto, y es la heartline la que hace la hélice.
 
 ---
 
@@ -447,39 +451,51 @@ $$G_x = \frac{a_t}{g} + T_z, \qquad a_t = -g\,T_z - \frac{F_{res}}{m} \quad\Long
 
 Esta sección responde qué curva es "la vía", porque son tres y confundirlas es el error que este modelo existe para evitar.
 
+### 14.0 Hipótesis del eje de roll, en dos líneas
+
+**Se prescribe el riel** — es la curva que se integra y el eje alrededor del cual rola el carro — **y la heartline del pasajero se despeja de él**, $\mathbf{r}_h = \mathbf{r} + d\,\mathbf{U}$. Sobre un riel recto que rola, el riel sigue recto y la heartline hace una hélice: el pasajero rota respecto de la vía.
+
+| Brazo desde el riel, sobre $\mathbf{U}$ | Parámetro | Qué se calcula ahí |
+|---|---|---|
+| $d$ | `DistanciaHeartline` | centro de masa: energía, `FuerzaNormal`, reparto entre ruedas |
+| $b$ ($= d$, o $d+e$) | `BrazoDeVerificacion(Parametros)` | G que los modos imponen y que se verifica contra la norma; longitud de la transición de roll |
+| $d+e$ | `DistanciaHeartline + DistanciaHeartlineACabeza` | cabeza: G informativa (Rohde 2024, §7.6.2) |
+
+El mismo bloque está en el encabezado de [`GenerarGeometria.m`](GeneradorDeElementos/Elementos/GenerarGeometria.m); la derivación, en [`memoria_de_calculo.md` §3](memoria_de_calculo.md#3-cinemática-de-heartline).
+
 ### 14.1 Las tres curvas y qué gobierna cada una
 
 | Curva | Campo en el código | Qué gobierna |
 |---|---|---|
-| Heartline $\mathbf{r}(s)$ | `Track.PuntosHeartline` | Curva integrada, eje de roll, centro de masa supuesto. Energía, rodadura, `FuerzaNormal` |
-| Punto de evaluación $\mathbf{r}+e\mathbf{U}$ | — (se evalúa al vuelo) | `Sim.Gx/Gy/Gz` y toda la verificación normativa |
-| Riel $\mathbf{r}-d\mathbf{U}$ | `Track.PuntosRiel` | Fabricación, interferencia, bounding box, altura sobre el suelo, radio mínimo imprimible |
+| Riel $\mathbf{r}(s)$ | `Track.PuntosRiel`, `Track.Curvatura` (exacta), `Estado.Posicion` | Curva integrada y eje de roll. Fabricación, interferencia, bounding box, altura sobre el suelo, radio mínimo imprimible |
+| Heartline $\mathbf{r}+d\mathbf{U}$ | `Track.PuntosHeartline`, `Track.CurvaturaHeartline` (numérica) | Centro de masa: energía, rodadura, `FuerzaNormal`. Punto de verificación por defecto: `Sim.Gx/Gy/Gz` y toda la verificación normativa |
+| Cabeza $\mathbf{r}+(d+e)\mathbf{U}$ | `Sim.GxCabeza/GyCabeza/GzCabeza` | Chequeo informativo por rotaciones |
 
-### 14.2 Por qué el heartline es la curva integrada y no el riel
+### 14.2 Por qué el riel es la curva integrada y la G se impone en el pasajero
 
-Los modos de curvatura resuelven $\kappa = g(G_{obj}-U_z)/v^2$ sobre la curva que se está integrando. Si esa curva es el riel, el radio queda dimensionado para que el **riel** reciba $G_{obj}$ y el pasajero recibe otra cosa, porque recorre otro radio. Integrando el heartline, la misma fórmula —sin cambiar un signo— dimensiona el radio para el **pasajero**, que es lo que interesa.
+El carro va montado sobre el riel: cuando rola, gira alrededor de la tangente del riel, y el pasajero —que está a $d$ de él— describe un arco. Prescribir el riel es lo que reproduce eso. Una versión anterior del generador prescribía la heartline y despejaba el riel restando $d\mathbf{U}$; era autoconsistente, pero producía la geometría inversa —heartline recta y riel helicoidal en cada transición de roll— que no corresponde a un vehículo sobre un riel dado.
 
-La diferencia entre los dos radios vale $d$ en valor absoluto y $d/R$ en relativo. El heartline queda del lado del centro de curvatura, así que $R_{riel} = R + d$: con el radio de cúspide de 0.11 m del loop y $d = 3$ cm, **27 %**. El test 9 de `TestsValidacion.m` verifica esa relación sobre la geometría generada y da 0.7 % de desvío.
+El precio es que los modos de curvatura ya no pueden imponer $\kappa = g(G_{obj}-U_z)/v^2$ sobre la curva integrada, porque el pasajero no está ahí: recorre un radio $R - d$ y además rota. `CurvaturaDelModo` resuelve la curvatura **del riel** para que la G **transportada al pasajero** dé el objetivo. Es una cuadrática cerrada por punto ([`memoria_de_calculo.md` §3.6](memoria_de_calculo.md#36-transporte-inverso-la-curvatura-del-riel-para-una-g-del-pasajero)), y trae dos cosas de regalo: la proyección $\cos\psi$ de la curvatura sobre $\mathbf{U}$, que la versión anterior omitía y le hacía errar a la hélice por 1 G, y una G máxima alcanzable explícita.
+
+La diferencia entre los dos radios vale $d$ en valor absoluto y $d/R$ en relativo: con el radio de cúspide de 0.11 m del loop y $d = 3$ cm, **27 %**. El test 9 verifica $R_h = R_{riel} - d$ sobre la geometría generada y da 0.7 % de desvío. Comprobado sobre los cuatro elementos en `FuerzaGConstante` y en el modo normativo, la $G_z$ del pasajero en el arco coincide con el objetivo dentro de 0.004 G, mientras que la del riel difiere entre 0.08 y 0.70 G.
 
 ### 14.3 La velocidad angular tiene dos aportes, no uno
 
-La G del pasajero sale por transferencia de cuerpo rígido desde el heartline hasta el punto de evaluación, con la velocidad angular **completa** del marco del carro:
+La G del pasajero sale por transferencia de cuerpo rígido desde el punto del riel hasta el punto transportado, con la velocidad angular **completa** del marco del carro:
 
 $$\boldsymbol\omega = v\,\big(\underbrace{\mathbf{T}\times\boldsymbol\kappa}_{\text{giro del marco de transporte}} + \underbrace{\phi'\,\mathbf{T}}_{\text{roll}}\big)$$
 
-Quedarse sólo con el segundo término —que es lo que hacía la versión anterior— pierde los términos cruzados entre curvatura y roll, que son los que dominan justo donde la vía curva y rola **a la vez**: over-banked turn y dive loop. Medido sobre el over-banked turn de 120° con peralte de 110°, el aporte total de rotación llega a **0.49 G**.
+Quedarse sólo con el segundo término pierde los términos cruzados entre curvatura y roll, que son los que dominan justo donde la vía curva y rola **a la vez**: over-banked turn y dive loop. Medido sobre el over-banked turn de 120° con peralte de 110°, el aporte total llega a **0.49 G**.
 
-Se evalúa numéricamente sobre la polilínea ya construida y no analíticamente, porque $\phi''$ del tramo helicoidal depende de $d\kappa/ds$, que no está disponible dentro del paso de integración. Derivación completa en [`memoria_de_calculo.md` §3.5](memoria_de_calculo.md#35-resultado-la-expresión-que-se-implementa).
+Las componentes sobre $\mathbf{U}$ y $\mathbf{L}$ tienen forma cerrada y no necesitan $d\kappa/ds$ ([`memoria_de_calculo.md` §3.4](memoria_de_calculo.md#34-componentes-cerradas-en-el-plano-normal)): son las que usan `CargasEnLaVia` y `CurvaturaDelModo` dentro del paso. La componente sobre $\mathbf{T}$ sí lo necesita, así que `SimularSobreTrack` evalúa el transporte completo numéricamente sobre la polilínea ya construida. Derivación completa en [`memoria_de_calculo.md` §3.5](memoria_de_calculo.md#35-resultado-la-expresión-que-se-implementa).
 
-### 14.4 Por qué la rotación no se anula aunque el pasajero esté sobre el eje
+### 14.4 Energía del centro de masa y dos velocidades
 
-Un punto **matemático** sobre el eje de roll no recibe aporte de esa rotación: es el punto fijo del giro. Pero el pasajero no es un punto — cabeza y hombros quedan fuera del eje, con brazo $e$, y sí la sienten. Anular el término equivaldría a afirmar que rolear no se siente.
-
-Lo que el heartlineado logra no es eliminar el efecto sino **minimizarlo**: pone al pasajero lo más cerca posible del eje de rotación en vez de hacerlo orbitar alrededor del riel. Por eso $e$ (`DistanciaEvaluacionPasajero`) y $d$ (`DistanciaHeartline`) son parámetros separados: $d$ es geometría de la vía, $e$ es confort. El valor por defecto de $e$ **está sin cerrar** — reproduce la geometría previa a esta corrección, no una medida antropométrica. A escala $\lambda\approx22$, un offset cabeza-corazón real de ~0.25 m daría $e\approx0.011$ m.
+Como la masa está en la heartline y la heartline no es unit-speed en el arco del riel, el estado que se integra es $v_{cm}^2$ y la velocidad del punto del riel se despeja como $v = v_{cm}/J$ con $J = \sqrt{(1-d\kappa_u)^2 + d^2\phi'^2}$ ([`memoria_de_calculo.md` §3.7](memoria_de_calculo.md#37-energía-del-centro-de-masa)). Las dos aparecen en `Sim`: `VelocidadCentroDeMasa` es la que conserva energía y la que usan los modos de curvatura; `Velocidad` es la del riel, que marca el tiempo, la velocidad angular del marco y el jerk. `Estado.Velocidad` es la del centro de masa. Integrar la energía con la velocidad del riel metería un error de $(1-d\kappa_u)^2$ — 47 % a $R = 0.11$ m.
 
 ### 14.5 Lo que queda abierto
 
-Para la rotación pura, el criterio normativo propio es un límite de **velocidad angular** del carro (ASTM F2291 §7.1.6), no un offset equivalente. Hoy la rotación entra sólo a través del brazo $e$, tanto para reportar la G como para dimensionar la transición de roll ([§7](#7-presupuesto-de-onset-y-longitudes-de-transición)). Cerrar $e$ contra una medida antropométrica, o reemplazar el criterio por el límite de velocidad angular, son las dos salidas posibles y ninguna está tomada.
+Para la rotación pura, el criterio normativo propio es un límite de **velocidad angular** del carro (ASTM F2291 §7.1.6), no un offset equivalente. Hoy la rotación entra a través del brazo $b$, tanto para reportar la G como para dimensionar la transición de roll ([§7](#7-presupuesto-de-onset-y-longitudes-de-transición)). El valor de $e$ (`DistanciaHeartlineACabeza`) **está sin cerrar** —no es una medida antropométrica escalada— pero sólo afecta la G informativa de la cabeza salvo que se pida verificar ahí. Cerrar $e$, o reemplazar el criterio por el límite de velocidad angular, son las dos salidas posibles y ninguna está tomada.
 
 ---
 
@@ -487,8 +503,9 @@ Para la rotación pura, el criterio normativo propio es un límite de **velocida
 
 - **§7.1.7.1 simplificada.** Si aparece un evento de $-G_z$ de más de 3 s, se aplica la columna reducida de $+G_z$ a todo el elemento en vez de arrastrar el reloj de los 6 s. Es conservador y evita que el reloj cruce entre elementos.
 - **Modelo de partícula.** El tren se trata como un punto. Con $n_{carros}$ carros la velocidad es común y la altura relevante es la del conjunto; la arquitectura está preparada para $n_{carros}>1$ pero el reparto no está.
-- **Centro de masa supuesto en el heartline.** Las fuerzas (rodadura, `FuerzaNormal`) se calculan como $m(\mathbf{a}_{cm}-\mathbf{g})$ con el centro de masa sobre el heartline. El centro de masa real está más abajo, entre el heartline y el riel, porque el chasis y las ruedas pesan. El error que mete es de orden $d/R$ sobre la rodadura — pocos por ciento — muy por debajo de la incertidumbre de los $C_{rr}$, que están sin calibrar. Sobre la G del pasajero **no** aplica esa disculpa, y por eso ahí sí se hace el transporte completo ([§14.3](#143-la-velocidad-angular-tiene-dos-aportes-no-uno)).
-- **Criterio de rotación por offset equivalente.** La rotación entra en la G del pasajero y en la longitud de transición de roll a través del brazo $e$, que está **sin cerrar**. El criterio normativo propio de la rotación pura es un límite de velocidad angular (ASTM F2291 §7.1.6). Ver [§14.5](#145-lo-que-queda-abierto).
+- **Centro de masa supuesto en la heartline.** Las fuerzas (rodadura, `FuerzaNormal`) y la energía se calculan con el centro de masa a $d$ del riel, sobre la heartline. El centro de masa real del conjunto carro más pasajero está más abajo, porque el chasis y las ruedas pesan. El error que mete es de orden $d/R$ sobre la rodadura — pocos por ciento — muy por debajo de la incertidumbre de los $C_{rr}$, que están sin calibrar. Sobre la G del pasajero **no** aplica esa disculpa, y por eso ahí sí se hace el transporte completo ([§14.3](#143-la-velocidad-angular-tiene-dos-aportes-no-uno)).
+- **Aceleración tangencial aproximada dentro del paso.** El término de Euler del roll, $b\,a_t\phi'/g$, se evalúa dentro del paso con $a_t \approx -g\,T_z$ (sin la resistencia al avance, que es ~0.1 g). Sólo pesa en las transiciones de roll, donde el modo de curvatura no actúa; la verificación posterior usa la $a_t$ numérica completa.
+- **Criterio de rotación por offset equivalente.** La rotación entra en la G del pasajero y en la longitud de transición de roll a través del brazo $b$. El criterio normativo propio de la rotación pura es un límite de velocidad angular (ASTM F2291 §7.1.6). Ver [§14.5](#145-lo-que-queda-abierto).
 - **Reparto entre juegos de ruedas — específico de este script.** En el generador de elementos (`Fisica/CargasEnLaVia.m` y `Fisica/ResistenciaAlAvance.m`) el reparto **ya se hace correctamente**, proyectando la normal sobre $\mathbf{U}$ y $\mathbf{L}$ del marco del carro: la componente sobre $\mathbf{U}$ va a las portantes si es positiva y a las de retención si es negativa, y la componente sobre $\mathbf{L}$ va a las de guía (código verificado: `ResistenciaAlAvance.m` líneas 10–12). Esto es distinto de lo que hace el script `analisis_energia.m` de la raíz del repo, que todavía asume peralte perfecto (ver [`documentacion_analisis_energia.md` §8](documentacion_analisis_energia.md#8-modelo-de-resistencia-al-avance)) — son dos scripts separados y esta sección se refiere únicamente al generador. Los tres $C_{rr}$ y el $C_d$ siguen siendo provisorios y **requieren calibración experimental**.
 - **Modo inverso**, elemento conector y tren de $n_{carros}>1$ quedan fuera de alcance, igual que el backend web.
 - **Modo `GMaximas`**: la interfaz está completa pero el seguimiento de duración de exposición trata el arco como un único evento sostenido.

@@ -4,10 +4,20 @@ function Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros)
 %   velocidad de lanzamiento, la via ya fabricada sigue siendo la misma: por
 %   eso la separacion es un requisito y no una comodidad.
 %
-%   Integra dv^2/ds = -2*g*Tz - 2*F_resistencia/m con RK4 sobre la polilinea,
-%   interpolando linealmente la geometria entre nodos.
+%   La curva del Track es el RIEL y el estado que se integra es la energia
+%   del CENTRO DE MASA, que va sobre la heartline (riel + d*U):
+%       d(v_cm^2)/ds = -2*g*dz_cm/ds - 2*F_res/m,   v_riel = v_cm/J
+%   con J = |d r_heartline/ds| = hypot(1 - d*ku, d*phi'). Es la misma ecuacion
+%   que integra DerivadaDeVia al generar, con RK4 sobre la polilinea e
+%   interpolando la geometria entre nodos.
+%
+%   Las G que se reportan salen por transporte de cuerpo rigido desde el
+%   punto del riel, con la velocidad angular completa del marco del carro, a
+%   tres brazos distintos: d (centro de masa: fuerza normal y ruedas), el de
+%   verificacion (donde se aplica la norma) y d + e (cabeza, informativa).
 
     g = Parametros.Gravedad;
+    d = Parametros.DistanciaHeartline;
     Arco = Track.LongitudArco;
     NumeroDeNodos = numel(Arco);
 
@@ -15,30 +25,24 @@ function Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros)
     % interpola con pchip y no lineal: los estadios intermedios de RK4 caen
     % entre nodos y el error de orden ds^2 de la interpolacion lineal se veia
     % directamente en el balance de energia.
-    CurvaturaSobreArriba  = sum(Track.VectorCurvatura .* Track.VersorArribaCarro, 2);
-    CurvaturaSobreLateral = sum(Track.VectorCurvatura .* Track.VersorLateral,     2);
+    CurvaturaArribaCarro  = sum(Track.VectorCurvatura .* Track.VersorArribaCarro, 2);
+    CurvaturaLateralCarro = sum(Track.VectorCurvatura .* Track.VersorLateral,     2);
 
-    Geometria.Arco = Arco;
-    Geometria.TangenteVertical = Interpolante(Arco, Track.VersorTangente(:,3));
-    Geometria.ArribaVertical   = Interpolante(Arco, Track.VersorArribaCarro(:,3));
-    Geometria.LateralVertical  = Interpolante(Arco, Track.VersorLateral(:,3));
-    Geometria.CurvaturaSobreArriba  = Interpolante(Arco, CurvaturaSobreArriba);
-    Geometria.CurvaturaSobreLateral = Interpolante(Arco, CurvaturaSobreLateral);
+    Geometria.TangenteVertical      = Interpolante(Arco, Track.VersorTangente(:,3));
+    Geometria.ArribaVertical        = Interpolante(Arco, Track.VersorArribaCarro(:,3));
+    Geometria.LateralVertical       = Interpolante(Arco, Track.VersorLateral(:,3));
+    Geometria.CurvaturaArribaCarro  = Interpolante(Arco, CurvaturaArribaCarro);
+    Geometria.CurvaturaLateralCarro = Interpolante(Arco, CurvaturaLateralCarro);
+    Geometria.VelocidadRoll         = Interpolante(Arco, Track.VelocidadRoll);
+    Geometria.AceleracionRoll       = Interpolante(Arco, Track.AceleracionRoll);
 
-    GeometriaNodos.TangenteVertical = Track.VersorTangente(:,3);
-    GeometriaNodos.CurvaturaSobreArriba  = CurvaturaSobreArriba;
-    GeometriaNodos.CurvaturaSobreLateral = CurvaturaSobreLateral;
-    GeometriaNodos.ArribaVertical  = Track.VersorArribaCarro(:,3);
-    GeometriaNodos.LateralVertical = Track.VersorLateral(:,3);
-
-    Sim.Velocidad       = nan(NumeroDeNodos, 1);
-    Sim.Tiempo          = nan(NumeroDeNodos, 1);
-    Sim.EnergiaTotal    = nan(NumeroDeNodos, 1);
+    Sim.VelocidadCentroDeMasa = nan(NumeroDeNodos, 1);
+    Sim.Tiempo         = nan(NumeroDeNodos, 1);
     Sim.FuerzaRodadura = zeros(NumeroDeNodos, 1);
     Sim.FuerzaArrastre = zeros(NumeroDeNodos, 1);
-    Sim.PuntoDeParada   = [];
+    Sim.PuntoDeParada  = [];
 
-    VelocidadCuadrado = EstadoEntrada.Velocidad^2;
+    VelocidadCuadrado = EstadoEntrada.Velocidad^2;   % del centro de masa
     Tiempo = 0;
 
     for k = 1:NumeroDeNodos
@@ -46,8 +50,8 @@ function Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros)
             Sim.PuntoDeParada = k;
             break
         end
-        Sim.Velocidad(k) = sqrt(VelocidadCuadrado);
-        Sim.Tiempo(k)    = Tiempo;
+        Sim.VelocidadCentroDeMasa(k) = sqrt(VelocidadCuadrado);
+        Sim.Tiempo(k) = Tiempo;
 
         [~, Rodadura, Arrastre] = ResistenciaEnArco(Arco(k), VelocidadCuadrado, Geometria, Parametros);
         Sim.FuerzaRodadura(k) = Rodadura;
@@ -62,11 +66,18 @@ function Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros)
     end
 
     if ~isempty(Sim.PuntoDeParada)
-        Sim.Velocidad(Sim.PuntoDeParada:end) = NaN;
-        Sim.Tiempo(Sim.PuntoDeParada:end)    = NaN;
+        Sim.VelocidadCentroDeMasa(Sim.PuntoDeParada:end) = NaN;
+        Sim.Tiempo(Sim.PuntoDeParada:end) = NaN;
     end
 
     %% ------------- magnitudes derivadas, ya vectorizadas -----------------
+    VelocidadRoll = Track.VelocidadRoll;
+    FactorVelocidadHeartline = hypot(1 - d*CurvaturaArribaCarro, d*VelocidadRoll);
+    Sim.FactorVelocidadHeartline = FactorVelocidadHeartline;
+
+    % Velocidad del punto del RIEL: la que marca el tiempo y la velocidad
+    % angular del marco.
+    Sim.Velocidad = Sim.VelocidadCentroDeMasa ./ FactorVelocidadHeartline;
     Velocidad = Sim.Velocidad;
     VelocidadCuadradoNodos = Velocidad.^2;
 
@@ -74,30 +85,35 @@ function Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros)
     PasoEntreNodos = [diff(Arco); 0];
     Sim.EnergiaDisipadaRodadura = cumsum(Sim.FuerzaRodadura .* PasoEntreNodos);
     Sim.EnergiaDisipadaArrastre = cumsum(Sim.FuerzaArrastre .* PasoEntreNodos);
-    Sim.AceleracionTangencial = -g*GeometriaNodos.TangenteVertical - FuerzaResistencia/Parametros.Masa;
-    Sim.AceleracionTangencial(isnan(Velocidad)) = NaN;
 
-    Sim.GArribaHeartline  = VelocidadCuadradoNodos.*GeometriaNodos.CurvaturaSobreArriba/g  + GeometriaNodos.ArribaVertical;
-    Sim.GLateralHeartline = VelocidadCuadradoNodos.*GeometriaNodos.CurvaturaSobreLateral/g + GeometriaNodos.LateralVertical;
+    % dv_cm/dt del centro de masa: es lo que se grafica como aceleracion
+    % tangencial. La del punto del riel, dv/dt, es otra (el riel recorre un
+    % arco distinto) y entra solo en el transporte de cuerpo rigido.
+    Sim.AceleracionTangencial = DerivadaPorArco(Sim.VelocidadCentroDeMasa, Arco) .* Velocidad;
+    AceleracionTangencialRiel = DerivadaPorArco(Velocidad, Arco) .* Velocidad;
 
-    % G reportadas: transporte de cuerpo rigido desde el heartline hasta el
-    % punto donde se evalua al pasajero. NO son las del heartline pelado.
-    %
-    % El heartline es el eje de roll, asi que un punto matematico ahi no
-    % recibe aporte de la rotacion. Pero el pasajero no es un punto: cabeza y
-    % hombros quedan fuera del eje y si sienten la rotacion. Por eso la G que
-    % se verifica contra la norma se evalua desplazada e*U del eje.
-    [Sim.Gx, Sim.Gy, Sim.Gz] = GEnPuntoDeEvaluacion(Track, Sim, Parametros);
+    % Transporte de cuerpo rigido a los tres brazos. El centro de masa da la
+    % fuerza normal; el brazo de verificacion, la G que se compara contra la
+    % norma; la cabeza es informativa (Rohde 2024, 7.6.2: el disenador debe
+    % incluir las rotaciones aunque la norma no mida ahi).
+    BrazoVerificacion = BrazoDeVerificacion(Parametros);
+    BrazoCabeza = d + Parametros.DistanciaHeartlineACabeza;
 
-    % Masa puntual con el centro de masa en el heartline: la fuerza que el
+    [~, Sim.GLateralHeartline, Sim.GArribaHeartline] = GTransportada(Track, Sim, AceleracionTangencialRiel, d, Parametros);
+    [Sim.Gx, Sim.Gy, Sim.Gz] = GTransportada(Track, Sim, AceleracionTangencialRiel, BrazoVerificacion, Parametros);
+    [Sim.GxCabeza, Sim.GyCabeza, Sim.GzCabeza] = GTransportada(Track, Sim, AceleracionTangencialRiel, BrazoCabeza, Parametros);
+    Sim.BrazoDeVerificacion = BrazoVerificacion;
+
+    % Masa puntual con el centro de masa en la heartline: la fuerza que el
     % riel le hace al carro vale m*(a_cm - g_vec).
     Sim.FuerzaNormal = Parametros.Masa*g*hypot(Sim.GArribaHeartline, Sim.GLateralHeartline);
 
-    Sim.EnergiaCinetica  = 0.5*Parametros.Masa*VelocidadCuadradoNodos;
+    Sim.EnergiaCinetica  = 0.5*Parametros.Masa*Sim.VelocidadCentroDeMasa.^2;
     Sim.EnergiaPotencial = Parametros.Masa*g*Track.PuntosHeartline(:,3);
     Sim.EnergiaTotal     = Sim.EnergiaCinetica + Sim.EnergiaPotencial;
 
-    % Jerk por eje, en G/s: dG/dt = (dG/ds)*v.
+    % Jerk por eje, en G/s: dG/dt = (dG/ds)*v, con v la del riel (ds es arco
+    % del riel).
     Jerk = DerivadaPorArco([Sim.Gx, Sim.Gy, Sim.Gz], Arco) .* Velocidad;
     Sim.JerkGx = Jerk(:,1);
     Sim.JerkGy = Jerk(:,2);
@@ -114,12 +130,12 @@ function Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros)
 end
 
 %% ========================= auxiliares =====================================
-function [Gx, Gy, Gz] = GEnPuntoDeEvaluacion(Track, Sim, Parametros)
-%GENPUNTODEEVALUACION G sentida en el punto donde se evalua al pasajero.
-%   Transporte de cuerpo rigido desde el heartline, que es a la vez la curva
-%   integrada, el eje de roll y el centro de masa supuesto:
+function [Gx, Gy, Gz] = GTransportada(Track, Sim, AceleracionTangencialRiel, Brazo, Parametros)
+%GTRANSPORTADA G en un punto a distancia Brazo del riel, sobre U.
+%   Transporte de cuerpo rigido desde el punto del riel, que es la curva
+%   integrada y el eje de roll:
 %
-%       a_e = a_h + dw/dt x r + w x (w x r),      r = e*U
+%       a_P = a_riel + dw/dt x r + w x (w x r),      r = Brazo*U
 %
 %   La velocidad angular del marco del carro tiene DOS aportes y no uno:
 %
@@ -129,18 +145,14 @@ function [Gx, Gy, Gz] = GEnPuntoDeEvaluacion(Track, Sim, Parametros)
 %            transporte, que da
 %            vueltas con la via
 %
-%   El primero es el que la version anterior no tenia. Solo se sumaba el
-%   termino de roll e*(a_t*phi' + v^2*phi'')/g, y por eso el aporte de
-%   rotacion quedaba incompleto justo donde la via curva y rola a la vez, que
-%   es todo el interes de un over-banked turn o un dive loop.
+%   Quedarse solo con el termino de roll pierde los terminos cruzados entre
+%   curvatura y roll, que dominan justo donde la via curva y rola a la vez,
+%   que es todo el interes de un over-banked turn o un dive loop.
 %
-%   Con e = 0 esto se reduce exactamente a GArribaHeartline / GLateralHeartline
-%   / Gx del heartline, y el test 10 lo verifica.
-%
-%   Que e NO sea DistanciaHeartline es deliberado: DistanciaHeartline mide del
-%   riel al heartline (geometria de la via) y e mide del heartline al cuerpo
-%   del pasajero (donde se evalua el confort). Son dos cosas distintas que
-%   antes estaban colapsadas en un solo numero.
+%   Con Brazo = 0 esto se reduce exactamente a la G del punto del riel, y con
+%   Brazo = d a las componentes que CargasEnLaVia calcula en forma cerrada
+%   (salvo la aproximacion de a_t en el termino de Euler, que aca es
+%   numerica). El test 10 verifica las dos cosas.
 
     g = Parametros.Gravedad;
     Arco = Track.LongitudArco;
@@ -150,11 +162,10 @@ function [Gx, Gy, Gz] = GEnPuntoDeEvaluacion(Track, Sim, Parametros)
 
     VelocidadCuadrado = Sim.Velocidad.^2;
 
-    % Aceleracion del heartline: tangencial mas centripeta.
-    Aceleracion = Sim.AceleracionTangencial.*T + VelocidadCuadrado.*Track.VectorCurvatura;
+    % Aceleracion del punto del riel: tangencial mas centripeta.
+    Aceleracion = AceleracionTangencialRiel.*T + VelocidadCuadrado.*Track.VectorCurvatura;
 
-    Offset = Parametros.DistanciaEvaluacionPasajero;
-    if Offset ~= 0
+    if Brazo ~= 0
         OmegaPorArco = cross(T, Track.VectorCurvatura, 2) + Track.VelocidadRoll.*T;
         Omega        = Sim.Velocidad .* OmegaPorArco;
 
@@ -163,10 +174,10 @@ function [Gx, Gy, Gz] = GEnPuntoDeEvaluacion(Track, Sim, Parametros)
         % que no esta disponible dentro del paso de integracion.
         DerivadaOmega = Sim.Velocidad .* DerivadaPorArco(Omega, Arco);
 
-        Brazo = Offset * U;
+        r = Brazo * U;
         Aceleracion = Aceleracion ...
-                    + cross(DerivadaOmega, Brazo, 2) ...
-                    + cross(Omega, cross(Omega, Brazo, 2), 2);
+                    + cross(DerivadaOmega, r, 2) ...
+                    + cross(Omega, cross(Omega, r, 2), 2);
     end
 
     % Fuerza especifica f = a - g_vec, con g_vec = -g*zhat. Es lo que mide un
@@ -198,23 +209,40 @@ function [VelocidadCuadrado, Tiempo] = PasoDeEnergia(Arco, VelocidadCuadrado, Ti
 end
 
 function Derivada = DerivadaDeEnergia(Arco, VelocidadCuadrado, Geometria, Parametros)
+%DERIVADADEENERGIA La misma ecuacion que DerivadaDeVia, sobre la geometria
+%   interpolada: energia del centro de masa y tiempo del punto del riel.
+    d = Parametros.DistanciaHeartline;
     VelocidadCuadrado = max(VelocidadCuadrado, 0);
-    Velocidad = sqrt(VelocidadCuadrado);
-    FuerzaResistencia = ResistenciaEnArco(Arco, VelocidadCuadrado, Geometria, Parametros);
-    Derivada = [-2*Parametros.Gravedad*Geometria.TangenteVertical(Arco) - 2*FuerzaResistencia/Parametros.Masa, ...
-                 1/max(Velocidad, 1e-6)];
+    VelocidadCentroDeMasa = sqrt(VelocidadCuadrado);
+
+    [FuerzaResistencia, ~, ~, FactorVelocidadHeartline] = ResistenciaEnArco(Arco, VelocidadCuadrado, Geometria, Parametros);
+
+    DerivadaAlturaCentroDeMasa = (1 - d*Geometria.CurvaturaArribaCarro(Arco))*Geometria.TangenteVertical(Arco) ...
+                               + d*Geometria.VelocidadRoll(Arco)*Geometria.LateralVertical(Arco);
+    Derivada = [-2*Parametros.Gravedad*DerivadaAlturaCentroDeMasa - 2*FuerzaResistencia/Parametros.Masa, ...
+                 FactorVelocidadHeartline/max(VelocidadCentroDeMasa, 1e-6)];
 end
 
-function [FuerzaResistencia, Rodadura, Arrastre] = ResistenciaEnArco(Arco, VelocidadCuadrado, Geometria, Parametros)
+function [FuerzaResistencia, Rodadura, Arrastre, FactorVelocidadHeartline] = ResistenciaEnArco(Arco, VelocidadCuadrado, Geometria, Parametros)
+    g = Parametros.Gravedad;
+    d = Parametros.DistanciaHeartline;
     VelocidadCuadrado = max(VelocidadCuadrado, 0);
-    Velocidad = sqrt(VelocidadCuadrado);
 
-    GArribaHeartline  = VelocidadCuadrado*Geometria.CurvaturaSobreArriba(Arco) /Parametros.Gravedad ...
-                      + Geometria.ArribaVertical(Arco);
-    GLateralHeartline = VelocidadCuadrado*Geometria.CurvaturaSobreLateral(Arco)/Parametros.Gravedad ...
-                      + Geometria.LateralVertical(Arco);
+    CurvaturaArribaCarro  = Geometria.CurvaturaArribaCarro(Arco);
+    CurvaturaLateralCarro = Geometria.CurvaturaLateralCarro(Arco);
+    VelocidadRoll   = Geometria.VelocidadRoll(Arco);
+    AceleracionRoll = Geometria.AceleracionRoll(Arco);
+    TangenteVertical = Geometria.TangenteVertical(Arco);
 
-    [FuerzaResistencia, Rodadura, Arrastre] = ResistenciaAlAvance(Velocidad, GArribaHeartline, GLateralHeartline, Parametros);
+    FactorVelocidadHeartline = hypot(1 - d*CurvaturaArribaCarro, d*VelocidadRoll);
+    VelocidadRiel = sqrt(VelocidadCuadrado) / FactorVelocidadHeartline;
+
+    [GArribaHeartline, GLateralHeartline] = CargasEnLaVia( ...
+        CurvaturaArribaCarro, CurvaturaLateralCarro, VelocidadRiel, ...
+        VelocidadRoll, AceleracionRoll, -g*TangenteVertical, ...
+        Geometria.ArribaVertical(Arco), Geometria.LateralVertical(Arco), d, g);
+
+    [FuerzaResistencia, Rodadura, Arrastre] = ResistenciaAlAvance(VelocidadRiel, GArribaHeartline, GLateralHeartline, Parametros);
 end
 
 function Objeto = Interpolante(Arco, Valores)
