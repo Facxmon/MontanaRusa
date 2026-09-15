@@ -8,7 +8,20 @@ function [EstadoSalida, Elemento, Reporte] = ElementoHelice(EstadoEntrada, Param
 %   El avance sobre el eje de la helice es el mismo parametro que en el loop
 %   separa las dos patas. Ahi el eje es lateral y sirve para no chocarse; aca
 %   el eje es vertical y es directamente cuanto sube o baja el elemento.
+%
+%   Llamado sin argumentos devuelve la declaracion de los parametros
+%   geometricos que consume (ver DeclaracionDeParametros).
 
+    if nargin == 0
+        EstadoSalida = DeclaracionDeParametros( ...
+            'RadioDeLaHelice',   'm',   ['radio de la heartline en el arco: en Clotoide es el que se impone; en los modos ' ...
+                                         'dependientes de v es solo la longitud caracteristica de Froude y el radio real es una salida'], ...
+            'VueltasDeLaHelice', '-',   'vueltas del giro (puede no ser entero)', ...
+            'AvanceDeLaHelice',  'm',   'cuanto sube (positivo) o baja (negativo) sobre el eje vertical', ...
+            'PeralteDeLaHelice', 'rad', 'roll del carro respecto de la vertical en el arco', ...
+            'SentidoDelGiro',    '-',   '''Derecha'' o ''Izquierda''');
+        return
+    end
     if nargin < 3
         Layout = [];
     end

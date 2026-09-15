@@ -66,7 +66,19 @@ run('DemoLayout.m')           % los cuatro elementos encadenados en un circuito
 run('TestsValidacion.m')      % trece tests, termina con error si alguno falla
 ```
 
-Todos los parámetros de entrada están agrupados en [`ParametrosPorDefecto.m`](GeneradorDeElementos/ParametrosPorDefecto.m). Los que dependen de investigación pendiente (disponibilidad de rodamientos en Argentina, tolerancia de la impresora) están marcados como **SIN CERRAR** ahí mismo. La tabla completa de esos parámetros, con símbolo, unidad y sección donde se usan, está en [`NOMENCLATURA.md` bloque 3](NOMENCLATURA.md#3-parámetros-de-entrada-del-generador-parametrospordefectom).
+Todos los parámetros de entrada están agrupados en [`ParametrosPorDefecto.m`](GeneradorDeElementos/ParametrosPorDefecto.m), en cuatro bloques: **parámetros del modo de curvatura**, **parámetros geométricos de cada elemento**, **criterios de aceptación** y parámetros generales. Los que dependen de investigación pendiente (disponibilidad de rodamientos en Argentina, tolerancia de la impresora) están marcados como **SIN CERRAR** ahí mismo. La tabla completa de esos parámetros, con símbolo, unidad y sección donde se usan, está en [`NOMENCLATURA.md` bloque 3](NOMENCLATURA.md#3-parámetros-de-entrada-del-generador-parametrospordefectom).
+
+**Quién consume qué, declarado en el código y no en un comentario.** Un valor del primer bloque sólo hace algo en su modo y uno del segundo sólo en su elemento — `RadioDelLoop` con el dive loop, o `FuerzaGObjetivo` en modo normativo, no hacen nada — y eso antes era invisible. Ahora hay una fuente única consultable:
+
+| Qué | Dónde se declara | Cómo se consulta |
+|---|---|---|
+| Parámetros que consume cada modo de curvatura | [`Fisica/ParametrosDelModo.m`](GeneradorDeElementos/Fisica/ParametrosDelModo.m) | `ParametrosDelModo('FuerzaGConstante')`; sin argumentos lista los modos |
+| Parámetros geométricos que consume cada elemento | el propio `ElementoXxx.m`, junto a la Receta que los lee | `ElementoHelice()` sin argumentos |
+| Criterios de aceptación | [`Verificacion/ParametrosDeAceptacion.m`](GeneradorDeElementos/Verificacion/ParametrosDeAceptacion.m) | `ParametrosDeAceptacion()` |
+
+`DemoElemento.m` sobrescribe sus valores en un struct `Ajustes` aparte; `AjustarParametros` los aplica y **avisa** por cada uno que ni el modo ni el elemento elegidos consumen (y falla si el nombre no existe), y `DescribirParametros` imprime sólo los tres grupos que aplican, con unidades. `GMinimaCuspide` está entre los criterios de aceptación y no entre los parámetros del modo a propósito: es la holgura de cúspide de la bisección de velocidad mínima y de la estimación a priori, y vale en todos los modos.
+
+**El estado de entrada de `DemoElemento.m` es sintético** (vía a nivel, carro derecho, sin curvatura) porque la demo aísla un elemento; el encadenado real está en `DemoLayout.m`. Opcionalmente, `ArchivoLayoutPrevio` apunta a un `.mat` guardado por `LayoutGuardar` y el elemento arranca del estado de salida de ese layout, con su vía cargada para el chequeo de interferencia. La posición del estado es la del **riel** y la velocidad la del **centro de masa** ([§14](#14-el-modelo-de-heartline-tres-curvas)).
 
 ---
 
@@ -76,12 +88,12 @@ El código está en [`GeneradorDeElementos/`](GeneradorDeElementos), en seis car
 
 | Carpeta | Qué contiene |
 |---|---|
-| *(raíz)* | `ParametrosPorDefecto` — el único archivo que se edita para configurar |
+| *(raíz)* | `ParametrosPorDefecto` — el único archivo que se edita para configurar; `AjustarParametros` — aplica overrides y avisa de los inertes |
 | `Nucleo/` | contrato de `Estado`, marco de Bishop, integrador RK4, registro de nodos |
-| `Fisica/` | cargas por juego de ruedas, resistencia, modos de curvatura, Froude, simulación |
-| `Elementos/` | los cuatro elementos, el motor común y los dos métodos de acoplamiento |
-| `Verificacion/` | curvas de la norma, chequeos de factibilidad, distancia entre polilíneas |
-| `Salida/` | reporte por consola y gráficos |
+| `Fisica/` | cargas por juego de ruedas, resistencia, modos de curvatura y qué consume cada uno, transporte inverso, Froude, simulación |
+| `Elementos/` | los cuatro elementos (cada uno declara sus parámetros), el motor común y los dos métodos de acoplamiento |
+| `Verificacion/` | curvas de la norma, chequeos de factibilidad, criterios de aceptación declarados, distancia entre polilíneas |
+| `Salida/` | reporte por consola, descripción de parámetros y gráficos |
 | `LayoutDeVia/` | alta, deshacer, guardar, cargar y re-simular el circuito |
 
 ### 2.1 Los cuatro elementos comparten un solo motor

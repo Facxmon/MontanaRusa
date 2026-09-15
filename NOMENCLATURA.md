@@ -88,6 +88,8 @@ Esta es la desambiguación adoptada; se aplica en todo el texto reescrito.
 
 ## 3. Parámetros de entrada del generador (`ParametrosPorDefecto.m`)
 
+Qué consume cada modo lo declara `ParametrosDelModo`; qué consume cada elemento, el propio `ElementoXxx` llamado sin argumentos; los criterios de aceptación, `ParametrosDeAceptacion`. `AjustarParametros` avisa si un override no lo lee ni el modo ni el elemento elegidos. Nombres nuevos: `ParametrosDelModo`, `DeclaracionDeParametros`, `CatalogoDeElementos`, `ParametrosDeAceptacion`, `AjustarParametros`, `DescribirParametros`.
+
 | Símbolo / campo | Nombre en código | Significado | Unidad | Definido en | Notas |
 |---|---|---|---|---|---|
 | $g$ | `Parametros.Gravedad` | aceleración de la gravedad | m/s² | memoria §5.1 | 9.81 |

@@ -7,7 +7,18 @@ function [EstadoSalida, Elemento, Reporte] = ElementoLoopVertical(EstadoEntrada,
 %   La separacion entre patas es obligatoria: un giro de 2*pi contenido en un
 %   plano vuelve a pasar por donde entro. Ver GenerarGeometria para el detalle
 %   de como se consigue.
+%
+%   Llamado sin argumentos devuelve la declaracion de los parametros
+%   geometricos que consume (ver DeclaracionDeParametros).
 
+    if nargin == 0
+        EstadoSalida = DeclaracionDeParametros( ...
+            'RadioDelLoop',     'm',   ['radio de la heartline en la cuspide: en Clotoide es el que se impone; en los modos ' ...
+                                        'dependientes de v es solo la longitud caracteristica de Froude y el radio real es una salida'], ...
+            'RollExtraDelLoop', 'rad', 'roll adicional del carro respecto de la vertical (0 = loop vertical estandar)', ...
+            'SeparacionDePatas','m',   'avance sobre el eje de la helice: separa la pata de salida de la de entrada');
+        return
+    end
     if nargin < 3
         Layout = [];
     end

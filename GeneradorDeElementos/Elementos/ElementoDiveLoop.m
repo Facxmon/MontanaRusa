@@ -19,7 +19,18 @@ function [EstadoSalida, Elemento, Reporte] = ElementoDiveLoop(EstadoEntrada, Par
 %   es el maximo de la Fig. 8: los dos maximos juntos violan la elipse de
 %   7.1.5.1, asi que se prioriza el Gz y el Gy es lo que deja la elipse
 %   (CurvaturaDelModo). El lado lo fija SentidoDelGiro.
+%
+%   Llamado sin argumentos devuelve la declaracion de los parametros
+%   geometricos que consume (ver DeclaracionDeParametros).
 
+    if nargin == 0
+        EstadoSalida = DeclaracionDeParametros( ...
+            'RadioDelDiveLoop',      'm', ['radio de la heartline en la cuspide: en Clotoide es el que se impone; en los modos ' ...
+                                           'dependientes de v es solo la longitud caracteristica de Froude y el radio real es una salida'], ...
+            'SeparacionDelDiveLoop', 'm', 'avance sobre el eje de la helice (0: gira solo pi y no se cruza consigo mismo)', ...
+            'SentidoDelGiro',        '-', 'lado hacia el que se desalinea la curvatura para el Gy objetivo en modo GNormativaMaxima');
+        return
+    end
     if nargin < 3
         Layout = [];
     end

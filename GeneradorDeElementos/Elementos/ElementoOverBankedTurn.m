@@ -10,7 +10,20 @@ function [EstadoSalida, Elemento, Reporte] = ElementoOverBankedTurn(EstadoEntrad
 %   que cambia es como esta parado el carro sobre ella. Eso lo habilita el
 %   marco de transporte paralelo con el roll explicito encima; con Frenet el
 %   peralte quedaria atado a la geometria y no se podria elegir.
+%
+%   Llamado sin argumentos devuelve la declaracion de los parametros
+%   geometricos que consume (ver DeclaracionDeParametros).
 
+    if nargin == 0
+        EstadoSalida = DeclaracionDeParametros( ...
+            'RadioDelGiro',   'm',   ['radio de la heartline en el arco: en Clotoide es el que se impone; en los modos ' ...
+                                      'dependientes de v es solo la longitud caracteristica de Froude y el radio real es una salida'], ...
+            'AnguloDelGiro',  'rad', 'cambio de rumbo', ...
+            'PeralteDelGiro', 'rad', 'roll del carro respecto de la vertical en el arco (mas de pi/2 = over-banked)', ...
+            'AvanceDelGiro',  'm',   'cuanto sube o baja sobre el eje vertical (0 = giro a nivel)', ...
+            'SentidoDelGiro', '-',   '''Derecha'' o ''Izquierda''');
+        return
+    end
     if nargin < 3
         Layout = [];
     end
