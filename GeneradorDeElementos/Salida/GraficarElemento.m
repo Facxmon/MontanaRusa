@@ -1,9 +1,17 @@
 function Figuras = GraficarElemento(Elemento, Reporte)
 %GRAFICARELEMENTO Graficos de salida del elemento.
 %   Los sub-tramos se distinguen por color en las trayectorias y quedan
-%   marcados con lineas verticales en los graficos contra distancia. Los
-%   graficos de G llevan superpuesta la banda de limite normativo: una curva
-%   desnuda no dice si el diseno pasa o no.
+%   marcados con lineas verticales en los graficos contra distancia y contra
+%   tiempo. Los graficos de G llevan superpuesta la banda de limite
+%   normativo: una curva desnuda no dice si el diseno pasa o no.
+%
+%   Las G y el jerk se grafican dos veces: contra el arco del riel, que es
+%   la lectura de fabricacion (donde en la pieza pasa cada cosa), y contra
+%   el tiempo del prototipo, que es la variable en la que la norma define
+%   sus curvas (las duraciones de las Figs. 6 a 10 son de prototipo, y el
+%   modelo las recorre sqrt(lambda) veces mas rapido). Comparar las bandas
+%   normativas sobre un eje de arco es una lectura aproximada; la de tiempo
+%   es la literal.
 
     Track = Elemento.Track;
     Sim   = Elemento.Sim;
@@ -11,6 +19,10 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     Escala = Elemento.Diagnostico.Escala;
 
     Arco = Track.LongitudArco;
+    % Tiempo del prototipo: el del modelo por sqrt(lambda_loop). Es el eje en
+    % el que estan definidas las curvas de la norma.
+    TiempoPrototipo = Sim.Tiempo * Escala.RaizLambdaLoop;
+    NivelesParaGraficar = 400;   % LimitePorPunto: grilla fina solo para dibujar; la verificacion usa la suya
     Colores = lines(max(numel(Track.SubTramos), 4));
     Figuras = gobjects(0);
 
@@ -52,9 +64,12 @@ function Figuras = GraficarElemento(Elemento, Reporte)
         plot3(Track.PuntosRiel(Rango,1), Track.PuntosRiel(Rango,2), Track.PuntosRiel(Rango,3), ...
               'Color', Colores(i,:), 'LineWidth', 2)
     end
+    plot3(Track.PuntosHeartline(:,1), Track.PuntosHeartline(:,2), Track.PuntosHeartline(:,3), ...
+          ':', 'Color', [0.45 0.45 0.45], 'LineWidth', 1)
     DibujarMarcoDelCarro(Track, Parametros);
     xlabel('x [m]'); ylabel('y [m]'); zlabel('z [m]')
-    title('Marco del carro: U del riel al heartline, L lateral')
+    title({'Marco del carro sobre el riel: U (arriba, hacia la heartline) y L (lateral)', ...
+           sprintf('Punteada: heartline, a %.0f mm del riel sobre U', 1000*Parametros.DistanciaHeartline)})
 
     %% --- Velocidad y aceleracion tangencial --------------------------------
     Figuras(end+1) = figure('Name', 'Velocidad y aceleracion tangencial');
@@ -62,7 +77,7 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     subplot(2,1,1)
     plot(Arco, Sim.VelocidadCentroDeMasa, 'LineWidth', 2); grid on; hold on
     plot(Arco, Sim.Velocidad, '--', 'LineWidth', 1);
-    MarcarSubTramos(Track);
+    MarcarSubTramos(Track, Arco);
     legend('Centro de masa (heartline)', 'Punto del riel', 'Location', 'best')
     xlabel('Longitud recorrida sobre el riel [m]'); ylabel('Velocidad [m/s]')
     title('Velocidad sobre el elemento')
@@ -70,60 +85,94 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     subplot(2,1,2)
     plot(Arco, Sim.AceleracionTangencial, 'LineWidth', 2); grid on; hold on
     yline(0, 'k:');
-    MarcarSubTramos(Track);
+    MarcarSubTramos(Track, Arco);
     xlabel('Longitud recorrida [m]'); ylabel('a_t [m/s^2]')
     title('Aceleracion tangencial')
 
-    %% --- G por eje con banda normativa -------------------------------------
-    Figuras(end+1) = figure('Name', 'Fuerzas G con limites normativos');
+    %% --- G por eje con banda normativa, contra arco y contra tiempo ---------
+    % La misma figura dos veces, con distinto eje horizontal. La de arco es
+    % la lectura de fabricacion; la de tiempo del prototipo es la variable de
+    % la norma, y ahi las bandas se leen literalmente.
     FactorTiempo = Escala.RaizLambdaLoop;
+    Figuras(end+1) = figure('Name', 'Fuerzas G con limites normativos (arco)');
+    GraficarGPorEje(Arco, 'Longitud recorrida sobre el riel [m]', Sim, Track, ...
+                    FactorTiempo, Reporte.Normativo.CurvaMasGzAplicada, NivelesParaGraficar);
+    Figuras(end+1) = figure('Name', 'Fuerzas G con limites normativos (tiempo del prototipo)');
+    GraficarGPorEje(TiempoPrototipo, 'Tiempo del prototipo [s]', Sim, Track, ...
+                    FactorTiempo, Reporte.Normativo.CurvaMasGzAplicada, NivelesParaGraficar);
 
-    subplot(3,1,1)
-    GraficarGConBanda(Arco, Sim.Gx, Sim.Tiempo, FactorTiempo, 'MasGxBase', 'MenosGxBase', Track);
-    ylabel('G_x [G]'); title('G_x -- limites Figs. 6 y 7')
-
-    subplot(3,1,2)
-    GraficarGConBanda(Arco, Sim.Gy, Sim.Tiempo, FactorTiempo, 'GyBase', 'GyBase', Track);
-    ylabel('G_y [G]'); title('G_y -- limite Fig. 8')
-
-    subplot(3,1,3)
-    GraficarGConBanda(Arco, Sim.Gz, Sim.Tiempo, FactorTiempo, ...
-                      Reporte.Normativo.CurvaMasGzAplicada, 'MenosGzBase', Track);
-    ylabel('G_z [G]'); xlabel('Longitud recorrida [m]')
-    title(sprintf('G_z -- limites Figs. 9 y 10 (curva +G_z aplicada: %s)', ...
-                  Reporte.Normativo.CurvaMasGzAplicada))
-
-    %% --- Jerk con presupuesto de onset --------------------------------------
-    Figuras(end+1) = figure('Name', 'Jerk y presupuesto de onset');
+    %% --- Jerk con presupuesto de onset, contra arco y contra tiempo ---------
+    % CONVENCION, una sola por figura y sin mezclar:
+    %   - contra arco se dibuja el jerk DEL MODELO contra el presupuesto del
+    %     modelo, Escala.OnsetMaximo = sqrt(lambda) x norma;
+    %   - contra tiempo del prototipo se dibuja el jerk DEL PROTOTIPO, que es
+    %     el del modelo dividido por sqrt(lambda), contra el numero literal de
+    %     la norma, Parametros.OnsetNormativoPorEje.
+    % Las dos comparaciones son la misma desigualdad escrita en unidades
+    % distintas; lo que no se puede hacer es cruzarlas.
     Ejes = {'G_x', 'G_y', 'G_z'};
-    Jerks = {Sim.JerkGx, Sim.JerkGy, Sim.JerkGz};
+    JerkModelo = {Sim.JerkGx, Sim.JerkGy, Sim.JerkGz};
+
+    Figuras(end+1) = figure('Name', 'Jerk y presupuesto de onset (arco, modelo)');
     for i = 1:3
         subplot(3,1,i)
-        plot(Arco, Jerks{i}, 'LineWidth', 1.5); grid on; hold on
+        plot(Arco, JerkModelo{i}, 'LineWidth', 1.5); grid on; hold on
         yline( Escala.OnsetMaximo(i), 'r--', 'LineWidth', 1.5);
         yline(-Escala.OnsetMaximo(i), 'r--', 'LineWidth', 1.5);
-        MarcarSubTramos(Track);
-        ylabel(sprintf('dj/dt de %s [G/s]', Ejes{i}))
-        title(sprintf('Jerk de %s -- presupuesto del modelo %.1f G/s = sqrt(lambda) x %.1f G/s', ...
+        MarcarSubTramos(Track, Arco);
+        ylabel(sprintf('d%s/dt [G/s]', Ejes{i}))
+        title(sprintf('Jerk de %s DEL MODELO -- presupuesto del modelo %.1f G/s = sqrt(lambda) x %.1f G/s de la norma', ...
                       Ejes{i}, Escala.OnsetMaximo(i), Parametros.OnsetNormativoPorEje(i)))
     end
-    xlabel('Longitud recorrida [m]')
+    xlabel('Longitud recorrida sobre el riel [m]')
+
+    Figuras(end+1) = figure('Name', 'Jerk y presupuesto de onset (tiempo del prototipo)');
+    for i = 1:3
+        subplot(3,1,i)
+        plot(TiempoPrototipo, JerkModelo{i} / Escala.RaizLambdaLoop, 'LineWidth', 1.5); grid on; hold on
+        yline( Parametros.OnsetNormativoPorEje(i), 'r--', 'LineWidth', 1.5);
+        yline(-Parametros.OnsetNormativoPorEje(i), 'r--', 'LineWidth', 1.5);
+        MarcarSubTramos(Track, TiempoPrototipo);
+        ylabel(sprintf('d%s/dt [G/s]', Ejes{i}))
+        title(sprintf('Jerk de %s DEL PROTOTIPO (modelo / sqrt(lambda) = / %.2f) -- limite de la norma %.1f G/s', ...
+                      Ejes{i}, Escala.RaizLambdaLoop, Parametros.OnsetNormativoPorEje(i)))
+    end
+    xlabel('Tiempo del prototipo [s]')
 
     %% --- Roll ---------------------------------------------------------------
+    % Tres angulos que miden cosas distintas y conviene no confundir:
+    %   phi      roll del carro contra el marco de transporte paralelo. En una
+    %            curva plana (torsion nula) Bishop coincide con Frenet y phi
+    %            es CONSTANTE; solo crece por la torsion que mete la
+    %            inclinacion helicoidal, a razon dphi/dtheta = tan(alfa).
+    %   peralte  inclinacion de U contra la vertical del plano que contiene a
+    %            T. En un loop vale 0, salta a +-180 al invertirse y no esta
+    %            definido con T vertical (NaN): es lo que se ve en la via.
+    %   psi      angulo entre el vector curvatura y U, en el plano normal del
+    %            carro: el desalineamiento entre "hacia donde apunta el
+    %            pasajero" y "hacia donde esta el centro instantaneo de
+    %            giro". En loop y dive loop es 0 salvo el sub-peralte que
+    %            impone el modo normativo; en los giros es el complemento
+    %            del peralte. Es el angulo fisicamente significativo para la G.
     Figuras(end+1) = figure('Name', 'Perfil de roll');
     subplot(2,1,1)
     plot(Arco, rad2deg(Track.AnguloRoll), 'LineWidth', 2); grid on; hold on
     plot(Arco, rad2deg(Track.AnguloPeralte), 'LineWidth', 2)
-    MarcarSubTramos(Track);
+    plot(Arco, rad2deg(Track.AnguloCurvaturaDesdeArriba), 'LineWidth', 2)
+    MarcarSubTramos(Track, Arco);
     ylabel('grados')
-    legend('\phi contra el marco de transporte', 'Peralte contra la vertical', 'Location', 'best')
-    title(['Angulo de roll. Los dos miden lo mismo contra referencias distintas: ' ...
-           '\phi crece porque el marco de transporte gira, el peralte es lo que se ve en la via'])
+    legend('\phi: roll contra el marco de transporte (constante si la curva es plana; crece con la torsion helicoidal)', ...
+           'Peralte: U contra la vertical del plano de T (lo que se ve en la via; \pm180 invertido; NaN con T vertical)', ...
+           '\psi: vector curvatura contra U (0 = el pasajero mira al centro de giro; \neq 0 en giros peraltados y sub-peralte)', ...
+           'Location', 'best')
+    title({'Tres angulos, tres referencias: \phi contra el marco de transporte, peralte contra la vertical, \psi contra el vector curvatura', ...
+           sprintf('Inclinacion helicoidal tan(\\alpha) = %.3f: es la pendiente d\\phi/d\\theta, lo unico que hace crecer a \\phi', ...
+                   Track.InclinacionHelicoidal)})
 
     subplot(2,1,2)
     plot(Arco, rad2deg(Track.VelocidadRoll), 'LineWidth', 2); grid on; hold on
     plot(Arco, rad2deg(Track.AceleracionRoll), 'LineWidth', 1.5);
-    MarcarSubTramos(Track);
+    MarcarSubTramos(Track, Arco);
     legend('d\phi/ds [grados/m]', 'd^2\phi/ds^2 [grados/m^2]', 'Location', 'best')
     xlabel('Longitud recorrida [m]')
     title(['Derivadas del roll -- entran en la G del pasajero por el brazo ' ...
@@ -142,7 +191,7 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     semilogy(Arco, RadioRiel, 'LineWidth', 2); grid on; hold on
     semilogy(Arco, Radio, '--', 'LineWidth', 1.5);
     yline(Parametros.RadioMinimoFabricable, 'r--', 'LineWidth', 2);
-    MarcarSubTramos(Track);
+    MarcarSubTramos(Track, Arco);
     xlabel('Longitud recorrida [m]'); ylabel('Radio de curvatura [m]')
     legend('Radio del riel', 'Radio del heartline', 'Radio minimo fabricable', 'Location', 'best')
     title('Radio de curvatura: riel contra heartline y contra el limite de fabricacion')
@@ -167,19 +216,22 @@ function DibujarPorSubTramo(Track, Colores, EjeHorizontal, EjeVertical)
          ':', 'Color', [0.45 0.45 0.45], 'LineWidth', 1)
 end
 
-function MarcarSubTramos(Track)
+function MarcarSubTramos(Track, EjeHorizontal)
+%MARCARSUBTRAMOS Lineas verticales en las fronteras de sub-tramo, sobre el
+%   eje horizontal que use la figura (arco o tiempo): la frontera es un nodo,
+%   y su abscisa es la de ese nodo en el eje elegido.
     for i = 1:numel(Track.SubTramos)-1
-        xline(Track.LongitudArco(Track.SubTramos(i).IndiceFin), 'k:', 'HandleVisibility', 'off');
+        xline(EjeHorizontal(Track.SubTramos(i).IndiceFin), 'k:', 'HandleVisibility', 'off');
     end
 end
 
 function DibujarMarcoDelCarro(Track, Parametros)
 %DIBUJARMARCODELCARRO Flechas del marco del carro sobre la trayectoria.
-%   Nacen en el RIEL, que es el eje de roll. La flecha de U se dibuja con la
-%   longitud real d, asi que su punta cae exactamente sobre la heartline: es la
-%   forma de ver de un vistazo cuanto se separan las dos curvas y por que en
-%   los radios chicos esa separacion deja de ser despreciable. La de L va a
-%   escala del dibujo, que si no queda invisible.
+%   Nacen en el RIEL, que es el eje de roll, y van a escala del dibujo: U es
+%   la flecha larga y oscura, L la corta y clara. La separacion riel-heartline
+%   no se lee de la flecha sino de la polilinea punteada de la heartline, que
+%   la figura dibuja aparte; dibujar U con su longitud real (d = 30 mm) la
+%   dejaba ilegible sin aportar nada que la punteada no muestre.
 
     NumeroDeNodos = size(Track.PuntosRiel, 1);
     Cantidad = min(Parametros.VersoresEnGrafico3D, NumeroDeNodos);
@@ -189,21 +241,47 @@ function DibujarMarcoDelCarro(Track, Parametros)
     Longitud  = 0.06 * Extension;
 
     Base = Track.PuntosRiel(Indices, :);
-    Arriba  = Parametros.DistanciaHeartline * Track.VersorArribaCarro(Indices, :);
-    Lateral = Longitud * Track.VersorLateral(Indices, :);
+    Arriba  = Longitud     * Track.VersorArribaCarro(Indices, :);
+    Lateral = 0.4*Longitud * Track.VersorLateral(Indices, :);
 
     quiver3(Base(:,1), Base(:,2), Base(:,3), Arriba(:,1), Arriba(:,2), Arriba(:,3), ...
             0, 'Color', [0.15 0.15 0.15], 'LineWidth', 1.1)
     quiver3(Base(:,1), Base(:,2), Base(:,3), Lateral(:,1), Lateral(:,2), Lateral(:,3), ...
             0, 'Color', [0.60 0.60 0.85], 'LineWidth', 0.8)
     legend([{Track.SubTramos.Nombre}, ...
-            {sprintf('U: riel -> heartline (%.0f mm)', 1000*Parametros.DistanciaHeartline), 'L: lateral'}], ...
+            {sprintf('Heartline (riel + %.0f mm sobre U)', 1000*Parametros.DistanciaHeartline), ...
+             'U: arriba del carro (a escala del dibujo)', 'L: lateral (a escala del dibujo)'}], ...
            'Location', 'best', 'Interpreter', 'none')
 end
 
-function GraficarGConBanda(Arco, G, Tiempo, FactorTiempo, CurvaPositiva, CurvaNegativa, Track)
+function GraficarGPorEje(EjeHorizontal, EtiquetaEje, Sim, Track, FactorTiempo, CurvaMasGz, NumeroDeNiveles)
+%GRAFICARGPOREJE Los tres subplots de G con banda normativa, sobre el eje
+%   horizontal que se le pase (arco del riel o tiempo del prototipo). La
+%   banda se evalua siempre con Sim.Tiempo, que es lo que fija la duracion
+%   de los eventos: el eje horizontal solo cambia contra que se dibuja.
+    subplot(3,1,1)
+    GraficarGConBanda(EjeHorizontal, Sim.Gx, Sim.Tiempo, FactorTiempo, 'MasGxBase', 'MenosGxBase', Track, NumeroDeNiveles);
+    ylabel('G_x [G]'); title('G_x -- limites Figs. 6 y 7')
+
+    subplot(3,1,2)
+    GraficarGConBanda(EjeHorizontal, Sim.Gy, Sim.Tiempo, FactorTiempo, 'GyBase', 'GyBase', Track, NumeroDeNiveles);
+    ylabel('G_y [G]'); title('G_y -- limite Fig. 8')
+
+    subplot(3,1,3)
+    GraficarGConBanda(EjeHorizontal, Sim.Gz, Sim.Tiempo, FactorTiempo, CurvaMasGz, 'MenosGzBase', Track, NumeroDeNiveles);
+    ylabel('G_z [G]'); xlabel(EtiquetaEje)
+    title(sprintf('G_z -- limites Figs. 9 y 10 (curva +G_z aplicada: %s)', CurvaMasGz))
+end
+
+function GraficarGConBanda(EjeHorizontal, G, Tiempo, FactorTiempo, CurvaPositiva, CurvaNegativa, Track, NumeroDeNiveles)
 %GRAFICARGCONBANDA Superpone los limites normativos, que dependen de la
 %   duracion del evento sostenido y por lo tanto NO son un escalar.
+%
+%   EjeHorizontal es el vector contra el que se dibuja (arco del riel o
+%   tiempo del prototipo), del mismo largo que G. Tiempo es siempre el del
+%   modelo, Sim.Tiempo: es lo que define la duracion de cada evento, y no
+%   depende de contra que se grafique. NumeroDeNiveles es la resolucion de
+%   la escalera de LimitePorPunto, solo para dibujar.
 %
 %   Se dibujan tres cosas distintas, que antes estaban colapsadas en una sola
 %   linea y daban una lectura enganosa:
@@ -224,7 +302,8 @@ function GraficarGConBanda(Arco, G, Tiempo, FactorTiempo, CurvaPositiva, CurvaNe
     LimiteLargoSuperior =  abs(LimiteNormativo(CurvaPositiva, 40));
     LimiteLargoInferior = -abs(LimiteNormativo(CurvaNegativa, 40));
 
-    Extremos = [Arco(1), Arco(end)];
+    % min/max ignoran los NaN del tramo donde la marcha se quedo sin energia.
+    Extremos = [min(EjeHorizontal), max(EjeHorizontal)];
     hold on; grid on
 
     fill([Extremos, fliplr(Extremos)], ...
@@ -238,19 +317,19 @@ function GraficarGConBanda(Arco, G, Tiempo, FactorTiempo, CurvaPositiva, CurvaNe
     Etiquetas{end+1} = sprintf('Limite a 200 ms (%+.1f / %+.1f G)', LimiteCortoSuperior, LimiteCortoInferior);
     plot(Extremos, [LimiteCortoInferior LimiteCortoInferior], 'r--', 'LineWidth', 1.2, 'HandleVisibility', 'off')
 
-    LimiteAplicableSuperior = LimitePorPunto(G, Tiempo, CurvaPositiva, FactorTiempo, +1);
-    LimiteAplicableInferior = LimitePorPunto(G, Tiempo, CurvaNegativa, FactorTiempo, -1);
+    LimiteAplicableSuperior = LimitePorPunto(G, Tiempo, CurvaPositiva, FactorTiempo, +1, NumeroDeNiveles);
+    LimiteAplicableInferior = LimitePorPunto(G, Tiempo, CurvaNegativa, FactorTiempo, -1, NumeroDeNiveles);
 
     HayAplicable = false;
     if any(~isnan(LimiteAplicableSuperior))
-        Trazos(end+1) = plot(Arco, LimiteAplicableSuperior, 'r-', 'LineWidth', 1.6);
+        Trazos(end+1) = plot(EjeHorizontal, LimiteAplicableSuperior, 'r-', 'LineWidth', 1.6);
         HayAplicable = true;
     end
     if any(~isnan(LimiteAplicableInferior))
         if HayAplicable
-            plot(Arco, LimiteAplicableInferior, 'r-', 'LineWidth', 1.6, 'HandleVisibility', 'off')
+            plot(EjeHorizontal, LimiteAplicableInferior, 'r-', 'LineWidth', 1.6, 'HandleVisibility', 'off')
         else
-            Trazos(end+1) = plot(Arco, LimiteAplicableInferior, 'r-', 'LineWidth', 1.6);
+            Trazos(end+1) = plot(EjeHorizontal, LimiteAplicableInferior, 'r-', 'LineWidth', 1.6);
             HayAplicable = true;
         end
     end
@@ -258,10 +337,10 @@ function GraficarGConBanda(Arco, G, Tiempo, FactorTiempo, CurvaPositiva, CurvaNe
         Etiquetas{end+1} = 'Limite aplicable segun la duracion del evento';
     end
 
-    Trazos(end+1) = plot(Arco, G, 'LineWidth', 2);
+    Trazos(end+1) = plot(EjeHorizontal, G, 'LineWidth', 2);
     Etiquetas{end+1} = 'Valor calculado';
 
     yline(0, 'k:', 'HandleVisibility', 'off');
-    MarcarSubTramos(Track);
+    MarcarSubTramos(Track, EjeHorizontal);
     legend(Trazos, Etiquetas, 'Location', 'best')
 end
