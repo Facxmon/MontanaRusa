@@ -20,6 +20,23 @@ function [EstadoSalida, Elemento, Reporte] = ElementoDiveLoop(EstadoEntrada, Par
 %   7.1.5.1, asi que se prioriza el Gz y el Gy es lo que deja la elipse
 %   (CurvaturaDelModo). El lado lo fija SentidoDelGiro.
 %
+%   EN ESE MODO EL DIVE LOOP SALE "TORCIDO", Y NO ES UN BUG. Con el carro
+%   invertido a roll fijo, la unica forma de darle a la curvatura del riel
+%   una componente lateral sostenida (el sub-peralte psi) es inclinar el
+%   plano entero del giro: la media vuelta sigue siendo PLANA, pero su plano
+%   queda inclinado psi respecto de la vertical (~10.7 grados con los
+%   defaults). Dos consecuencias geometricas, las dos del Gy objetivo:
+%     - la salida queda desplazada lateralmente (~0.18 m con los defaults),
+%     - el carro sale peraltado 2*psi (~21 grados), porque U gira pi
+%       alrededor de la normal del plano inclinado y no de la horizontal.
+%   El lado cambia con SentidoDelGiro. En Clotoide y FuerzaGConstante, que
+%   no persiguen Gy, el giro es plano y vertical y el carro sale derecho
+%   (verificado en Diagnostico/DiagnosticoPlanitudDiveLoop.m: distancia al
+%   mejor plano por SVD del orden de 1e-14 en los tres modos, inclinacion
+%   0 en los dos primeros y psi en el normativo). El peralte de salida es un
+%   dato para el elemento siguiente, que lo tiene que deshacer con su
+%   transicion de roll.
+%
 %   Llamado sin argumentos devuelve la declaracion de los parametros
 %   geometricos que consume (ver DeclaracionDeParametros).
 
