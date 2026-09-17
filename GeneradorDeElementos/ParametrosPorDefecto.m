@@ -122,6 +122,16 @@ Parametros.OnsetMaximoModelo    = [];           % [G/s] override directo; vacio 
 Parametros.TolObjetivoDeG = 0.05;    % [G] desvio admitido entre la G del pasajero y la que pidio el modo
 Parametros.TolCierrePitch = 1e-4;    % [rad] residual de cierre admitido en el giro objetivo
 
+% Factor de seguridad sobre la curva de la norma que persigue el modo
+% GNormativaMaxima: el objetivo de diseno es el limite de la Fig. 10 (y el
+% Gy de la elipse de 7.1.5.1 en el dive loop) DIVIDIDO por este factor, asi
+% que el diseno nace con margen. Se aplica SOLO en el objetivo del modo
+% (CurvaturaDelModo y el criterio que lo reconstruye); la verificacion de
+% cumplimiento (VerificarLimitesNormativos, LimitePorPunto) sigue comparando
+% contra la norma literal. Aplicarlo tambien ahi haria fallar elementos
+% correctamente disenados contra la norma real. 1.0 = sin margen.
+Parametros.FactorDeSeguridadNormativo = 1.0;   % [-]
+
 % --- Fabricacion y espacio ---
 % SIN CERRAR: las dimensiones definitivas dependen de la huella disponible.
 Parametros.AlturaMaximaDelElemento = 1.00;   % [m] restriccion dura del proyecto

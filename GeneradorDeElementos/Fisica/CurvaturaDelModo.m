@@ -50,6 +50,13 @@ function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Es
 %   posterior mide en cambio la duracion de cada evento sostenido por nivel,
 %   que arranca en la clotoide de entrada: la diferencia esta cuantificada en
 %   documentacion_generador_elementos.md, seccion 5, y no se corrige aca.
+%
+%   El limite que persigue va dividido por Parametros.FactorDeSeguridadNormativo:
+%   es el objetivo de DISENO, con margen. El factor se aplica aca y en el
+%   criterio que reconstruye el objetivo (ConstruirElemento), y en ningun
+%   otro lado: la verificacion compara contra la norma literal. En el dive
+%   loop se dividen tambien los dos semiejes de la elipse y la curva de Gy,
+%   para que el Gy objetivo quede escalado igual que el Gz.
 
     g = Parametros.Gravedad;
     d = Parametros.DistanciaHeartline;
@@ -82,11 +89,14 @@ function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Es
             end
             DuracionModelo = max(Punto.Tiempo - ArcoTiempoDeReferencia, 0);
             DuracionReal   = DuracionModelo * Escala.RaizLambdaLoop;
-            GLimite = LimiteNormativo(Receta.CurvaLimiteGz, DuracionReal);
+            % Objetivo de diseno: la curva de la norma con el margen del factor.
+            FactorDeSeguridad = Parametros.FactorDeSeguridadNormativo;
+            GLimite = LimiteNormativo(Receta.CurvaLimiteGz, DuracionReal) / FactorDeSeguridad;
             ObjetivoSinGravedad = g*(GLimite - ArribaVertical) / VelocidadCentroDeMasa^2;
 
             if isfield(Receta, 'CurvaLimiteGy') && ~isempty(Receta.CurvaLimiteGy)
-                GyObjetivo = ObjetivoDeGyDentroDeLaElipse(GLimite, DuracionReal, Receta, Parametros.TolObjetivoDeG);
+                GyObjetivo = ObjetivoDeGyDentroDeLaElipse(GLimite, DuracionReal, Receta, ...
+                                                          Parametros.TolObjetivoDeG, FactorDeSeguridad);
                 [Curvatura, AnguloDesdeArriba] = CurvaturaDelRielParaGzYGyObjetivo( ...
                     ObjetivoSinGravedad, (GyObjetivo - Punto.VersorLateral(3))*g/VelocidadCentroDeMasa^2, ...
                     Brazo, d, VelocidadCentroDeMasa, Punto.VelocidadRoll, Punto.AceleracionRoll, ...
@@ -112,7 +122,7 @@ function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Es
 end
 
 %% ========================= auxiliares =====================================
-function GyObjetivo = ObjetivoDeGyDentroDeLaElipse(GzLimite, DuracionReal, Receta, Tolerancia)
+function GyObjetivo = ObjetivoDeGyDentroDeLaElipse(GzLimite, DuracionReal, Receta, Tolerancia, FactorDeSeguridad)
 %OBJETIVODEGYDENTRODELAELIPSE Gy maximo admisible dado el Gz que ya se pide.
 %   Apuntar a la vez al +Gz maximo de la Fig. 10 y al |Gy| maximo de la
 %   Fig. 8 viola la elipse de dos ejes de 7.1.5.1 por construccion:
@@ -122,14 +132,19 @@ function GyObjetivo = ObjetivoDeGyDentroDeLaElipse(GzLimite, DuracionReal, Recet
 %   multiplicados por 1.1, igual que en VerificarLimitesNormativos. El lado
 %   lo fija Receta.SentidoDeGy (+1 hacia el versor lateral del carro).
 %
+%   GzLimite llega ya dividido por el factor de seguridad, y aca se dividen
+%   tambien los dos semiejes y la curva de Gy: la elipse entera se escala y
+%   el Gy objetivo queda con el mismo margen que el Gz. Dividir solo el Gz
+%   dejaria la elipse sin escalar y el Gy objetivo inconsistente.
+%
 %   Se le descuenta al objetivo la tolerancia con la que el chequeo posterior
 %   admite que el transporte inverso erre (TolObjetivoDeG): un objetivo
 %   exactamente sobre la elipse la viola con el ruido numerico de la
 %   simulacion, y el chequeo de 7.1.5.1 es estricto.
-    SemiejeGz = 1.1*abs(LimiteNormativo(Receta.CurvaLimiteGz, 0.2));
-    SemiejeGy = 1.1*abs(LimiteNormativo(Receta.CurvaLimiteGy, 0.2));
+    SemiejeGz = 1.1*abs(LimiteNormativo(Receta.CurvaLimiteGz, 0.2)) / FactorDeSeguridad;
+    SemiejeGy = 1.1*abs(LimiteNormativo(Receta.CurvaLimiteGy, 0.2)) / FactorDeSeguridad;
     GyDeLaElipse = SemiejeGy*sqrt(max(1 - (GzLimite/SemiejeGz)^2, 0));
-    GyDeLaCurva  = abs(LimiteNormativo(Receta.CurvaLimiteGy, DuracionReal));
+    GyDeLaCurva  = abs(LimiteNormativo(Receta.CurvaLimiteGy, DuracionReal)) / FactorDeSeguridad;
     GyObjetivo   = Receta.SentidoDeGy * max(min(GyDeLaElipse, GyDeLaCurva) - Tolerancia, 0);
 end
 

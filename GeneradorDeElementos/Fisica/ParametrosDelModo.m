@@ -39,7 +39,8 @@ function [Lista, Nota] = ParametrosDelModo(Modo)
         case 'GNormativaMaxima'
             Lista = Fila();
             Nota = ['ninguno global: la curva de la norma que persigue es parte de la Receta del elemento ' ...
-                    '(Receta.CurvaLimiteGz en los cuatro; CurvaLimiteGy y SentidoDeGy en el dive loop)'];
+                    '(Receta.CurvaLimiteGz en los cuatro; CurvaLimiteGy y SentidoDeGy en el dive loop). ' ...
+                    'La curva va dividida por FactorDeSeguridadNormativo, del bloque de criterios de aceptacion'];
         otherwise
             error('ParametrosDelModo:ModoDesconocido', ...
                   'Modo de curvatura no reconocido: %s. Los modos son: %s.', Modo, strjoin(Modos, ', '));

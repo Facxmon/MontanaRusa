@@ -390,6 +390,59 @@ Resultados = Anotar(Resultados, 'El dive loop alcanza su Gy objetivo por sub-per
             ReporteGy.Normativo.Elipse.ValorMaximoGyGz, ReporteGy.Normativo.OnsetMaximoPorEje(2), ...
             ReporteGy.Resumen.OnsetMaximoModelo(2)));
 
+%% --- Test 14: el factor de seguridad escala el objetivo y no la verificacion
+% Con FactorDeSeguridadNormativo > 1 el modo normativo tiene que poner en el
+% pasajero la curva de la norma DIVIDIDA por el factor (y en el dive loop
+% tambien el Gy, con la elipse entera escalada), el criterio "objetivo
+% alcanzado" tiene que reconstruir el mismo objetivo y pasar, y la
+% verificacion de cumplimiento tiene que seguir comparando contra la norma
+% literal: los semiejes de la elipse de 7.1.5.1 no se mueven. Los tests 12
+% y 13 corren con el default 1.0 y son los que garantizan que sea neutral.
+Parametros = ParametrosBase;
+Parametros.ModoCurvatura = 'GNormativaMaxima';
+Parametros.FactorDeSeguridadNormativo = 1.25;
+Estado = EstadoInicial([0 0 1.0], [1 0 0], [0 0 1], 6.0, Parametros);
+
+Constructores = {@ElementoLoopVertical, @ElementoDiveLoop};
+PeorDesvioFS = 0;
+CriteriosFS  = true;
+ElipseLiteral = true;
+DetallesFS = {};
+for i = 1:numel(Constructores)
+    [~, ElementoFS, ReporteFS] = Constructores{i}(Estado, Parametros);
+    TrackFS = ElementoFS.Track;  SimFS = ElementoFS.Sim;  RecetaFS = ElementoFS.Receta;
+    IndiceArco = find(strcmp({TrackFS.SubTramos.Nombre}, 'ArcoPrincipal'), 1);
+    RangoArco  = TrackFS.SubTramos(IndiceArco).IndiceInicio : TrackFS.SubTramos(IndiceArco).IndiceFin;
+    DuracionReal = (SimFS.Tiempo(RangoArco) - SimFS.Tiempo(RangoArco(1))) * ElementoFS.Diagnostico.Escala.RaizLambdaLoop;
+    ObjetivoFS = arrayfun(@(D) LimiteNormativo(RecetaFS.CurvaLimiteGz, D), DuracionReal) / Parametros.FactorDeSeguridadNormativo;
+    DesvioFS = max(abs(SimFS.Gz(RangoArco) - ObjetivoFS));
+    PeorDesvioFS = max(PeorDesvioFS, DesvioFS);
+
+    NombresFS = {ReporteFS.Posteriores.Nombre};
+    CriteriosFS = CriteriosFS && ReporteFS.Posteriores(strcmp(NombresFS, 'Gz objetivo del modo alcanzado')).Pasa;
+    if isfield(RecetaFS, 'CurvaLimiteGy')
+        SemiejeGzFS = 1.1*LimiteNormativo(RecetaFS.CurvaLimiteGz, 0.2) / Parametros.FactorDeSeguridadNormativo;
+        SemiejeGyFS = 1.1*LimiteNormativo(RecetaFS.CurvaLimiteGy, 0.2) / Parametros.FactorDeSeguridadNormativo;
+        GyCurvaFS   = arrayfun(@(D) LimiteNormativo(RecetaFS.CurvaLimiteGy, D), DuracionReal) / Parametros.FactorDeSeguridadNormativo;
+        GyObjetivoFS = RecetaFS.SentidoDeGy * (min(GyCurvaFS, SemiejeGyFS*sqrt(max(1 - (ObjetivoFS/SemiejeGzFS).^2, 0))) ...
+                                               - Parametros.TolObjetivoDeG);
+        DesvioGyFS = max(abs(SimFS.Gy(RangoArco) - GyObjetivoFS));
+        PeorDesvioFS = max(PeorDesvioFS, DesvioGyFS);
+        CriteriosFS = CriteriosFS && ReporteFS.Posteriores(strcmp(NombresFS, 'Gy objetivo del modo alcanzado')).Pasa;
+    end
+    % La verificacion no ve el factor: semiejes literales de 200 ms x 1.1.
+    SemiejesLiterales = [1.1*LimiteNormativo('MasGxBase', 0.2), 1.1*LimiteNormativo('GyBase', 0.2), ...
+                         1.1*LimiteNormativo(ReporteFS.Normativo.CurvaMasGzAplicada, 0.2)];
+    ElipseLiteral = ElipseLiteral && max(abs(ReporteFS.Normativo.Elipse.Semiejes - SemiejesLiterales)) < 1e-12;
+    DetallesFS{end+1} = sprintf('%s Gz max %.3f G (objetivo %.3f), desvio %.4f G', ElementoFS.Nombre, ...
+                                max(SimFS.Gz(RangoArco)), ObjetivoFS(1), DesvioFS); %#ok<SAGROW>
+end
+
+Resultados = Anotar(Resultados, 'El factor de seguridad escala el objetivo del modo y no la verificacion', ...
+    PeorDesvioFS < 0.02 && CriteriosFS && ElipseLiteral, ...
+    sprintf('FS = %.2f: %s (limite 0.02 G); criterios de objetivo pasan; semiejes de la elipse sin escalar', ...
+            Parametros.FactorDeSeguridadNormativo, strjoin(DetallesFS, ', ')));
+
 %% --- Resumen ----------------------------------------------------------
 fprintf('\n');
 NoPasan = 0;

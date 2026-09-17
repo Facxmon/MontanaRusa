@@ -22,7 +22,11 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     % Tiempo del prototipo: el del modelo por sqrt(lambda_loop). Es el eje en
     % el que estan definidas las curvas de la norma.
     TiempoPrototipo = Sim.Tiempo * Escala.RaizLambdaLoop;
-    NivelesParaGraficar = 400;   % LimitePorPunto: grilla fina solo para dibujar; la verificacion usa la suya
+    % Opciones de dibujo de las bandas: grilla fina de LimitePorPunto (solo
+    % para dibujar; la verificacion usa la suya) y el factor de seguridad, que
+    % si es distinto de 1 agrega la linea punteada del objetivo de diseno.
+    OpcionesDeBanda.NumeroDeNiveles   = 400;
+    OpcionesDeBanda.FactorDeSeguridad = Parametros.FactorDeSeguridadNormativo;
     Colores = lines(max(numel(Track.SubTramos), 4));
     Figuras = gobjects(0);
 
@@ -96,10 +100,10 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     FactorTiempo = Escala.RaizLambdaLoop;
     Figuras(end+1) = figure('Name', 'Fuerzas G con limites normativos (arco)');
     GraficarGPorEje(Arco, 'Longitud recorrida sobre el riel [m]', Sim, Track, ...
-                    FactorTiempo, Reporte.Normativo.CurvaMasGzAplicada, NivelesParaGraficar);
+                    FactorTiempo, Reporte.Normativo.CurvaMasGzAplicada, OpcionesDeBanda);
     Figuras(end+1) = figure('Name', 'Fuerzas G con limites normativos (tiempo del prototipo)');
     GraficarGPorEje(TiempoPrototipo, 'Tiempo del prototipo [s]', Sim, Track, ...
-                    FactorTiempo, Reporte.Normativo.CurvaMasGzAplicada, NivelesParaGraficar);
+                    FactorTiempo, Reporte.Normativo.CurvaMasGzAplicada, OpcionesDeBanda);
 
     %% --- Jerk con presupuesto de onset, contra arco y contra tiempo ---------
     % CONVENCION, una sola por figura y sin mezclar:
@@ -254,34 +258,36 @@ function DibujarMarcoDelCarro(Track, Parametros)
            'Location', 'best', 'Interpreter', 'none')
 end
 
-function GraficarGPorEje(EjeHorizontal, EtiquetaEje, Sim, Track, FactorTiempo, CurvaMasGz, NumeroDeNiveles)
+function GraficarGPorEje(EjeHorizontal, EtiquetaEje, Sim, Track, FactorTiempo, CurvaMasGz, Opciones)
 %GRAFICARGPOREJE Los tres subplots de G con banda normativa, sobre el eje
 %   horizontal que se le pase (arco del riel o tiempo del prototipo). La
 %   banda se evalua siempre con Sim.Tiempo, que es lo que fija la duracion
 %   de los eventos: el eje horizontal solo cambia contra que se dibuja.
     subplot(3,1,1)
-    GraficarGConBanda(EjeHorizontal, Sim.Gx, Sim.Tiempo, FactorTiempo, 'MasGxBase', 'MenosGxBase', Track, NumeroDeNiveles);
+    GraficarGConBanda(EjeHorizontal, Sim.Gx, Sim.Tiempo, FactorTiempo, 'MasGxBase', 'MenosGxBase', Track, Opciones);
     ylabel('G_x [G]'); title('G_x -- limites Figs. 6 y 7')
 
     subplot(3,1,2)
-    GraficarGConBanda(EjeHorizontal, Sim.Gy, Sim.Tiempo, FactorTiempo, 'GyBase', 'GyBase', Track, NumeroDeNiveles);
+    GraficarGConBanda(EjeHorizontal, Sim.Gy, Sim.Tiempo, FactorTiempo, 'GyBase', 'GyBase', Track, Opciones);
     ylabel('G_y [G]'); title('G_y -- limite Fig. 8')
 
     subplot(3,1,3)
-    GraficarGConBanda(EjeHorizontal, Sim.Gz, Sim.Tiempo, FactorTiempo, CurvaMasGz, 'MenosGzBase', Track, NumeroDeNiveles);
+    GraficarGConBanda(EjeHorizontal, Sim.Gz, Sim.Tiempo, FactorTiempo, CurvaMasGz, 'MenosGzBase', Track, Opciones);
     ylabel('G_z [G]'); xlabel(EtiquetaEje)
     title(sprintf('G_z -- limites Figs. 9 y 10 (curva +G_z aplicada: %s)', CurvaMasGz))
 end
 
-function GraficarGConBanda(EjeHorizontal, G, Tiempo, FactorTiempo, CurvaPositiva, CurvaNegativa, Track, NumeroDeNiveles)
+function GraficarGConBanda(EjeHorizontal, G, Tiempo, FactorTiempo, CurvaPositiva, CurvaNegativa, Track, Opciones)
 %GRAFICARGCONBANDA Superpone los limites normativos, que dependen de la
 %   duracion del evento sostenido y por lo tanto NO son un escalar.
 %
 %   EjeHorizontal es el vector contra el que se dibuja (arco del riel o
 %   tiempo del prototipo), del mismo largo que G. Tiempo es siempre el del
 %   modelo, Sim.Tiempo: es lo que define la duracion de cada evento, y no
-%   depende de contra que se grafique. NumeroDeNiveles es la resolucion de
-%   la escalera de LimitePorPunto, solo para dibujar.
+%   depende de contra que se grafique. Opciones.NumeroDeNiveles es la
+%   resolucion de la escalera de LimitePorPunto, solo para dibujar, y
+%   Opciones.FactorDeSeguridad agrega, si es distinto de 1, la linea
+%   punteada del objetivo de diseno (limite / factor).
 %
 %   Se dibujan tres cosas distintas, que antes estaban colapsadas en una sola
 %   linea y daban una lectura enganosa:
@@ -317,8 +323,8 @@ function GraficarGConBanda(EjeHorizontal, G, Tiempo, FactorTiempo, CurvaPositiva
     Etiquetas{end+1} = sprintf('Limite a 200 ms (%+.1f / %+.1f G)', LimiteCortoSuperior, LimiteCortoInferior);
     plot(Extremos, [LimiteCortoInferior LimiteCortoInferior], 'r--', 'LineWidth', 1.2, 'HandleVisibility', 'off')
 
-    LimiteAplicableSuperior = LimitePorPunto(G, Tiempo, CurvaPositiva, FactorTiempo, +1, NumeroDeNiveles);
-    LimiteAplicableInferior = LimitePorPunto(G, Tiempo, CurvaNegativa, FactorTiempo, -1, NumeroDeNiveles);
+    LimiteAplicableSuperior = LimitePorPunto(G, Tiempo, CurvaPositiva, FactorTiempo, +1, Opciones.NumeroDeNiveles);
+    LimiteAplicableInferior = LimitePorPunto(G, Tiempo, CurvaNegativa, FactorTiempo, -1, Opciones.NumeroDeNiveles);
 
     HayAplicable = false;
     if any(~isnan(LimiteAplicableSuperior))
@@ -335,6 +341,22 @@ function GraficarGConBanda(EjeHorizontal, G, Tiempo, FactorTiempo, CurvaPositiva
     end
     if HayAplicable
         Etiquetas{end+1} = 'Limite aplicable segun la duracion del evento';
+    end
+
+    % Con factor de seguridad distinto de 1, el objetivo de diseno del modo
+    % normativo es el limite dividido por el factor: se dibuja punteado para
+    % distinguirlo de la linea roja llena, que sigue siendo la norma literal.
+    if Opciones.FactorDeSeguridad ~= 1
+        if HayAplicable
+            ObjetivoSuperior = LimiteAplicableSuperior / Opciones.FactorDeSeguridad;
+            ObjetivoInferior = LimiteAplicableInferior / Opciones.FactorDeSeguridad;
+        else
+            ObjetivoSuperior = LimiteCortoSuperior / Opciones.FactorDeSeguridad * ones(size(G));
+            ObjetivoInferior = LimiteCortoInferior / Opciones.FactorDeSeguridad * ones(size(G));
+        end
+        Trazos(end+1) = plot(EjeHorizontal, ObjetivoSuperior, ':', 'Color', [0.75 0.15 0.15], 'LineWidth', 1.4);
+        plot(EjeHorizontal, ObjetivoInferior, ':', 'Color', [0.75 0.15 0.15], 'LineWidth', 1.4, 'HandleVisibility', 'off')
+        Etiquetas{end+1} = sprintf('Objetivo de diseno: limite / FS %.2f', Opciones.FactorDeSeguridad);
     end
 
     Trazos(end+1) = plot(EjeHorizontal, G, 'LineWidth', 2);
