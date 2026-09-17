@@ -1,4 +1,4 @@
-function Limite = LimitePorPunto(G, Tiempo, Curva, FactorTiempo, Signo)
+function Limite = LimitePorPunto(G, Tiempo, Curva, FactorTiempo, Signo, NumeroDeNiveles)
 %LIMITEPORPUNTO Limite normativo aplicable en cada punto del recorrido.
 %   Para cada nodo se mide la duracion del evento sostenido que lo contiene a
 %   su propio nivel de G, se convierte a duracion equivalente del prototipo
@@ -12,11 +12,27 @@ function Limite = LimitePorPunto(G, Tiempo, Curva, FactorTiempo, Signo)
 %   entera y el otro se corta en el primer nodo que baja -- y el limite sale
 %   picado sin que eso signifique nada fisico. Con la grilla, todos los nodos
 %   de una meseta caen en el mismo nivel y el limite queda escalonado limpio.
-%   Es ademas el mismo barrido de niveles que usa el chequeo de cumplimiento,
-%   asi que grafico y verificacion dicen lo mismo.
+%
+%   DE DONDE SALE LA ESCALERA. La tabla de LimiteNormativo se interpola
+%   LINEALMENTE en la duracion, asi que la curva de la norma es continua. Lo
+%   que escalona el limite es esta cuantizacion de niveles: todos los nodos
+%   de un mismo nivel comparten un evento sostenido, y por lo tanto una
+%   duracion y un limite; al pasar al nivel siguiente la duracion salta y
+%   con ella el limite. Con pocos niveles la escalera es grosera y parece
+%   un error de interpolacion; no lo es.
+%
+%   NumeroDeNiveles es opcional. El valor por defecto, 40, es el que usa la
+%   verificacion y preserva su comportamiento. Para graficar se puede pedir
+%   una grilla mas fina (GraficarElemento usa 400): la escalera se vuelve
+%   casi continua sin cambiar el criterio, porque el chequeo de cumplimiento
+%   no pasa por aca (VerificarLimitesNormativos barre sus propios niveles).
 %
 %   Los eventos de menos de 200 ms no estan cubiertos (7.1.4.2); ahi se evalua
 %   la curva en 0.2 s, que es su extremo mas permisivo.
+
+    if nargin < 6 || isempty(NumeroDeNiveles)
+        NumeroDeNiveles = 40;
+    end
 
     H = Signo * G(:);
     Tiempo = Tiempo(:);
@@ -28,7 +44,6 @@ function Limite = LimitePorPunto(G, Tiempo, Curva, FactorTiempo, Signo)
         return
     end
 
-    NumeroDeNiveles = 40;
     Niveles = linspace(ValorMaximo/NumeroDeNiveles, ValorMaximo, NumeroDeNiveles);
 
     % Los niveles se recorren de menor a mayor, asi que cada nodo termina con
