@@ -30,8 +30,8 @@ addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'GeneradorDeElementos
 
 %% ===================== ELECCION ======================================
 % Cual de los cuatro elementos se genera y con que modo de curvatura.
-Elegido = @ElementoDiveLoop;   % @ElementoLoopVertical | @ElementoHelice
-                               % @ElementoOverBankedTurn | @ElementoDiveLoop
+Elegido = @ElementoLoopVertical;   % @ElementoLoopVertical | @ElementoHelice
+                                   % @ElementoOverBankedTurn | @ElementoDiveLoop
 
 Parametros = ParametrosPorDefecto();
 Parametros.ModoCurvatura        = 'GNormativaMaxima';   % 'Clotoide' | 'FuerzaGConstante' | 'AceleracionNormalConstante' | 'GNormativaMaxima'
@@ -47,15 +47,29 @@ Parametros.MetodoDeAcoplamiento = 'A';                  % 'A' rapido | 'B' punto
 % Ajustes.FuerzaGObjetivo           = 3.00;   % [G]     solo FuerzaGConstante
 % Ajustes.AceleracionNormalObjetivo = 20;     % [m/s^2] solo AceleracionNormalConstante
 
-% --- Parametros geometricos del elemento (ver ElementoDiveLoop() sin argumentos) ---
-% El radio cumple dos roles. En Clotoide es el radio de la heartline en el
-% arco. En los modos que dependen de v (FuerzaGConstante, GNormativaMaxima,
-% AceleracionNormalConstante) el radio real de cuspide es una SALIDA que
-% resuelve el transporte inverso, y este numero es solo la longitud
-% caracteristica de Froude: fija lambda, el presupuesto de onset y la
-% conversion de duraciones contra la norma. Conviene ponerlo cerca del que va
-% a salir; el chequeo posterior avisa si se apartan mas de un 25 %.
-Ajustes.RadioDelDiveLoop = 0.45;   % [m]
+% --- Parametros geometricos del elemento (ver ElementoXxx() sin argumentos) ---
+% Cada elemento declara su propio parametro de radio (RadioDelLoop,
+% RadioDelDiveLoop, RadioDeLaHelice, RadioDelGiro) y lo copia en
+% Parametros.RadioDeReferencia antes de llamar a ConstruirElemento. Los
+% demas parametros geometricos (separacion de patas, vueltas, peralte,
+% avance, sentido) los lista cada elemento llamado sin argumentos.
+%
+% ADVERTENCIA sobre el radio. Solo en Clotoide es geometria: el radio que la
+% heartline efectivamente toma en el arco. En los modos que dependen de v
+% (FuerzaGConstante, GNormativaMaxima, AceleracionNormalConstante) el radio
+% real es una SALIDA del transporte inverso, y este numero es unicamente la
+% longitud caracteristica de Froude: fija lambda = RadioDeReferenciaReal/R, y
+% con el sqrt(lambda), y con el TODAS las conversiones de duracion contra las
+% curvas de la norma y TODO el presupuesto de onset. Editar el radio de un
+% elemento que no es el elegido no da error -- AjustarParametros solo avisa --
+% pero el elegido sigue usando su propio radio, y si ese esta lejos del que
+% sale, los resultados normativos llevan un factor de escala equivocado.
+% Conviene ponerlo cerca del que va a salir; el chequeo posterior "Radio
+% alcanzado coherente con el nominal" avisa si se apartan mas de un 25 %.
+Ajustes.RadioDelLoop = 0.11;   % [m] @ElementoLoopVertical
+% Ajustes.RadioDelDiveLoop = 0.45;   % [m] @ElementoDiveLoop
+% Ajustes.RadioDeLaHelice  = 0.70;   % [m] @ElementoHelice
+% Ajustes.RadioDelGiro     = 0.80;   % [m] @ElementoOverBankedTurn
 
 % --- Criterios de aceptacion (ver ParametrosDeAceptacion) ---
 Ajustes.GMinimaCuspide = 0.50;   % [G] holgura de Gz en la cuspide; vale en todos los modos
