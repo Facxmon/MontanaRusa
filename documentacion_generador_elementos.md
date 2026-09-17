@@ -63,7 +63,7 @@ Ver la tabla completa en [`NOMENCLATURA.md`](NOMENCLATURA.md).
 ```matlab
 run('DemoElemento.m')         % un elemento en detalle: reporte y gráficos
 run('DemoLayout.m')           % los cuatro elementos encadenados en un circuito
-run('TestsValidacion.m')      % trece tests, termina con error si alguno falla
+run('TestsValidacion.m')      % catorce tests, termina con error si alguno falla
 ```
 
 Todos los parámetros de entrada están agrupados en [`ParametrosPorDefecto.m`](GeneradorDeElementos/ParametrosPorDefecto.m), en cuatro bloques: **parámetros del modo de curvatura**, **parámetros geométricos de cada elemento**, **criterios de aceptación** y parámetros generales. Los que dependen de investigación pendiente (disponibilidad de rodamientos en Argentina, tolerancia de la impresora) están marcados como **SIN CERRAR** ahí mismo. La tabla completa de esos parámetros, con símbolo, unidad y sección donde se usan, está en [`NOMENCLATURA.md` bloque 3](NOMENCLATURA.md#3-parámetros-de-entrada-del-generador-parametrospordefectom).
@@ -411,7 +411,7 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 
 ## 11. Tests de validación
 
-`TestsValidacion.m` implementa **trece** tests y termina con error si alguno falla. Todos pasan por la API pública de los elementos, para que lo que se verifica sea el mismo camino que usa el usuario.
+`TestsValidacion.m` implementa **catorce** tests y termina con error si alguno falla. Todos pasan por la API pública de los elementos, para que lo que se verifica sea el mismo camino que usa el usuario.
 
 | # | Test | Resultado típico |
 |---|---|---|
@@ -428,8 +428,9 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 | 11 | El riel es el eje de roll | en la transición de roll del dive loop el riel queda exactamente recto, la heartline sale con la curvatura de la hélice $d\phi'^2/(1+d^2\phi'^2)$ (0.0 % de desvío) y la $G_y$ de rotación en la cabeza es exactamente el doble que en la heartline |
 | 12 | El modo normativo pone el $+G_z$ límite en el pasajero, en los cuatro elementos | desvío máximo $\lvert G_z - G_{lim}(t)\rvert$ sobre el arco: 0.003 G (loop), 0.002 G (hélice), 0.000 G (over-banked turn, dive loop) |
 | 13 | El dive loop alcanza su $G_y$ objetivo por sub-peralte | $\lvert G_y - \text{objetivo}\rvert < 10^{-4}$ G; sub-peralte hasta 10.7°; cierre $10^{-5}$ rad; elipse 7.1.5.1 en 0.988 y onset lateral pasan |
+| 14 | El factor de seguridad escala el objetivo del modo y no la verificación (`FactorDeSeguridadNormativo` = 1.25, loop y dive loop) | $G_z$ del arco = 6.0/1.25 = 4.80 G dentro de 0.002 G; criterios de objetivo pasan; semiejes de la elipse de §7.1.5.1 sin escalar |
 
-**Nota de discrepancia doc↔código corregida.** Una versión anterior de este documento decía en prosa "los ocho son ejecutables" pero la tabla sólo listaba siete filas, sin el test de encadenamiento. Se corrigió agregando la fila que faltaba. Hoy son **trece**: los tests 9 y 10 se agregaron junto con el modelo de heartline de [§14](#14-el-modelo-de-heartline-tres-curvas), el 11 fija la hipótesis del eje de roll, el 12 es el que hubiera cazado el error de proyección de la hélice y el 13 cubre el $G_y$ del dive loop.
+**Nota de discrepancia doc↔código corregida.** Una versión anterior de este documento decía en prosa "los ocho son ejecutables" pero la tabla sólo listaba siete filas, sin el test de encadenamiento. Se corrigió agregando la fila que faltaba. Hoy son **catorce**: los tests 9 y 10 se agregaron junto con el modelo de heartline de [§14](#14-el-modelo-de-heartline-tres-curvas), el 11 fija la hipótesis del eje de roll, el 12 es el que hubiera cazado el error de proyección de la hélice y el 13 cubre el $G_y$ del dive loop; el 14 verifica que `FactorDeSeguridadNormativo` escala el objetivo del modo y no la verificación.
 
 **Test 2 excluye los nodos cuyo esquema de tres puntos cruza una frontera de sub-tramo.** Ahí $d\kappa/ds$ salta y la circunferencia por tres puntos devuelve un promedio de dos curvaturas distintas: el error sube a $4.6\times10^{-3}$. Es una limitación del estimador discreto, no de la geometría generada — y es exactamente la fragilidad que ya documenta [`documentacion_analisis_energia.md` §4](documentacion_analisis_energia.md#4-radio-de-giro-curvatura-local).
 
