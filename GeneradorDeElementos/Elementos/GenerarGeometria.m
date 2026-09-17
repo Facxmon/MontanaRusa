@@ -93,8 +93,24 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
                            VersorArribaTransporteEntrada, VersorLateralTransporteEntrada, ...
                            EstadoEntrada.Velocidad^2, 0, 0];
 
-    RollObjetivo = Beta + Receta.RollDelElemento;
-    DeltaRoll    = AjustarAngulo(RollObjetivo - EstadoEntrada.AnguloRoll);
+    % El roll que pide el elemento y cuanto hay que girar para llegar. El
+    % numero de phi es continuo entre elementos y puede traer vueltas
+    % acumuladas, asi que la diferencia cruda puede superar pi en modulo: en
+    % ese caso se envuelve a (-pi, pi] para ir por el camino corto. Si la
+    % diferencia cruda ya esta dentro de [-pi, pi] se conserva tal cual,
+    % incluido su signo en +-pi exacto (el dive loop entra con +pi y rola
+    % hacia ese lado). La transicion quintica recorre ESTE DeltaRoll, el
+    % mismo con el que se dimensiona su longitud: si recorriera la
+    % diferencia cruda sin envolver, un objetivo a -5.9 rad se haria en una
+    % longitud dimensionada para 0.37 rad y phi' saldria fuera de todo
+    % presupuesto (pasaba al encadenar tras un dive loop que sale peraltado).
+    DeltaRollCrudo = Beta + Receta.RollDelElemento - EstadoEntrada.AnguloRoll;
+    if abs(DeltaRollCrudo) <= pi + 1e-9
+        DeltaRoll = DeltaRollCrudo;
+    else
+        DeltaRoll = AjustarAngulo(DeltaRollCrudo);
+    end
+    RollObjetivo = EstadoEntrada.AnguloRoll + DeltaRoll;
 
     %% ---------------- Generacion ------------------------------------------
     % Tres lazos anidados, los tres chicos:

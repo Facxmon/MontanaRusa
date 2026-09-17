@@ -31,8 +31,13 @@ function Criterios = ChequeosPrevios(EstadoEntrada, Parametros, Receta)
         CurvaturaFueraPlano, NaN, '1/m', ...
         'Si no es nula se inserta un tramo de acondicionamiento que la lleva a cero.');
 
+    % Misma regla que GenerarGeometria: la diferencia cruda se conserva si ya
+    % esta en [-pi, pi] y se envuelve al camino corto si la supera.
     Beta = AnguloEntreNormalYTransporte(EstadoEntrada, NormalEnPlano);
-    DeltaRoll = mod(Beta + Receta.RollDelElemento - EstadoEntrada.AnguloRoll + pi, 2*pi) - pi;
+    DeltaRoll = Beta + Receta.RollDelElemento - EstadoEntrada.AnguloRoll;
+    if abs(DeltaRoll) > pi + 1e-9
+        DeltaRoll = mod(DeltaRoll + pi, 2*pi) - pi;
+    end
     Criterios = AgregarCriterio(Criterios, 'Roll de entrada compatible', 'Informativo', ...
         rad2deg(DeltaRoll), NaN, 'grados', ...
         'Si no es cero se inserta una transicion de roll con smoothstep quintico.');
