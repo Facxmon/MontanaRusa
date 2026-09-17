@@ -564,15 +564,27 @@ function Normal = NormalDelPlanoVertical(VersorTangente)
 end
 
 function [AnguloRoll, VelocidadRoll, AceleracionRoll] = PerfilRollDelElemento(Arco, AnguloGirado, EstadoEntrada, RollBase, LongitudAcondicionamiento, Inclinacion)
-%PERFILROLLDELLOOP Roll del elemento: transicion quintica al roll del loop y,
-%   encima de eso, la parte helicoidal proporcional al angulo ya girado.
+%PERFILROLLDELELEMENTO Roll del elemento: transicion quintica al roll del
+%   elemento y, encima de eso, la parte helicoidal proporcional al angulo ya
+%   girado.
 %
-%   Que el numero del roll avance NO es un peralte agregado: el roll se mide
-%   contra el marco de transporte, que gira respecto de la normal de la curva
-%   a razon de la torsion. Seguir esa misma razon es exactamente mantener el
-%   eje "arriba" del carro alineado con el vector curvatura, que es la
-%   orientacion natural. Por eso el carro sale del loop derecho aunque el
-%   numero de phi no termine en cero.
+%   phi se mide contra el marco de transporte paralelo (Bishop). En una curva
+%   PLANA la torsion es nula, el transporte paralelo coincide con Frenet y
+%   phi es CONSTANTE: un loop con Inclinacion = 0 entra y sale con el mismo
+%   numero de phi, y el eje "arriba" del carro queda alineado con el vector
+%   curvatura sin que phi tenga que moverse. phi crece UNICAMENTE por el
+%   termino Inclinacion*AnguloGirado, o sea por la torsion que introduce la
+%   inclinacion helicoidal (la que impone SeparacionDePatas): el marco de
+%   transporte gira respecto de la normal de la curva a razon de la torsion,
+%   kappa*tan(alfa), y seguir esa misma razon es exactamente mantener U
+%   alineado con la curvatura. Ese avance de phi NO es un peralte agregado,
+%   y por eso el carro sale del loop derecho (peralte cero) aunque el numero
+%   de phi no termine donde empezo.
+%
+%   La pendiente de phi respecto del giro acumulado es tan(alfa):
+%       dphi/dtheta = Inclinacion = Diagnostico.InclinacionHelicoidal,
+%   contrastable directamente en el grafico "Perfil de roll" (phi contra
+%   AnguloGirado) o en el reporte, que imprime la inclinacion y su angulo.
 %
 %   La derivada de la parte helicoidal la completa DerivadaDeVia, que es donde
 %   recien se conoce la curvatura: dphi/ds = kappa*tan(alfa).
