@@ -1,3 +1,5 @@
 layout_*.mat
 layout_*.json
 esquema/node_modules/
+web/node_modules/
+web/dist/

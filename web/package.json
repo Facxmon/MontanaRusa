@@ -1,0 +1,25 @@
+{
+  "name": "montanarusa-visualizador",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Visualizador web del contrato de layout (CONTRATO_VISUALIZADOR.md): lee golden/*.json y dibuja la via en 3D",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "tipos": "node scripts/generar-tipos.mjs"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/three": "^0.170.0",
+    "json-schema-to-typescript": "^15.0.3",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0"
+  }
+}
