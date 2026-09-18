@@ -189,16 +189,19 @@ function Criterios = CriterioDeObjetivoDeG(Criterios, Track, Sim, Diagnostico, R
             Objetivo = Parametros.FuerzaGObjetivo * ones(numel(Rango), 1);
             Detalle  = sprintf('FuerzaGObjetivo = %.2f G', Parametros.FuerzaGObjetivo);
         case 'GNormativaMaxima'
-            % Misma definicion de duracion que el modo: desde el inicio del
-            % arco. Y la misma curva de diseno (quiebres redondeados,
-            % LimiteDeDiseno) con el mismo factor de seguridad: el objetivo
-            % que se reconstruye aca es el de diseno, no la norma literal, o
-            % el criterio fallaria de forma espuria.
+            % El objetivo es exactamente la tabla que el modo persiguio
+            % (Track.ObjetivoNormativo, de ObjetivoNormativoPorNiveles): la
+            % curva de diseno con los quiebres redondeados, el factor de
+            % seguridad, TolObjetivoDeG descontada y el reloj de cada nivel
+            % arrancando donde la rampa lo cruzo. Reconstruirla desde la
+            % norma literal con un reloj unico desde el arco fallaria de
+            % forma espuria.
             FactorDeSeguridad = Parametros.FactorDeSeguridadNormativo;
             Semiancho = Parametros.SemianchoDeSuavizadoNormativo;
             DuracionReal = (Sim.Tiempo(Rango) - Sim.Tiempo(Rango(1))) * Diagnostico.Escala.RaizLambdaLoop;
-            Objetivo = LimiteDeDiseno(Receta.CurvaLimiteGz, DuracionReal, Semiancho) / FactorDeSeguridad;
-            Detalle  = sprintf('curva %s / FS %.2f, de %.2f a %.2f G a lo largo del arco (%.2f s reales)', ...
+            Objetivo = EvaluarObjetivoNormativo(Track.ObjetivoNormativo, Sim.Tiempo(Rango));
+            Detalle  = sprintf(['curva %s / FS %.2f menos TolObjetivoDeG, reloj por nivel: ' ...
+                                'de %.2f a %.2f G a lo largo del arco (%.2f s reales)'], ...
                                Receta.CurvaLimiteGz, FactorDeSeguridad, Objetivo(1), Objetivo(end), DuracionReal(end));
         otherwise
             return

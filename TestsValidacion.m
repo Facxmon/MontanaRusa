@@ -322,8 +322,11 @@ Resultados = Anotar(Resultados, 'El riel es el eje de roll', ...
 
 %% --- Test 12: el modo normativo pone el +Gz limite en el pasajero -------
 % En los cuatro elementos, sobre el arco principal, la Gz del punto de
-% verificacion tiene que coincidir con la curva limite de la Receta evaluada
-% en la duracion desde el inicio del arco (x sqrt(lambda)). Es el test que
+% verificacion tiene que coincidir con el objetivo que el modo persiguio
+% (Track.ObjetivoNormativo: la curva limite de la Receta con el reloj de
+% cada nivel, ver ObjetivoNormativoPorNiveles), y ese objetivo tiene que
+% arrancar en el nivel de evento corto de la curva menos TolObjetivoDeG y
+% no superarlo nunca. Es el test que
 % hubiera cazado el error de proyeccion de la helice: con la curvatura
 % horizontal y el carro peraltado beta, imponer la G sobre el eje de la
 % curvatura en vez de sobre U le erraba al objetivo por 1/sin(beta).
@@ -350,8 +353,12 @@ for i = 1:numel(Constructores)
     end
     RangoArco  = TrackN.SubTramos(IndiceArco).IndiceInicio : TrackN.SubTramos(IndiceArco).IndiceFin;
     DuracionReal = (SimN.Tiempo(RangoArco) - SimN.Tiempo(RangoArco(1))) * ElementoNormativo.Diagnostico.Escala.RaizLambdaLoop;
-    Objetivo = LimiteDeDiseno(ElementoNormativo.Receta.CurvaLimiteGz, DuracionReal, Parametros.SemianchoDeSuavizadoNormativo);
+    Objetivo = EvaluarObjetivoNormativo(TrackN.ObjetivoNormativo, SimN.Tiempo(RangoArco));
+    NivelCorto = LimiteDeDiseno(ElementoNormativo.Receta.CurvaLimiteGz, 0.2, Parametros.SemianchoDeSuavizadoNormativo) - Parametros.TolObjetivoDeG;
     Desvio = max(abs(SimN.Gz(RangoArco) - Objetivo));
+    if abs(Objetivo(1) - NivelCorto) > 0.011 || max(Objetivo) > NivelCorto + 1e-9
+        Desvio = Inf;   % el objetivo no arranca en el nivel de evento corto menos la tolerancia
+    end
     PeorDesvio = max(PeorDesvio, Desvio);
     Criterio = ReporteNormativo.Posteriores(strcmp({ReporteNormativo.Posteriores.Nombre}, 'Gz objetivo del modo alcanzado'));
     CriteriosDeObjetivo = CriteriosDeObjetivo && ~isempty(Criterio) && Criterio.Pasa;
@@ -381,7 +388,9 @@ TrackGy = ElementoGy.Track;  SimGy = ElementoGy.Sim;  RecetaGy = ElementoGy.Rece
 IndiceArco = find(strcmp({TrackGy.SubTramos.Nombre}, 'ArcoPrincipal'), 1);
 RangoArco  = TrackGy.SubTramos(IndiceArco).IndiceInicio : TrackGy.SubTramos(IndiceArco).IndiceFin;
 DuracionReal = (SimGy.Tiempo(RangoArco) - SimGy.Tiempo(RangoArco(1))) * ElementoGy.Diagnostico.Escala.RaizLambdaLoop;
-GzLimite = LimiteDeDiseno(RecetaGy.CurvaLimiteGz, DuracionReal, Parametros.SemianchoDeSuavizadoNormativo);
+% El Gz que entra en la elipse es el que el modo persiguio (con el reloj por
+% nivel y TolObjetivoDeG descontada), no la curva literal.
+GzLimite = EvaluarObjetivoNormativo(TrackGy.ObjetivoNormativo, SimGy.Tiempo(RangoArco));
 SemiejeGz = 1.1*LimiteNormativo(RecetaGy.CurvaLimiteGz, 0.2);
 SemiejeGy = 1.1*LimiteNormativo(RecetaGy.CurvaLimiteGy, 0.2);
 GyObjetivo = RecetaGy.SentidoDeGy * (min(LimiteDeDiseno(RecetaGy.CurvaLimiteGy, DuracionReal, Parametros.SemianchoDeSuavizadoNormativo), ...
@@ -405,8 +414,8 @@ Resultados = Anotar(Resultados, 'El dive loop alcanza su Gy objetivo por sub-per
 
 %% --- Test 14: el factor de seguridad escala el objetivo y no la verificacion
 % Con FactorDeSeguridadNormativo > 1 el modo normativo tiene que poner en el
-% pasajero la curva de la norma DIVIDIDA por el factor (y en el dive loop
-% tambien el Gy, con la elipse entera escalada), el criterio "objetivo
+% pasajero la curva de la norma DIVIDIDA por el factor, menos TolObjetivoDeG
+% (y en el dive loop tambien el Gy, con la elipse entera escalada), el criterio "objetivo
 % alcanzado" tiene que reconstruir el mismo objetivo y pasar, y la
 % verificacion de cumplimiento tiene que seguir comparando contra la norma
 % literal: los semiejes de la elipse de 7.1.5.1 no se mueven. Los tests 12
@@ -427,8 +436,13 @@ for i = 1:numel(Constructores)
     IndiceArco = find(strcmp({TrackFS.SubTramos.Nombre}, 'ArcoPrincipal'), 1);
     RangoArco  = TrackFS.SubTramos(IndiceArco).IndiceInicio : TrackFS.SubTramos(IndiceArco).IndiceFin;
     DuracionReal = (SimFS.Tiempo(RangoArco) - SimFS.Tiempo(RangoArco(1))) * ElementoFS.Diagnostico.Escala.RaizLambdaLoop;
-    ObjetivoFS = LimiteDeDiseno(RecetaFS.CurvaLimiteGz, DuracionReal, Parametros.SemianchoDeSuavizadoNormativo) / Parametros.FactorDeSeguridadNormativo;
+    ObjetivoFS = EvaluarObjetivoNormativo(TrackFS.ObjetivoNormativo, SimFS.Tiempo(RangoArco));
+    NivelCortoFS = LimiteDeDiseno(RecetaFS.CurvaLimiteGz, 0.2, Parametros.SemianchoDeSuavizadoNormativo) / Parametros.FactorDeSeguridadNormativo ...
+                 - Parametros.TolObjetivoDeG;
     DesvioFS = max(abs(SimFS.Gz(RangoArco) - ObjetivoFS));
+    if abs(ObjetivoFS(1) - NivelCortoFS) > 0.011 || max(ObjetivoFS) > NivelCortoFS + 1e-9
+        DesvioFS = Inf;   % el objetivo no arranca en (limite de 200 ms) / FS menos la tolerancia
+    end
     PeorDesvioFS = max(PeorDesvioFS, DesvioFS);
 
     NombresFS = {ReporteFS.Posteriores.Nombre};
@@ -507,6 +521,44 @@ Resultados = Anotar(Resultados, 'El diseno es C2 en roll: objetivo C1 y onset la
              'cae a %.2f al refinar la grilla a la mitad (0.5 = C1, 1 = quiebre; limite 0.7); ' ...
              'onset lateral del loop %.1f G/s a 2 mm y %.1f G/s a 1 mm (%.0f %% de variacion, limite 15 %%)'], ...
             ExcesoSobreLaNorma, RazonDeSaltos, OnsetPorPaso(1), OnsetPorPaso(2), 100*VariacionRelativa));
+
+%% --- Test 16: el loop normativo cumple +Gz (Fig. 10) y el peralte no salta
+% Dos bugs que convivian en el loop vertical de DemoElemento. (a) El modo
+% contaba la duracion desde el inicio del arco con un reloj unico, y la
+% verificacion mide cada evento sostenido por nivel desde que la G lo cruza
+% en la clotoide: el criterio "+Gz (Fig. 10)" fallaba por 0.36 G sobre la
+% misma G que el modo habia pedido. Con el reloj por nivel
+% (ObjetivoNormativoPorNiveles) tiene que pasar, y ademas ningun nodo del
+% elemento puede superar el nivel de evento corto de la curva: el margen
+% TolObjetivoDeG queda entero. (b) El peralte contra la vertical vive en
+% (-pi, pi] y en la cuspide el signo lo decidia el ruido: el grafico
+% saltaba de +180 a -180. En modulo, que es lo que se dibuja, la curva
+% tiene que ser continua nodo a nodo (el paso mas grande es la propia
+% rotacion de la referencia al pasar por la vertical, unos pocos grados).
+Parametros = ParametrosBase;
+Parametros.RadioDelLoop  = 0.11;
+Parametros.ModoCurvatura = 'GNormativaMaxima';
+Estado = EstadoInicial([0 0 1.0], [1 0 0], [0 0 1], 4.6, Parametros);
+[~, ElementoLoop, ReporteLoop] = ElementoLoopVertical(Estado, Parametros);
+CriterioMasGz = ReporteLoop.Posteriores(strcmp({ReporteLoop.Posteriores.Nombre}, '+Gz (Fig. 10)'));
+NivelCortoLiteral = LimiteNormativo(ElementoLoop.Receta.CurvaLimiteGz, 0.2);
+GzMaximaLoop = max(ElementoLoop.Sim.Gz);
+PeralteModulo = rad2deg(abs(ElementoLoop.Track.AnguloPeralte));
+PeralteModulo = PeralteModulo(~isnan(PeralteModulo));
+SaltoDePeralte = max(abs(diff(PeralteModulo)));
+ArcoLoop = ElementoLoop.Track.SubTramos(strcmp({ElementoLoop.Track.SubTramos.Nombre}, 'ArcoPrincipal'));
+DuracionArcoLoop = (ElementoLoop.Sim.Tiempo(ArcoLoop.IndiceFin) - ElementoLoop.Sim.Tiempo(ArcoLoop.IndiceInicio)) ...
+                 * ElementoLoop.Diagnostico.Escala.RaizLambdaLoop;
+
+Resultados = Anotar(Resultados, 'El loop normativo cumple +Gz (Fig. 10) y su peralte en modulo es continuo', ...
+    CriterioMasGz.Pasa && CriterioMasGz.Valor < -0.5*Parametros.TolObjetivoDeG ...
+    && GzMaximaLoop < NivelCortoLiteral - 0.5*Parametros.TolObjetivoDeG && DuracionArcoLoop > 2.0 ...
+    && SaltoDePeralte < 10 && max(PeralteModulo) > 170, ...
+    sprintf(['+Gz (Fig. 10): exceso %.4f G (nivel critico %.2f G, %.2f s reales; tiene que ser menor que -%.3f); ' ...
+             'Gz maxima %.4f G contra %.1f G de evento corto; arco de %.2f s reales; ' ...
+             '|peralte| llega a %.1f grados y su salto maximo entre nodos es %.2f grados (limite 10)'], ...
+            CriterioMasGz.Valor, ReporteLoop.Normativo.MasGz.NivelCritico, ReporteLoop.Normativo.MasGz.DuracionReal, 0.5*Parametros.TolObjetivoDeG, ...
+            GzMaximaLoop, NivelCortoLiteral, DuracionArcoLoop, max(PeralteModulo), SaltoDePeralte));
 
 %% --- Resumen ----------------------------------------------------------
 fprintf('\n');

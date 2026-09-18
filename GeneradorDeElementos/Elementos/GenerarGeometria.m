@@ -225,6 +225,7 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
     Track.PasoGeneracion          = Parametros.PasoGeneracion;
     Track.NormalDelPlano          = NormalEnPlano;
     Track.InclinacionHelicoidal   = Inclinacion;
+    Track.ObjetivoNormativo       = Recorrido.ObjetivoNormativo;   % Gz(t) que persiguio el modo normativo; [] en los otros modos
     Track.AnguloPeralte           = AnguloDePeralte(Registro.VersorTangente, Registro.VersorArribaCarro);
     % Angulo de la curvatura del riel medido desde U hacia L en el marco del
     % carro. En loop y dive loop es 0 salvo donde el modo lo desalinea a
@@ -332,6 +333,7 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     Recorrido.ResidualCierre              = 0;
     Recorrido.DesplazamientoLateral       = 0;
     Recorrido.LongitudDelGiro             = 0;
+    Recorrido.ObjetivoNormativo           = [];   % tabla del modo normativo, la fija el arco
     Recorrido.NormalArco      = Plan.NormalEnPlano;
     Recorrido.TangenteArco    = Plan.EstadoEntrada.VersorTangente;
     Recorrido.PosicionArco    = Plan.EstadoEntrada.Posicion;
@@ -424,16 +426,16 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
         CurvaturaObjetivo*sin(AnguloObjetivo) - CurvaturaInicialArco*sin(AnguloInicial), Plan.Onset, Parametros);
     Recorrido.LongitudClotoideEntrada = LongitudEntrada;
 
-    % La rampa apunta a la curvatura del modo con duracion CERO: el modo
-    % normativo trata el arco como un unico evento sostenido que empieza al
-    % arrancar el arco, asi que durante la rampa el objetivo es el limite de
-    % evento corto, el mismo que el arco va a pedir en su primer punto. Si
-    % el reloj de la rampa arrancara en su propio inicio (como antes), una
-    % rampa de mas de 1.0 s de prototipo -- la helice a 6 m/s la tiene --
-    % veria bajar la curva de la norma y la curvatura saltaria hacia arriba
-    % al arrancar el arco: una rotura C0, no de dkappa/ds. Con la referencia
-    % en +Inf la duracion queda en cero en toda la rampa (CurvaturaDelModo
-    % la acota por abajo) y el empalme con el arco es exacto.
+    % La rampa apunta a la curvatura del modo con duracion CERO: el nivel
+    % de evento corto, que es el que la tabla por niveles del arco va a
+    % pedir en su primer punto (el nivel maximo se cruza recien al terminar
+    % la rampa, y su meseta arranca ahi). Si el reloj de la rampa arrancara
+    % en su propio inicio, una rampa de mas de 1.0 s de prototipo -- la
+    % helice a 6 m/s la tiene -- veria bajar la curva de la norma y la
+    % curvatura saltaria hacia arriba al arrancar el arco: una rotura C0,
+    % no de dkappa/ds. Con la referencia en +Inf la duracion queda en cero
+    % en toda la rampa (CurvaturaDelModo la acota por abajo) y el empalme
+    % con el arco es exacto.
     ArcoInicio = Arco;
     TiempoReferenciaRampa = Inf;
     Contexto.FuncionCurvatura = @(Punto) MezclaDeClotoide(Punto, ArcoInicio, LongitudEntrada, ...
@@ -450,8 +452,20 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     end
 
     %% --- ArcoLoop ---
-    TiempoReferenciaArco = y(15);
-    Contexto.FuncionCurvatura = @(Punto) CurvaturaDelModoProyectada(Punto, Plan, TiempoReferenciaArco);
+    % El modo normativo no cuenta la duracion desde aca con un reloj unico:
+    % cada nivel de G arranca el suyo donde la G registrada hasta ahora
+    % (acondicionamiento y rampa) lo cruzo, que es como la verificacion
+    % posterior mide cada evento sostenido (ObjetivoNormativoPorNiveles).
+    if strcmp(Parametros.ModoCurvatura, 'GNormativaMaxima')
+        NodosPrevios = 1:Recorrido.Registro.NumeroDeNodos;
+        RelojArco = ObjetivoNormativoPorNiveles(Plan.Receta.CurvaLimiteGz, ...
+            Recorrido.Registro.Tiempo(NodosPrevios), Recorrido.Registro.GArribaVerificacion(NodosPrevios), ...
+            y(15), Plan.Escala, Parametros);
+        Recorrido.ObjetivoNormativo = RelojArco;
+    else
+        RelojArco = y(15);
+    end
+    Contexto.FuncionCurvatura = @(Punto) CurvaturaDelModoProyectada(Punto, Plan, RelojArco);
 
     % La rampa de salida arranca con la pendiente dkappa/ds que traiga el
     % arco (rampa de Hermite, ver RampaDeSalida), y su giro depende de esa

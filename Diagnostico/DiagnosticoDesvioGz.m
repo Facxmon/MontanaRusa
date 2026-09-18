@@ -73,7 +73,7 @@ for c = 1:numel(Constructores)
     % (CriterioDeObjetivoDeG) y se compara con lo que el reporte informa: si
     % los dos numeros no coinciden, el criterio esta mal tomado.
     DuracionReal = (Sim.Tiempo(Rango) - Sim.Tiempo(Rango(1))) * Diag.Escala.RaizLambdaLoop;
-    Objetivo     = LimiteDeDiseno(Receta.CurvaLimiteGz, DuracionReal, Parametros.SemianchoDeSuavizadoNormativo);
+    Objetivo     = EvaluarObjetivoNormativo(Track.ObjetivoNormativo, Sim.Tiempo(Rango));
     DesvioMedido = max(abs(Sim.Gz(Rango) - Objetivo));
     [GzMaxima, NodoMaximo] = max(Sim.Gz);
 
@@ -109,18 +109,13 @@ for c = 1:numel(Constructores)
     end
     fprintf('  Gz en el nodo de maximo: %.4f G; objetivo ahi: %.4f G; diferencia %+.4f G\n', ...
             GzMaxima, ObjetivoEnNodo(NodoMaximo, Rango, Objetivo), GzMaxima - ObjetivoEnNodo(NodoMaximo, Rango, Objetivo));
-    % Que pasaria si el reloj arrancara en la clotoide de entrada, que es
-    % donde la verificacion posterior empieza a contar el evento sostenido.
-    IndiceClotoide = find(strcmp({Track.SubTramos.Nombre}, 'ClotoideEntrada'), 1);
-    if ~isempty(IndiceClotoide)
-        TiempoClotoide = Sim.Tiempo(Track.SubTramos(IndiceClotoide).IndiceInicio);
-        DuracionDesdeClotoide = (Sim.Tiempo(Rango) - TiempoClotoide) * Diag.Escala.RaizLambdaLoop;
-        ObjetivoDesdeClotoide = LimiteDeDiseno(Receta.CurvaLimiteGz, DuracionDesdeClotoide, Parametros.SemianchoDeSuavizadoNormativo);
-        fprintf('  Si el reloj arrancara en la clotoide de entrada (%.3f s reales antes), el objetivo\n', ...
-                DuracionDesdeClotoide(1));
-        fprintf('  cambiaria hasta %.4f G respecto del que uso el modo (H3 alternativa).\n', ...
-                max(abs(ObjetivoDesdeClotoide - Objetivo)));
-    end
+    % Cuanto le costo al objetivo el reloj por nivel respecto del reloj
+    % unico desde el arco que usaba antes el modo (y que la verificacion
+    % por nivel cobraba con 0.36 G de exceso en este loop).
+    ObjetivoRelojUnico = LimiteDeDiseno(Receta.CurvaLimiteGz, DuracionReal, Parametros.SemianchoDeSuavizadoNormativo) ...
+                       / Parametros.FactorDeSeguridadNormativo - Parametros.TolObjetivoDeG;
+    fprintf('  Reloj por nivel contra reloj unico desde el arco (misma curva, FS y tolerancia): el objetivo\n');
+    fprintf('  queda hasta %.4f G mas abajo (H3, reloj).\n', max(ObjetivoRelojUnico - Objetivo));
 
     %% ---------------- H1. phi'' de diseno contra phi'' medido --------------
     % phi'' de diseno: solo la transicion quintica, que es lo unico que
@@ -194,7 +189,7 @@ for c = 1:numel(Constructores)
     RangoB = TrackB.SubTramos(IndiceArcoB).IndiceInicio : TrackB.SubTramos(IndiceArcoB).IndiceFin;
     RangoB = RangoB(~isnan(SimB.Gz(RangoB)));
     DuracionRealB = (SimB.Tiempo(RangoB) - SimB.Tiempo(RangoB(1))) * ElementoB.Diagnostico.Escala.RaizLambdaLoop;
-    ObjetivoB = LimiteDeDiseno(Receta.CurvaLimiteGz, DuracionRealB, Parametros.SemianchoDeSuavizadoNormativo);
+    ObjetivoB = EvaluarObjetivoNormativo(TrackB.ObjetivoNormativo, SimB.Tiempo(RangoB));
     H4.DesvioB   = max(abs(SimB.Gz(RangoB) - ObjetivoB));
     H4.GzMaximaB = max(SimB.Gz);
     [ArcoBUnico, IndicesUnicos] = unique(TrackB.LongitudArco, 'stable');

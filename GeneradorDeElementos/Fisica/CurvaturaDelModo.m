@@ -1,4 +1,4 @@
-function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Escala, ArcoTiempoDeReferencia, Receta)
+function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Escala, Reloj, Receta)
 %CURVATURADELMODO Curvatura del RIEL que pide el modo elegido en un punto del arco.
 %   Devuelve el modulo de la curvatura del riel y el angulo, medido desde U
 %   hacia L en el plano normal del carro, en el que hay que ponerla. Los modos
@@ -43,13 +43,17 @@ function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Es
 %   maxima. Eso es lo que da la forma de lagrima del loop clotoide real. Si
 %   sale un circulo, hay error.
 %
-%   GNormativaMaxima sigue el tiempo desde el comienzo del arco, lo convierte
-%   a duracion del prototipo (x sqrt(lambda)) y pide en cada punto el +Gz de
-%   la curva limite para esa duracion: el arco entero se trata como un unico
-%   evento sostenido que empieza al arrancar el arco. La verificacion
-%   posterior mide en cambio la duracion de cada evento sostenido por nivel,
-%   que arranca en la clotoide de entrada: la diferencia esta cuantificada en
-%   documentacion_generador_elementos.md, seccion 5, y no se corrige aca.
+%   GNormativaMaxima pide en cada punto el +Gz de la curva limite para la
+%   duracion del evento sostenido. Reloj dice como se mide esa duracion:
+%     - numerico: instante del modelo desde el que se cuenta (x sqrt(lambda)
+%       para entrar a la curva). Con Inf la duracion es cero: es lo que usa
+%       la rampa de entrada, que apunta al nivel de evento corto.
+%     - struct de ObjetivoNormativoPorNiveles: la tabla del arco, con el
+%       reloj de cada nivel arrancando donde la G registrada antes del arco
+%       lo cruzo. Es lo que hace que la verificacion por nivel de
+%       VerificarLimitesNormativos cierre con lo que el modo diseno.
+%   En los dos casos el objetivo lleva descontado TolObjetivoDeG, el error
+%   que el chequeo posterior le tolera al transporte inverso.
 %
 %   El limite que persigue va dividido por Parametros.FactorDeSeguridadNormativo:
 %   es el objetivo de DISENO, con margen. El factor se aplica aca y en el
@@ -87,13 +91,21 @@ function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Es
                      ['El modo GNormativaMaxima necesita Receta.CurvaLimiteGz: cada elemento ' ...
                       'declara que curva de la norma persigue (ver ElementoLoopVertical y companeros).']);
             end
-            DuracionModelo = max(Punto.Tiempo - ArcoTiempoDeReferencia, 0);
-            DuracionReal   = DuracionModelo * Escala.RaizLambdaLoop;
             % Objetivo de diseno: la curva de la norma con los quiebres
-            % redondeados por debajo (LimiteDeDiseno) y el margen del factor.
+            % redondeados por debajo (LimiteDeDiseno), el margen del factor
+            % y la tolerancia del chequeo posterior descontada.
             FactorDeSeguridad = Parametros.FactorDeSeguridadNormativo;
             Semiancho = Parametros.SemianchoDeSuavizadoNormativo;
-            GLimite = LimiteDeDiseno(Receta.CurvaLimiteGz, DuracionReal, Semiancho) / FactorDeSeguridad;
+            if isstruct(Reloj)
+                % Arco: la tabla por niveles ya trae el factor y el margen.
+                % La duracion desde el arco solo la usa la curva de Gy.
+                GLimite      = EvaluarObjetivoNormativo(Reloj, Punto.Tiempo);
+                DuracionReal = max(Punto.Tiempo - Reloj.TiempoInicioArco, 0) * Escala.RaizLambdaLoop;
+            else
+                DuracionReal = max(Punto.Tiempo - Reloj, 0) * Escala.RaizLambdaLoop;
+                GLimite = LimiteDeDiseno(Receta.CurvaLimiteGz, DuracionReal, Semiancho) / FactorDeSeguridad ...
+                        - Parametros.TolObjetivoDeG;
+            end
             ObjetivoSinGravedad = g*(GLimite - ArribaVertical) / VelocidadCentroDeMasa^2;
 
             if isfield(Receta, 'CurvaLimiteGy') && ~isempty(Receta.CurvaLimiteGy)
@@ -134,8 +146,9 @@ function GyObjetivo = ObjetivoDeGyDentroDeLaElipse(GzLimite, DuracionReal, Recet
 %   multiplicados por 1.1, igual que en VerificarLimitesNormativos. El lado
 %   lo fija Receta.SentidoDeGy (+1 hacia el versor lateral del carro).
 %
-%   GzLimite llega ya dividido por el factor de seguridad, y aca se dividen
-%   tambien los dos semiejes y la curva de Gy: la elipse entera se escala y
+%   GzLimite llega ya dividido por el factor de seguridad (y con la
+%   tolerancia descontada: es el Gz que de verdad va a haber), y aca se
+%   dividen tambien los dos semiejes y la curva de Gy: la elipse entera se escala y
 %   el Gy objetivo queda con el mismo margen que el Gz. Dividir solo el Gz
 %   dejaria la elipse sin escalar y el Gy objetivo inconsistente. La curva
 %   de Gy es la de diseno (quiebres redondeados, LimiteDeDiseno); los

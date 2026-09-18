@@ -126,7 +126,10 @@ Parametros.PuntoDeVerificacionNormativa = 'Heartline';
 Parametros.OnsetNormativoPorEje = [5, 5, 15];   % [G/s] reales
 Parametros.OnsetMaximoModelo    = [];           % [G/s] override directo; vacio = derivar de Froude
 
-Parametros.TolObjetivoDeG = 0.05;    % [G] desvio admitido entre la G del pasajero y la que pidio el modo
+% El modo normativo descuenta esta tolerancia de su objetivo de Gz (y del Gy del
+% dive loop): si el pasajero recibio el objetivo dentro de la tolerancia, esta
+% dentro de la norma. Achicarla acerca la meseta del loop a los 6.0 G literales.
+Parametros.TolObjetivoDeG = 0.05;    % [G] desvio admitido entre la G del pasajero y la que pidio el modo; se descuenta del objetivo
 Parametros.TolCierrePitch = 1e-4;    % [rad] residual de cierre admitido en el giro objetivo
 
 % Factor de seguridad sobre la curva de la norma que persigue el modo

@@ -66,7 +66,7 @@ Parametros.MetodoDeAcoplamiento = 'A';                  % 'A' rapido | 'B' punto
 % sale, los resultados normativos llevan un factor de escala equivocado.
 % Conviene ponerlo cerca del que va a salir; el chequeo posterior "Radio
 % alcanzado coherente con el nominal" avisa si se apartan mas de un 25 %.
-Ajustes.RadioDelLoop = 0.11;   % [m] @ElementoLoopVertical
+Ajustes.RadioDelLoop = 0.14;   % [m] @ElementoLoopVertical: el que sale a 4.6 m/s en modo normativo (0.138 m)
 % Ajustes.RadioDelDiveLoop = 0.45;   % [m] @ElementoDiveLoop
 % Ajustes.RadioDeLaHelice  = 0.70;   % [m] @ElementoHelice
 % Ajustes.RadioDelGiro     = 0.80;   % [m] @ElementoOverBankedTurn

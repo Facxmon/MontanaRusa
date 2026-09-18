@@ -277,7 +277,20 @@ function GraficarGPorEje(EjeHorizontal, EtiquetaEje, Sim, Track, FactorTiempo, C
     ylabel('G_y [G]'); title('G_y -- limite Fig. 8')
 
     subplot(3,1,3)
-    GraficarGConBanda(EjeHorizontal, Sim.Gz, Sim.Tiempo, FactorTiempo, CurvaMasGz, 'MenosGzBase', Track, Opciones);
+    % En el modo normativo se superpone el Gz que el modo persiguio en el
+    % arco (Track.ObjetivoNormativo): con el reloj de cada nivel, el factor
+    % de seguridad y TolObjetivoDeG descontada, queda por debajo de la
+    % linea roja en todo el arco, y la distancia entre las dos es el margen.
+    OpcionesGz = Opciones;
+    if isfield(Track, 'ObjetivoNormativo') && ~isempty(Track.ObjetivoNormativo)
+        IndiceArco = find(strcmp({Track.SubTramos.Nombre}, 'ArcoPrincipal'), 1);
+        if ~isempty(IndiceArco)
+            RangoArco = RangoDelSubTramo(Track, IndiceArco);
+            OpcionesGz.ObjetivoGz = nan(size(Sim.Gz));
+            OpcionesGz.ObjetivoGz(RangoArco) = EvaluarObjetivoNormativo(Track.ObjetivoNormativo, Sim.Tiempo(RangoArco));
+        end
+    end
+    GraficarGConBanda(EjeHorizontal, Sim.Gz, Sim.Tiempo, FactorTiempo, CurvaMasGz, 'MenosGzBase', Track, OpcionesGz);
     ylabel('G_z [G]'); xlabel(EtiquetaEje)
     title(sprintf('G_z -- limites Figs. 9 y 10 (curva +G_z aplicada: %s)', CurvaMasGz))
 end
@@ -362,6 +375,14 @@ function GraficarGConBanda(EjeHorizontal, G, Tiempo, FactorTiempo, CurvaPositiva
         Trazos(end+1) = plot(EjeHorizontal, ObjetivoSuperior, ':', 'Color', [0.75 0.15 0.15], 'LineWidth', 1.4);
         plot(EjeHorizontal, ObjetivoInferior, ':', 'Color', [0.75 0.15 0.15], 'LineWidth', 1.4, 'HandleVisibility', 'off')
         Etiquetas{end+1} = sprintf('Objetivo de diseno: limite / FS %.2f', Opciones.FactorDeSeguridad);
+    end
+
+    % Gz objetivo del modo normativo en el arco, tal como lo persiguio
+    % (ver GraficarGPorEje). Se dibuja aunque FS = 1: el reloj por nivel y
+    % la tolerancia descontada lo separan de la linea roja.
+    if isfield(Opciones, 'ObjetivoGz') && any(~isnan(Opciones.ObjetivoGz))
+        Trazos(end+1) = plot(EjeHorizontal, Opciones.ObjetivoGz, '--', 'Color', [0.35 0.35 0.35], 'LineWidth', 1.4);
+        Etiquetas{end+1} = 'Gz objetivo del modo normativo (reloj por nivel, / FS, menos TolObjetivoDeG)';
     end
 
     Trazos(end+1) = plot(EjeHorizontal, G, 'LineWidth', 2);
