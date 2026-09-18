@@ -107,7 +107,7 @@ El export redondea a 6 cifras significativas. A escala de modelo eso es del orde
 recorta el archivo de forma sustancial.
 
 **Tamaño medido** (`golden/circuito-demolayout.json`, 4 elementos, 6880 nodos, JSON compacto,
-commit `218f5a9`): **2 195 913 bytes crudo, 734 669 bytes con gzip -6** (733 862 con `-9`). Son
+commit `0517a37`): **2 199 944 bytes crudo, 735 868 bytes con gzip -6** (735 014 con `-9`). Son
 ~313 bytes por nodo crudos y ~107 gzipeados. El 98 % del archivo son los `nodos`; los tres versores
 solos pesan 654 kB crudos (30 %), que es exactamente el costo que §1.5 acepta en v1. Los elementos
 sueltos pesan entre 406 kB (`loop-normativa`) y 962 kB (`helice-clotoide`) crudos, 154–331 kB
