@@ -190,12 +190,14 @@ function Criterios = CriterioDeObjetivoDeG(Criterios, Track, Sim, Diagnostico, R
             Detalle  = sprintf('FuerzaGObjetivo = %.2f G', Parametros.FuerzaGObjetivo);
         case 'GNormativaMaxima'
             % Misma definicion de duracion que el modo: desde el inicio del
-            % arco. Y el mismo factor de seguridad: el objetivo que se
-            % reconstruye aca es el de diseno, no la norma literal, o el
-            % criterio fallaria de forma espuria con cualquier factor > 1.
+            % arco. Y la misma curva de diseno (quiebres redondeados,
+            % LimiteDeDiseno) con el mismo factor de seguridad: el objetivo
+            % que se reconstruye aca es el de diseno, no la norma literal, o
+            % el criterio fallaria de forma espuria.
             FactorDeSeguridad = Parametros.FactorDeSeguridadNormativo;
+            Semiancho = Parametros.SemianchoDeSuavizadoNormativo;
             DuracionReal = (Sim.Tiempo(Rango) - Sim.Tiempo(Rango(1))) * Diagnostico.Escala.RaizLambdaLoop;
-            Objetivo = arrayfun(@(D) LimiteNormativo(Receta.CurvaLimiteGz, D), DuracionReal) / FactorDeSeguridad;
+            Objetivo = LimiteDeDiseno(Receta.CurvaLimiteGz, DuracionReal, Semiancho) / FactorDeSeguridad;
             Detalle  = sprintf('curva %s / FS %.2f, de %.2f a %.2f G a lo largo del arco (%.2f s reales)', ...
                                Receta.CurvaLimiteGz, FactorDeSeguridad, Objetivo(1), Objetivo(end), DuracionReal(end));
         otherwise
@@ -217,7 +219,7 @@ function Criterios = CriterioDeObjetivoDeG(Criterios, Track, Sim, Diagnostico, R
         % semiejes y la curva de Gy divididos por el factor de seguridad.
         SemiejeGz = 1.1*abs(LimiteNormativo(Receta.CurvaLimiteGz, 0.2)) / FactorDeSeguridad;
         SemiejeGy = 1.1*abs(LimiteNormativo(Receta.CurvaLimiteGy, 0.2)) / FactorDeSeguridad;
-        GyDeLaCurva  = arrayfun(@(D) abs(LimiteNormativo(Receta.CurvaLimiteGy, D)), DuracionReal) / FactorDeSeguridad;
+        GyDeLaCurva  = abs(LimiteDeDiseno(Receta.CurvaLimiteGy, DuracionReal, Semiancho)) / FactorDeSeguridad;
         GyDeLaElipse = SemiejeGy*sqrt(max(1 - (Objetivo/SemiejeGz).^2, 0));
         ObjetivoGy = Receta.SentidoDeGy * max(min(GyDeLaCurva, GyDeLaElipse) - Parametros.TolObjetivoDeG, 0);
         DesvioGy = max(abs(Sim.Gy(Rango) - ObjetivoGy));

@@ -30,9 +30,16 @@ Parametros.ModoCurvatura = 'Clotoide';
 
 Parametros.AceleracionNormalObjetivo = 20;    % [m/s^2] solo AceleracionNormalConstante
 Parametros.FuerzaGObjetivo           = 3.0;   % [G]     solo FuerzaGConstante; G neta incluida la gravedad
-% GNormativaMaxima no tiene parametro global: la curva de la norma que persigue
-% es parte de la Receta de cada elemento (Receta.CurvaLimiteGz en los cuatro;
-% CurvaLimiteGy y SentidoDeGy en el dive loop, acotado por la elipse de 7.1.5.1).
+% GNormativaMaxima: la curva de la norma que persigue es parte de la Receta de
+% cada elemento (Receta.CurvaLimiteGz en los cuatro; CurvaLimiteGy y SentidoDeGy
+% en el dive loop, acotado por la elipse de 7.1.5.1). Su unico parametro global
+% es el semiancho con el que LimiteDeDiseno redondea POR DEBAJO los quiebres de
+% la tabla, en segundos de prototipo: la tabla es lineal por tramos y cada
+% quiebre de pendiente seria un salto de dkappa/ds, que el roll helicoidal
+% convierte en un escalon de Gy (memoria 7.8). Con 0.05 s el objetivo de la
+% Fig. 10 baja 0.025 G en 1.0 s y 0.007 G en 2.0 s. Cero = tabla literal. La
+% verificacion usa siempre la tabla literal.
+Parametros.SemianchoDeSuavizadoNormativo = 0.05;   % [s] de prototipo; solo GNormativaMaxima
 % Clotoide usa el radio del elemento (bloque 2) como radio de la heartline.
 
 %% =================================================================

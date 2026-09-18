@@ -16,18 +16,27 @@ function [Registro, y, Arco, PasosDados] = IntegrarTramo(Registro, y, Arco, Cont
     ArcoInicial = Arco;
     PasosDados  = 0;
 
+    % El ultimo paso de un tramo se acorta para caer justo en su longitud
+    % (o en el corte), pero nunca se deja una astilla: si lo que falta es
+    % menos de un paso y medio se toma entero ahora, asi que el ultimo paso
+    % queda entre 0.5 y 1.5 pasos. Una astilla de microns entre dos nodos
+    % no cambia la geometria, pero las derivadas numericas sobre la
+    % polilinea (phi'' y el jerk, que son segundas diferencias) se
+    % amplifican con la razon entre pasos vecinos y en el borde del
+    % elemento daban picos de jerk que no existian.
+    PasoNominal = Parametros.PasoGeneracion;
     while (Arco - ArcoInicial) < Longitud - 1e-12
         [~, Punto] = DerivadaDeVia(Arco, y, Contexto);
 
-        Paso = min(Parametros.PasoGeneracion, Longitud - (Arco - ArcoInicial));
+        Paso = PasoSinAstilla(PasoNominal, Longitud - (Arco - ArcoInicial));
         UltimoPaso = false;
 
         if ~isempty(DistanciaHastaParar)
             Restante = DistanciaHastaParar(Punto, Registro);
             if Restante <= 0
                 break
-            elseif Restante < Paso
-                Paso = Restante;
+            elseif Restante < 1.5*PasoNominal
+                Paso = Restante;   % cae justo en el corte, con un paso de a lo sumo 1.5 pasos
                 UltimoPaso = true;
             end
         end
@@ -45,5 +54,16 @@ function [Registro, y, Arco, PasosDados] = IntegrarTramo(Registro, y, Arco, Cont
         if UltimoPaso || y(13) <= 0
             break   % corte pedido, o el carro se quedo sin energia
         end
+    end
+end
+
+function Paso = PasoSinAstilla(PasoNominal, Faltante)
+%PASOSINASTILLA Paso nominal, salvo que lo que falta del tramo sea menos de
+%   un paso y medio: entonces se toma todo lo que falta, para que el ultimo
+%   paso quede entre 0.5 y 1.5 pasos y no deje una astilla.
+    if Faltante < 1.5*PasoNominal
+        Paso = Faltante;
+    else
+        Paso = PasoNominal;
     end
 end

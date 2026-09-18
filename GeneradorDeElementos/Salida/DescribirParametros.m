@@ -13,8 +13,13 @@ function DescribirParametros(Parametros, Elegido)
     [DelModo, Nota] = ParametrosDelModo(Modo);
 
     fprintf('\n--- Parametros del modo de curvatura: %s ---\n', Modo);
-    if isempty(DelModo)
+    if ~isempty(Nota)
         fprintf('  (%s)\n', Nota);
+    end
+    if isempty(DelModo)
+        if isempty(Nota)
+            fprintf('  (ninguno)\n');
+        end
     else
         ImprimirLista(Parametros, DelModo);
     end

@@ -1,4 +1,4 @@
-function Limite = LimiteNormativo(Curva, Duracion)
+function [Limite, Tabla] = LimiteNormativo(Curva, Duracion)
 %LIMITENORMATIVO Curvas limite de aceleracion de ASTM F2291-06a, seccion 7.
 %   El limite NO es puntual: depende de cuanto tiempo lleva el pasajero por
 %   encima de ese nivel. Interpolacion lineal por tramos, con extension
@@ -6,6 +6,11 @@ function Limite = LimiteNormativo(Curva, Duracion)
 %
 %   La duracion que entra aca es la del PROTOTIPO. Para evaluar un resultado
 %   del modelo hay que multiplicar antes su duracion por sqrt(lambda).
+%
+%   El segundo argumento de salida es la tabla [duracion, limite] de la
+%   curva, para quien necesite sus quiebres (LimiteDeDiseno). Esta es la
+%   curva LITERAL, la que usa la verificacion; el objetivo de diseno del
+%   modo normativo es LimiteDeDiseno, que la redondea por debajo.
 %
 %   Criterios autoimpuestos: una maqueta sin pasajeros no esta sujeta a la
 %   norma. Se adoptan como criterio de diseno. Valores leidos de las Figs. 6

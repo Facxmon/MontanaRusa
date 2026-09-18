@@ -3,9 +3,13 @@
 % nodo, la diferencia entre la Gz que el modo impuso y la que mide la
 % simulacion, en las cuatro hipotesis de la consigna:
 %
-%   H1  phi'' inconsistente: el diseno usa solo la parte quintica
-%       (PuntoCinematico) y la medicion usa la derivada numerica de phi'
-%       completo, que incluye Inclinacion*dkappa/ds (GenerarGeometria).
+%   H1  phi'' inconsistente: DENTRO DEL PASO el diseno usa solo la parte
+%       quintica (PuntoCinematico) y la medicion usa la derivada numerica
+%       de phi' completo, que incluye Inclinacion*dkappa/ds. Desde que
+%       GenerarGeometria completa phi'' sobre la polilinea al terminar cada
+%       recorrido (CompletarAceleracionRoll), la G registrada y el lazo de
+%       onset ya ven el termino: H1 mide lo que sigue faltando dentro del
+%       paso, y H2b mide lo que queda entre el registro y la simulacion.
 %   H2  formula cerrada (CargasEnLaVia, dentro del paso) contra transporte
 %       de cuerpo rigido completo (SimularSobreTrack/GTransportada), con la
 %       G registrada durante la marcha como tercer punto de comparacion.
@@ -69,7 +73,7 @@ for c = 1:numel(Constructores)
     % (CriterioDeObjetivoDeG) y se compara con lo que el reporte informa: si
     % los dos numeros no coinciden, el criterio esta mal tomado.
     DuracionReal = (Sim.Tiempo(Rango) - Sim.Tiempo(Rango(1))) * Diag.Escala.RaizLambdaLoop;
-    Objetivo     = arrayfun(@(D) LimiteNormativo(Receta.CurvaLimiteGz, D), DuracionReal);
+    Objetivo     = LimiteDeDiseno(Receta.CurvaLimiteGz, DuracionReal, Parametros.SemianchoDeSuavizadoNormativo);
     DesvioMedido = max(abs(Sim.Gz(Rango) - Objetivo));
     [GzMaxima, NodoMaximo] = max(Sim.Gz);
 
@@ -111,7 +115,7 @@ for c = 1:numel(Constructores)
     if ~isempty(IndiceClotoide)
         TiempoClotoide = Sim.Tiempo(Track.SubTramos(IndiceClotoide).IndiceInicio);
         DuracionDesdeClotoide = (Sim.Tiempo(Rango) - TiempoClotoide) * Diag.Escala.RaizLambdaLoop;
-        ObjetivoDesdeClotoide = arrayfun(@(D) LimiteNormativo(Receta.CurvaLimiteGz, D), DuracionDesdeClotoide);
+        ObjetivoDesdeClotoide = LimiteDeDiseno(Receta.CurvaLimiteGz, DuracionDesdeClotoide, Parametros.SemianchoDeSuavizadoNormativo);
         fprintf('  Si el reloj arrancara en la clotoide de entrada (%.3f s reales antes), el objetivo\n', ...
                 DuracionDesdeClotoide(1));
         fprintf('  cambiaria hasta %.4f G respecto del que uso el modo (H3 alternativa).\n', ...
@@ -190,7 +194,7 @@ for c = 1:numel(Constructores)
     RangoB = TrackB.SubTramos(IndiceArcoB).IndiceInicio : TrackB.SubTramos(IndiceArcoB).IndiceFin;
     RangoB = RangoB(~isnan(SimB.Gz(RangoB)));
     DuracionRealB = (SimB.Tiempo(RangoB) - SimB.Tiempo(RangoB(1))) * ElementoB.Diagnostico.Escala.RaizLambdaLoop;
-    ObjetivoB = arrayfun(@(D) LimiteNormativo(Receta.CurvaLimiteGz, D), DuracionRealB);
+    ObjetivoB = LimiteDeDiseno(Receta.CurvaLimiteGz, DuracionRealB, Parametros.SemianchoDeSuavizadoNormativo);
     H4.DesvioB   = max(abs(SimB.Gz(RangoB) - ObjetivoB));
     H4.GzMaximaB = max(SimB.Gz);
     [ArcoBUnico, IndicesUnicos] = unique(TrackB.LongitudArco, 'stable');

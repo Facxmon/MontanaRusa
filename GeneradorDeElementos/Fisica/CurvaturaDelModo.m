@@ -89,14 +89,16 @@ function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Es
             end
             DuracionModelo = max(Punto.Tiempo - ArcoTiempoDeReferencia, 0);
             DuracionReal   = DuracionModelo * Escala.RaizLambdaLoop;
-            % Objetivo de diseno: la curva de la norma con el margen del factor.
+            % Objetivo de diseno: la curva de la norma con los quiebres
+            % redondeados por debajo (LimiteDeDiseno) y el margen del factor.
             FactorDeSeguridad = Parametros.FactorDeSeguridadNormativo;
-            GLimite = LimiteNormativo(Receta.CurvaLimiteGz, DuracionReal) / FactorDeSeguridad;
+            Semiancho = Parametros.SemianchoDeSuavizadoNormativo;
+            GLimite = LimiteDeDiseno(Receta.CurvaLimiteGz, DuracionReal, Semiancho) / FactorDeSeguridad;
             ObjetivoSinGravedad = g*(GLimite - ArribaVertical) / VelocidadCentroDeMasa^2;
 
             if isfield(Receta, 'CurvaLimiteGy') && ~isempty(Receta.CurvaLimiteGy)
                 GyObjetivo = ObjetivoDeGyDentroDeLaElipse(GLimite, DuracionReal, Receta, ...
-                                                          Parametros.TolObjetivoDeG, FactorDeSeguridad);
+                                                          Parametros.TolObjetivoDeG, FactorDeSeguridad, Semiancho);
                 [Curvatura, AnguloDesdeArriba] = CurvaturaDelRielParaGzYGyObjetivo( ...
                     ObjetivoSinGravedad, (GyObjetivo - Punto.VersorLateral(3))*g/VelocidadCentroDeMasa^2, ...
                     Brazo, d, VelocidadCentroDeMasa, Punto.VelocidadRoll, Punto.AceleracionRoll, ...
@@ -122,7 +124,7 @@ function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Es
 end
 
 %% ========================= auxiliares =====================================
-function GyObjetivo = ObjetivoDeGyDentroDeLaElipse(GzLimite, DuracionReal, Receta, Tolerancia, FactorDeSeguridad)
+function GyObjetivo = ObjetivoDeGyDentroDeLaElipse(GzLimite, DuracionReal, Receta, Tolerancia, FactorDeSeguridad, Semiancho)
 %OBJETIVODEGYDENTRODELAELIPSE Gy maximo admisible dado el Gz que ya se pide.
 %   Apuntar a la vez al +Gz maximo de la Fig. 10 y al |Gy| maximo de la
 %   Fig. 8 viola la elipse de dos ejes de 7.1.5.1 por construccion:
@@ -135,7 +137,9 @@ function GyObjetivo = ObjetivoDeGyDentroDeLaElipse(GzLimite, DuracionReal, Recet
 %   GzLimite llega ya dividido por el factor de seguridad, y aca se dividen
 %   tambien los dos semiejes y la curva de Gy: la elipse entera se escala y
 %   el Gy objetivo queda con el mismo margen que el Gz. Dividir solo el Gz
-%   dejaria la elipse sin escalar y el Gy objetivo inconsistente.
+%   dejaria la elipse sin escalar y el Gy objetivo inconsistente. La curva
+%   de Gy es la de diseno (quiebres redondeados, LimiteDeDiseno); los
+%   semiejes son los literales de 200 ms, que son constantes.
 %
 %   Se le descuenta al objetivo la tolerancia con la que el chequeo posterior
 %   admite que el transporte inverso erre (TolObjetivoDeG): un objetivo
@@ -144,7 +148,7 @@ function GyObjetivo = ObjetivoDeGyDentroDeLaElipse(GzLimite, DuracionReal, Recet
     SemiejeGz = 1.1*abs(LimiteNormativo(Receta.CurvaLimiteGz, 0.2)) / FactorDeSeguridad;
     SemiejeGy = 1.1*abs(LimiteNormativo(Receta.CurvaLimiteGy, 0.2)) / FactorDeSeguridad;
     GyDeLaElipse = SemiejeGy*sqrt(max(1 - (GzLimite/SemiejeGz)^2, 0));
-    GyDeLaCurva  = abs(LimiteNormativo(Receta.CurvaLimiteGy, DuracionReal)) / FactorDeSeguridad;
+    GyDeLaCurva  = abs(LimiteDeDiseno(Receta.CurvaLimiteGy, DuracionReal, Semiancho)) / FactorDeSeguridad;
     GyObjetivo   = Receta.SentidoDeGy * max(min(GyDeLaElipse, GyDeLaCurva) - Tolerancia, 0);
 end
 

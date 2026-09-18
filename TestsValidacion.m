@@ -350,7 +350,7 @@ for i = 1:numel(Constructores)
     end
     RangoArco  = TrackN.SubTramos(IndiceArco).IndiceInicio : TrackN.SubTramos(IndiceArco).IndiceFin;
     DuracionReal = (SimN.Tiempo(RangoArco) - SimN.Tiempo(RangoArco(1))) * ElementoNormativo.Diagnostico.Escala.RaizLambdaLoop;
-    Objetivo = arrayfun(@(D) LimiteNormativo(ElementoNormativo.Receta.CurvaLimiteGz, D), DuracionReal);
+    Objetivo = LimiteDeDiseno(ElementoNormativo.Receta.CurvaLimiteGz, DuracionReal, Parametros.SemianchoDeSuavizadoNormativo);
     Desvio = max(abs(SimN.Gz(RangoArco) - Objetivo));
     PeorDesvio = max(PeorDesvio, Desvio);
     Criterio = ReporteNormativo.Posteriores(strcmp({ReporteNormativo.Posteriores.Nombre}, 'Gz objetivo del modo alcanzado'));
@@ -381,10 +381,10 @@ TrackGy = ElementoGy.Track;  SimGy = ElementoGy.Sim;  RecetaGy = ElementoGy.Rece
 IndiceArco = find(strcmp({TrackGy.SubTramos.Nombre}, 'ArcoPrincipal'), 1);
 RangoArco  = TrackGy.SubTramos(IndiceArco).IndiceInicio : TrackGy.SubTramos(IndiceArco).IndiceFin;
 DuracionReal = (SimGy.Tiempo(RangoArco) - SimGy.Tiempo(RangoArco(1))) * ElementoGy.Diagnostico.Escala.RaizLambdaLoop;
-GzLimite = arrayfun(@(D) LimiteNormativo(RecetaGy.CurvaLimiteGz, D), DuracionReal);
+GzLimite = LimiteDeDiseno(RecetaGy.CurvaLimiteGz, DuracionReal, Parametros.SemianchoDeSuavizadoNormativo);
 SemiejeGz = 1.1*LimiteNormativo(RecetaGy.CurvaLimiteGz, 0.2);
 SemiejeGy = 1.1*LimiteNormativo(RecetaGy.CurvaLimiteGy, 0.2);
-GyObjetivo = RecetaGy.SentidoDeGy * (min(arrayfun(@(D) LimiteNormativo(RecetaGy.CurvaLimiteGy, D), DuracionReal), ...
+GyObjetivo = RecetaGy.SentidoDeGy * (min(LimiteDeDiseno(RecetaGy.CurvaLimiteGy, DuracionReal, Parametros.SemianchoDeSuavizadoNormativo), ...
                                          SemiejeGy*sqrt(max(1 - (GzLimite/SemiejeGz).^2, 0))) - Parametros.TolObjetivoDeG);
 DesvioGy = max(abs(SimGy.Gy(RangoArco) - GyObjetivo));
 SubPeralteMaximo = max(abs(TrackGy.AnguloCurvaturaDesdeArriba(RangoArco)));
@@ -427,7 +427,7 @@ for i = 1:numel(Constructores)
     IndiceArco = find(strcmp({TrackFS.SubTramos.Nombre}, 'ArcoPrincipal'), 1);
     RangoArco  = TrackFS.SubTramos(IndiceArco).IndiceInicio : TrackFS.SubTramos(IndiceArco).IndiceFin;
     DuracionReal = (SimFS.Tiempo(RangoArco) - SimFS.Tiempo(RangoArco(1))) * ElementoFS.Diagnostico.Escala.RaizLambdaLoop;
-    ObjetivoFS = arrayfun(@(D) LimiteNormativo(RecetaFS.CurvaLimiteGz, D), DuracionReal) / Parametros.FactorDeSeguridadNormativo;
+    ObjetivoFS = LimiteDeDiseno(RecetaFS.CurvaLimiteGz, DuracionReal, Parametros.SemianchoDeSuavizadoNormativo) / Parametros.FactorDeSeguridadNormativo;
     DesvioFS = max(abs(SimFS.Gz(RangoArco) - ObjetivoFS));
     PeorDesvioFS = max(PeorDesvioFS, DesvioFS);
 
@@ -436,7 +436,7 @@ for i = 1:numel(Constructores)
     if isfield(RecetaFS, 'CurvaLimiteGy')
         SemiejeGzFS = 1.1*LimiteNormativo(RecetaFS.CurvaLimiteGz, 0.2) / Parametros.FactorDeSeguridadNormativo;
         SemiejeGyFS = 1.1*LimiteNormativo(RecetaFS.CurvaLimiteGy, 0.2) / Parametros.FactorDeSeguridadNormativo;
-        GyCurvaFS   = arrayfun(@(D) LimiteNormativo(RecetaFS.CurvaLimiteGy, D), DuracionReal) / Parametros.FactorDeSeguridadNormativo;
+        GyCurvaFS   = LimiteDeDiseno(RecetaFS.CurvaLimiteGy, DuracionReal, Parametros.SemianchoDeSuavizadoNormativo) / Parametros.FactorDeSeguridadNormativo;
         GyObjetivoFS = RecetaFS.SentidoDeGy * (min(GyCurvaFS, SemiejeGyFS*sqrt(max(1 - (ObjetivoFS/SemiejeGzFS).^2, 0))) ...
                                                - Parametros.TolObjetivoDeG);
         DesvioGyFS = max(abs(SimFS.Gy(RangoArco) - GyObjetivoFS));
@@ -455,6 +455,58 @@ Resultados = Anotar(Resultados, 'El factor de seguridad escala el objetivo del m
     PeorDesvioFS < 0.02 && CriteriosFS && ElipseLiteral, ...
     sprintf('FS = %.2f: %s (limite 0.02 G); criterios de objetivo pasan; semiejes de la elipse sin escalar', ...
             Parametros.FactorDeSeguridadNormativo, strjoin(DetallesFS, ', ')));
+
+%% --- Test 15: el diseno es C2 en roll: onset lateral independiente del paso
+% Dos cosas. (a) LimiteDeDiseno, el objetivo del modo normativo, nunca
+% supera en modulo a la tabla literal de LimiteNormativo y es C1: su
+% derivada numerica sobre una grilla fina no salta en los quiebres de la
+% tabla. (b) Con rampas de curvatura C1 y objetivo C1, phi'' es continua y
+% el onset lateral del loop vertical que reporta la verificacion tiene que
+% ser un jerk fisico: el mismo numero con paso de generacion de 2 mm y de
+% 1 mm. Con rampas lineales daba 124 y 446 G/s (la derivada numerica de un
+% escalon de 0.095 G crece como 1/paso); con los quiebres de la tabla sin
+% redondear, 16 y 28.
+Curvas = {'MasGzTodas', 'MasGzReducido', 'MenosGzBase', 'MenosGzExtendido', 'GyBase', ...
+          'MasGxBase', 'MenosGxBase', 'MenosGxOTS', 'MenosGxProne'};
+% Un quiebre (C0) da un salto de pendiente numerica que NO depende de la
+% grilla; en una curva C1 el salto es |d2/dt2| * paso y se reduce a la
+% mitad al refinar la grilla a la mitad. Se mide con dos grillas.
+PasosDeGrilla = [0.001, 0.0005];
+ExcesoSobreLaNorma = 0;
+SaltoDePendiente   = zeros(1, 2);
+for i = 1:numel(Curvas)
+    for j = 1:2
+        Grilla  = (0:PasosDeGrilla(j):14).';
+        Literal = arrayfun(@(D) LimiteNormativo(Curvas{i}, D), Grilla);
+        Diseno  = LimiteDeDiseno(Curvas{i}, Grilla, ParametrosBase.SemianchoDeSuavizadoNormativo);
+        ExcesoSobreLaNorma = max(ExcesoSobreLaNorma, max(abs(Diseno) - abs(Literal)));
+        Pendiente = diff(Diseno) ./ diff(Grilla);
+        SaltoDePendiente(j) = max(SaltoDePendiente(j), max(abs(diff(Pendiente))));
+    end
+end
+RazonDeSaltos = SaltoDePendiente(2) / SaltoDePendiente(1);   % 0.5 si es C1, 1 si hay un quiebre
+DisenoEsC1 = RazonDeSaltos < 0.7;
+
+Parametros = ParametrosBase;
+Parametros.RadioDelLoop  = 0.11;
+Parametros.ModoCurvatura = 'GNormativaMaxima';
+OnsetPorPaso = zeros(1, 2);
+Pasos = [0.002, 0.001];
+for i = 1:2
+    Parametros.PasoGeneracion = Pasos(i);
+    Parametros.PasoSimulacion = Pasos(i);
+    Estado = EstadoInicial([0 0 1.0], [1 0 0], [0 0 1], 4.6, Parametros);
+    [~, ~, ReportePaso] = ElementoLoopVertical(Estado, Parametros);
+    OnsetPorPaso(i) = ReportePaso.Normativo.OnsetMaximoPorEje(2);
+end
+VariacionRelativa = abs(OnsetPorPaso(2) - OnsetPorPaso(1)) / OnsetPorPaso(1);
+
+Resultados = Anotar(Resultados, 'El diseno es C2 en roll: objetivo C1 y onset lateral independiente del paso', ...
+    ExcesoSobreLaNorma < 1e-12 && DisenoEsC1 && VariacionRelativa < 0.15, ...
+    sprintf(['objetivo de diseno a lo sumo %.1e G por encima de la norma; el salto de pendiente numerica ' ...
+             'cae a %.2f al refinar la grilla a la mitad (0.5 = C1, 1 = quiebre; limite 0.7); ' ...
+             'onset lateral del loop %.1f G/s a 2 mm y %.1f G/s a 1 mm (%.0f %% de variacion, limite 15 %%)'], ...
+            ExcesoSobreLaNorma, RazonDeSaltos, OnsetPorPaso(1), OnsetPorPaso(2), 100*VariacionRelativa));
 
 %% --- Resumen ----------------------------------------------------------
 fprintf('\n');
