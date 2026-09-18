@@ -21,9 +21,11 @@ function Documento = LayoutAJson(Layout, RutaDeSalida)
 %       de la seccion 6.1 del contrato.
 %
 %   El bloque parametros.esquema NO se escribe a mano: sale de llamar a cada
-%   constructor de CatalogoDeElementos() sin argumentos, a ParametrosDelModo()
-%   y a ParametrosDeAceptacion(). Si se agrega un parametro a un elemento,
-%   aparece solo en el JSON y en el panel de la web.
+%   constructor de CatalogoDeElementos() sin argumentos, a ParametrosDelModo(),
+%   a ParametrosDeAceptacion() y a ParametrosGenerales(). Si se agrega un
+%   parametro a un elemento, aparece solo en el JSON y en el panel de la web;
+%   si se agrega a ParametrosPorDefecto sin declararlo en ningun lado, el
+%   export falla con un mensaje que dice donde declararlo.
 %
 %   Decisiones que el contrato deja abiertas y que aca se toman asi:
 %     - resumenLayout.alturaMaxima/alturaMinima son z del RIEL (lo que se
@@ -32,10 +34,6 @@ function Documento = LayoutAJson(Layout, RutaDeSalida)
 %       proposito es encuadrar la camara y las dos curvas se dibujan.
 %     - nodos.tiempo es Sim.Tiempo tal cual, que arranca en 0 en cada
 %       elemento; el acumulado del circuito lo suma el consumidor.
-%     - parametros.esquema.generales queda vacio: el bloque 4 de
-%       ParametrosPorDefecto no tiene declaracion Nombre/Unidad/Descripcion
-%       en el codigo y escribirla aca seria justo la lista a mano que el
-%       contrato prohibe.
 
     if nargin < 2
         RutaDeSalida = '';
@@ -77,6 +75,7 @@ end
 
 function Parametros = ParametrosAJson(ParametrosDelLayout)
 %PARAMETROSAJSON Valores de esta corrida, esquema autodescriptivo y defaults.
+    VerificarCobertura(ParametrosDelLayout);
     Parametros.valores  = EstructuraACamelCase(ParametrosDelLayout);
     Parametros.esquema  = EsquemaDeParametros(ParametrosDelLayout.ModoCurvatura);
     Parametros.defaults = EstructuraACamelCase(ParametrosPorDefecto());
@@ -97,12 +96,38 @@ function Esquema = EsquemaDeParametros(Modo)
     end
 
     Esquema.aceptacion = DeclaracionesAJson(ParametrosDeAceptacion());
+    Esquema.generales  = DeclaracionesAJson(ParametrosGenerales());
+end
 
-    % Bloque 4 de ParametrosPorDefecto (fisica, carro, discretizacion,
-    % tolerancias). No existe en el codigo una funcion que lo declare con
-    % ternas, como si existen ParametrosDelModo y ParametrosDeAceptacion.
-    % Hasta que exista, se exporta vacio y no una lista inventada aca.
-    Esquema.generales = {};
+function VerificarCobertura(Parametros)
+%VERIFICARCOBERTURA Todo campo de Parametros esta declarado en alguna lista.
+%   Es la garantia del contrato: el panel de la web se genera desde las
+%   declaraciones, asi que un parametro sin declarar apareceria sin etiqueta
+%   ni unidad. Se cubre con las cuatro fuentes (todos los modos, todos los
+%   elementos, aceptacion, generales); ModoCurvatura es el selector del modo
+%   y lo describe esquema.modo (nombre y opciones), no una terna.
+    Declarados = {'ModoCurvatura'};
+    for Modo = ParametrosDelModo()
+        Declarados = [Declarados, {ParametrosDelModo(Modo{1}).Nombre}]; %#ok<AGROW>
+    end
+    for Constructor = CatalogoDeElementos()
+        Declarados = [Declarados, {Constructor{1}().Nombre}]; %#ok<AGROW>
+    end
+    Declarados = [Declarados, {ParametrosDeAceptacion().Nombre}, {ParametrosGenerales().Nombre}];
+
+    SinDeclarar = setdiff(fieldnames(Parametros), Declarados);
+    if ~isempty(SinDeclarar)
+        error('LayoutAJson:ParametroSinDeclarar', ...
+              ['Parametros.%s no lo declara ningun modo, elemento, ParametrosDeAceptacion ni ' ...
+               'ParametrosGenerales: sin terna Nombre/Unidad/Descripcion el panel de la web no lo ' ...
+               'puede etiquetar. Declararlo donde se consume.'], strjoin(SinDeclarar, ', Parametros.'));
+    end
+    Inexistentes = setdiff(Declarados, fieldnames(Parametros));
+    if ~isempty(Inexistentes)
+        error('LayoutAJson:DeclaracionSinParametro', ...
+              'Se declara %s pero no existe en Parametros: revisar el nombre en la declaracion.', ...
+              strjoin(Inexistentes, ', '));
+    end
 end
 
 function Estado = EstadoAJson(EstadoMatlab)

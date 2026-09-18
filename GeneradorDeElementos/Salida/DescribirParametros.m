@@ -1,13 +1,15 @@
 function DescribirParametros(Parametros, Elegido)
-%DESCRIBIRPARAMETROS Imprime, con unidades, solo los parametros que aplican.
-%   Tres grupos, visiblemente separados, y nada mas:
+%DESCRIBIRPARAMETROS Imprime, con unidades, los parametros de la corrida.
+%   Cuatro grupos, visiblemente separados, los mismos cuatro bloques de
+%   ParametrosPorDefecto:
 %     1. los parametros del modo de curvatura elegido (ParametrosDelModo);
 %     2. los parametros geometricos del elemento elegido (el elemento sin
 %        argumentos);
 %     3. los criterios de aceptacion (ParametrosDeAceptacion), que valen en
-%        todos los modos y para todos los elementos.
-%   Lo que no aparece aca (fisica, carro, discretizacion, tolerancias
-%   numericas) es global y esta en ParametrosPorDefecto.
+%        todos los modos y para todos los elementos;
+%     4. los generales (ParametrosGenerales): fisica, carro, resolucion,
+%        escalado, discretizacion y tolerancias numericas.
+%   Cada grupo sale de su propia declaracion, nunca de una lista escrita aca.
 
     Modo = Parametros.ModoCurvatura;
     [DelModo, Nota] = ParametrosDelModo(Modo);
@@ -29,6 +31,9 @@ function DescribirParametros(Parametros, Elegido)
 
     fprintf('\n--- Criterios de aceptacion (todos los modos, todos los elementos) ---\n');
     ImprimirLista(Parametros, ParametrosDeAceptacion());
+
+    fprintf('\n--- Parametros generales (fisica, carro, resolucion, escalado, discretizacion, tolerancias) ---\n');
+    ImprimirLista(Parametros, ParametrosGenerales());
 end
 
 function ImprimirLista(Parametros, Lista)

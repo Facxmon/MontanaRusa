@@ -98,8 +98,7 @@ MATLAB usa `PascalCase`, JavaScript usa `camelCase`. El contrato adopta `camelCa
 consumidor de largo plazo es JS. La traducción es puramente mecánica (`PuntosHeartline` → `x/y/z`,
 `GArribaHeartline` → `gz`) y queda registrada en `NOMENCLATURA.md`.
 
-> **Decisión abierta.** Si preferís conservar los nombres MATLAB verbatim para no tener capa de
-> traducción, se cambia ahora sin costo. Después de que exista el visualizador, no.
+> **Decidido (2026-09-18): camelCase.** La regla y sus excepciones están en NOMENCLATURA.md §9.
 
 ### 1.8 Precisión: 6 cifras significativas
 
@@ -127,8 +126,10 @@ El repo ya tiene la infraestructura para que **el panel de parámetros de la web
 - `ElementoXxx()` sin argumentos declara los parámetros geométricos de ese elemento
   (`DeclaracionDeParametros`).
 - `ParametrosDeAceptacion()` declara los criterios de aceptación.
+- `ParametrosGenerales()` declara el resto: física, carro, resolución, escalado, discretización,
+  tolerancias.
 
-Las tres devuelven la misma terna: **`Nombre`, `Unidad`, `Descripcion`**.
+Las cuatro devuelven la misma terna: **`Nombre`, `Unidad`, `Descripcion`**.
 
 El export no manda solo los *valores*: manda también ese *esquema*. Resultado: el frontend construye
 los menús expandibles, las etiquetas, las unidades y los tooltips leyendo el JSON, y **nunca se
@@ -219,8 +220,8 @@ Dos mitades: los valores y el esquema que los describe.
     ],
 
     "generales": [
-      // bloque 4 de ParametrosPorDefecto: fisica, carro, discretizacion, tolerancias.
-      // HOY VACIO: el codigo no declara ese bloque con ternas (ver §10, pendiente 5)
+      { "clave": "masa", "unidad": "kg", "descripcion": "masa del carro con el pasajero" }
+      // ... ParametrosGenerales(): bloque 4, fisica, carro, resolucion, escalado, discretizacion, tolerancias
     ]
   },
 
@@ -229,14 +230,18 @@ Dos mitades: los valores y el esquema que los describe.
 ```
 
 `esquema.elementos` se arma llamando a cada constructor de `CatalogoDeElementos()` **sin argumentos**.
-`esquema.modo` sale de `ParametrosDelModo()`. `esquema.aceptacion` de `ParametrosDeAceptacion()`.
-Cero listas escritas a mano.
+`esquema.modo` sale de `ParametrosDelModo()`, `esquema.aceptacion` de `ParametrosDeAceptacion()` y
+`esquema.generales` de `ParametrosGenerales()`. Cero listas escritas a mano.
 
-`esquema.generales` **se exporta vacío** (`[]`): a diferencia de los otros tres bloques, el bloque 4 de
-`ParametrosPorDefecto.m` no tiene una función que lo declare con ternas `Nombre`/`Unidad`/`Descripcion`
-(`DescribirParametros.m` lo dice explícitamente: "lo que no aparece acá es global"). Escribir esa lista
-dentro del exportador sería exactamente la lista a mano que este diseño prohíbe. Los *valores* sí viajan,
-en `valores` y `defaults`; lo que falta son las etiquetas y unidades para el panel. Ver §10.
+**Garantía de cobertura.** El exportador verifica que *todo* campo de `Parametros` esté declarado en
+alguna de las cuatro listas (todos los modos, todos los elementos, aceptación, generales); el único
+exento es `ModoCurvatura`, que es el selector y lo describe `esquema.modo` (`nombre` + `opciones`).
+Un parámetro nuevo en `ParametrosPorDefecto.m` sin declarar hace fallar el export con un mensaje que
+dice dónde declararlo. Es lo que impide que el panel de la web muestre un valor sin etiqueta ni unidad.
+
+Una limitación consciente de v1: `esquema.modo.parametros` trae solo los del modo **actual**. Cambiar
+de modo en la web requiere recalcular, y quien recalcula (MATLAB hoy, el port mañana) produce el JSON
+con las declaraciones del modo nuevo.
 
 ---
 
@@ -501,21 +506,16 @@ por chico que sea el margen numérico.
 
 ## 10. Pendientes de decisión
 
-1. **camelCase vs. nombres MATLAB verbatim** (§1.7). El exportador ya traduce a camelCase con una
-   regla mecánica (primera letra en minúscula; las excepciones están en NOMENCLATURA.md §9). Sigue
-   siendo barato de revertir mientras no exista el visualizador.
+1. ~~camelCase vs. nombres MATLAB verbatim~~ **Decidido: camelCase** (2026-09-18). Regla mecánica
+   (primera letra en minúscula); las excepciones están en NOMENCLATURA.md §9.
 2. ~~Medir el tamaño real~~ **Medido** (§1.8): 2,2 MB crudo, 0,73 MB gzip para el circuito de cuatro.
    No hace falta binario en v1.
 3. **Tolerancias de §8**: los números de arriba son un punto de partida razonado, no medido. Se
    calibran con la primera corrida cruzada real.
 4. ~~`Reporte.Normativo`~~ **Detallado** en §6.4.1; el exportador lo vuelca entero.
-5. **`parametros.esquema.generales` está vacío** (§4). El bloque 4 de `ParametrosPorDefecto.m`
-   (física, carro, discretización, tolerancias) no tiene una función que lo declare con ternas, y el
-   exportador no inventa la lista. Dos salidas posibles, a elegir:
-   - agregar `ParametrosGenerales.m` (misma forma que `ParametrosDeAceptacion.m`, las unidades y
-     descripciones ya están en NOMENCLATURA.md §3) y que `DescribirParametros` también lo imprima; o
-   - sacar `generales` del esquema y dejar que el panel muestre esos parámetros sin etiqueta.
-   Mientras tanto los *valores* viajan igual en `valores` y `defaults`.
-6. **`nodos.tiempo` por elemento o acumulado** (§6.1). Hoy es `Sim.Tiempo` tal cual, que arranca en 0
-   en cada elemento. Si el botón play prefiere un eje continuo, o se acumula en el exportador (y en el
-   port) o lo suma el consumidor con `resumen.tiempoDeRecorrido`.
+5. ~~`parametros.esquema.generales` está vacío~~ **Resuelto** (2026-09-18): `ParametrosGenerales.m`
+   declara el bloque 4 con ternas, `DescribirParametros` lo imprime como cuarto grupo y el
+   exportador verifica la cobertura de todos los parámetros (§4).
+6. ~~`nodos.tiempo` por elemento o acumulado~~ **Decidido: por elemento** (2026-09-18). `nodos.tiempo`
+   es `Sim.Tiempo` tal cual, arranca en 0 en cada elemento; el eje continuo del botón play lo arma la
+   web sumando `resumen.tiempoDeRecorrido` de los elementos anteriores (§6.1).

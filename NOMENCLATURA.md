@@ -88,7 +88,7 @@ Esta es la desambiguación adoptada; se aplica en todo el texto reescrito.
 
 ## 3. Parámetros de entrada del generador (`ParametrosPorDefecto.m`)
 
-Qué consume cada modo lo declara `ParametrosDelModo`; qué consume cada elemento, el propio `ElementoXxx` llamado sin argumentos; los criterios de aceptación, `ParametrosDeAceptacion`. `AjustarParametros` avisa si un override no lo lee ni el modo ni el elemento elegidos. Nombres nuevos: `ParametrosDelModo`, `DeclaracionDeParametros`, `CatalogoDeElementos`, `ParametrosDeAceptacion`, `AjustarParametros`, `DescribirParametros`.
+Qué consume cada modo lo declara `ParametrosDelModo`; qué consume cada elemento, el propio `ElementoXxx` llamado sin argumentos; los criterios de aceptación, `ParametrosDeAceptacion`; el resto (física, carro, resolución, escalado, discretización, tolerancias), `ParametrosGenerales`. `AjustarParametros` avisa si un override no lo lee ni el modo ni el elemento elegidos; `LayoutAJson` falla si algún campo de `Parametros` no está declarado en ninguna de las cuatro listas. Nombres nuevos: `ParametrosDelModo`, `DeclaracionDeParametros`, `CatalogoDeElementos`, `ParametrosDeAceptacion`, `ParametrosGenerales`, `AjustarParametros`, `DescribirParametros`.
 
 | Símbolo / campo | Nombre en código | Significado | Unidad | Definido en | Notas |
 |---|---|---|---|---|---|
@@ -338,7 +338,7 @@ exportador calcula, y son estas:
 | `elementos[].tipo` | `Receta.Nombre` | texto | `'LoopVertical'`, `'Helice'`, `'OverBankedTurn'`, `'DiveLoop'` |
 | `elementos[].indice` | posición en `Layout.Elementos` | índice base 0 | — |
 | `elementos[].parametrosUsados` | `Elemento.Parametros.(Nombre)` para cada `Nombre` que declara `ElementoXxx()` | según parámetro | solo los geométricos del elemento |
-| `parametros.esquema.*[].clave` | `Nombre` de `ParametrosDelModo`, `ElementoXxx()`, `ParametrosDeAceptacion` | — | en camelCase, apunta a `parametros.valores` |
+| `parametros.esquema.*[].clave` | `Nombre` de `ParametrosDelModo`, `ElementoXxx()`, `ParametrosDeAceptacion`, `ParametrosGenerales` | — | en camelCase, apunta a `parametros.valores` |
 | `criterios.todosPasan` | `all([Previos.Pasa]) && all([Posteriores.Pasa])` | lógico | lo calcula el exportador |
 | `resumenLayout.alturaMaxima/alturaMinima` | `max/min(Layout.PuntosRiel(:,3))` | m | z del riel, absoluto |
 | `resumenLayout.boundingBox` | mín/máx de riel y heartline juntas | m | `[[xmin,xmax],[ymin,ymax],[zmin,zmax]]` |

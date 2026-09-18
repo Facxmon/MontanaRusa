@@ -35,7 +35,7 @@ que las dos piezas de código tienen que respetar.
 | Carpeta | Qué contiene |
 |---|---|
 | *(raíz)* | `analisis_energia.m`, `DemoElemento.m`, `DemoLayout.m`, `TestsValidacion.m` y los cinco documentos `.md` |
-| `GeneradorDeElementos/` (raíz) | `ParametrosPorDefecto.m` — el único archivo que se edita para configurar, en cuatro bloques (modo de curvatura, geometría de cada elemento, criterios de aceptación, generales); `AjustarParametros.m` avisa si se carga un valor que la corrida no lee |
+| `GeneradorDeElementos/` (raíz) | `ParametrosPorDefecto.m` — el único archivo que se edita para configurar, en cuatro bloques (modo de curvatura, geometría de cada elemento, criterios de aceptación, generales); `ParametrosGenerales.m` declara el cuarto bloque con unidades; `AjustarParametros.m` avisa si se carga un valor que la corrida no lee |
 | `GeneradorDeElementos/Nucleo/` | contrato de `Estado`, marco de Bishop, integrador RK4, registro de nodos |
 | `GeneradorDeElementos/Fisica/` | cargas por juego de ruedas, resistencia, modos de curvatura, Froude, simulación |
 | `GeneradorDeElementos/Elementos/` | los cuatro elementos, el motor común y los dos métodos de acoplamiento |
