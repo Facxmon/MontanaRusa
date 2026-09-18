@@ -65,3 +65,7 @@ GraficarLayout(Layout);
 
 %% ===================== GUARDADO =======================================
 LayoutGuardar(Layout, 'layout_circuito.mat');
+
+% El mismo layout en el contrato del visualizador (CONTRATO_VISUALIZADOR.md).
+% Se valida con:  node esquema/validar-layout.js layout_circuito.json
+LayoutAJson(Layout, 'layout_circuito.json');

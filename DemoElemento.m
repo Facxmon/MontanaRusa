@@ -116,3 +116,6 @@ GraficarElemento(Elemento, Reporte);
 
 %% ===================== GUARDADO DEL LAYOUT ===========================
 LayoutGuardar(Layout, 'layout_de_un_elemento.mat');
+
+% El mismo layout en el contrato del visualizador (CONTRATO_VISUALIZADOR.md).
+LayoutAJson(Layout, 'layout_de_un_elemento.json');
