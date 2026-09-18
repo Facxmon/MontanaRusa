@@ -107,10 +107,17 @@ El export redondea a 6 cifras significativas. A escala de modelo eso es del orde
 órdenes de magnitud por debajo de la tolerancia de la impresora 3D, así que no pierde nada físico y
 recorta el archivo de forma sustancial.
 
-**Estimación de tamaño, no medición:** ~2000 nodos × ~30 campos × ~10 bytes ≈ 600 kB por elemento,
-≈ 2,4 MB para el circuito de cuatro. Servido con gzip (GitHub Pages lo hace por defecto) debería
-quedar bastante por debajo del MB. **Hay que medirlo**; si molesta, v2 pasa a binario (`.bin` +
-`Float32Array`) sin tocar la estructura lógica.
+**Tamaño medido** (`golden/circuito-demolayout.json`, 4 elementos, 6880 nodos, JSON compacto,
+commit `218f5a9`): **2 195 913 bytes crudo, 734 669 bytes con gzip -6** (733 862 con `-9`). Son
+~313 bytes por nodo crudos y ~107 gzipeados. El 98 % del archivo son los `nodos`; los tres versores
+solos pesan 654 kB crudos (30 %), que es exactamente el costo que §1.5 acepta en v1. Los elementos
+sueltos pesan entre 406 kB (`loop-normativa`) y 962 kB (`helice-clotoide`) crudos, 154–331 kB
+gzipeados.
+
+Lectura: servido con gzip (GitHub Pages lo hace por defecto) el circuito completo queda en ~0,7 MB,
+del orden de una foto. **No hace falta binario en v1.** Si en v2 molesta, las dos palancas son
+reconstruir el marco de Bishop en el frontend (§1.5, −30 %) y pasar los `nodos` a `.bin` +
+`Float32Array` sin tocar la estructura lógica.
 
 ### 1.9 El bloque de parámetros es autodescriptivo — y esto es lo mejor del diseño
 
@@ -212,18 +219,24 @@ Dos mitades: los valores y el esquema que los describe.
     ],
 
     "generales": [
-      { "clave": "masa", "unidad": "kg", "descripcion": "..." }
-      // bloque 4 de ParametrosPorDefecto: fisica, carro, discretizacion, tolerancias
+      // bloque 4 de ParametrosPorDefecto: fisica, carro, discretizacion, tolerancias.
+      // HOY VACIO: el codigo no declara ese bloque con ternas (ver §10, pendiente 5)
     ]
   },
 
-  "defaults": { /* ParametrosPorDefecto() intacto: alimenta el botón "resetear" */ }
+  "defaults": { /* ParametrosPorDefecto() sin overrides, en camelCase: alimenta el botón "resetear" */ }
 }
 ```
 
 `esquema.elementos` se arma llamando a cada constructor de `CatalogoDeElementos()` **sin argumentos**.
 `esquema.modo` sale de `ParametrosDelModo()`. `esquema.aceptacion` de `ParametrosDeAceptacion()`.
 Cero listas escritas a mano.
+
+`esquema.generales` **se exporta vacío** (`[]`): a diferencia de los otros tres bloques, el bloque 4 de
+`ParametrosPorDefecto.m` no tiene una función que lo declare con ternas `Nombre`/`Unidad`/`Descripcion`
+(`DescribirParametros.m` lo dice explícitamente: "lo que no aparece acá es global"). Escribir esa lista
+dentro del exportador sería exactamente la lista a mano que este diseño prohíbe. Los *valores* sí viajan,
+en `valores` y `defaults`; lo que falta son las etiquetas y unidades para el panel. Ver §10.
 
 ---
 
@@ -271,7 +284,7 @@ Todos los arrays de este bloque tienen exactamente `numeroDeNodos` elementos.
 |---|---|---|---|
 | `numeroDeNodos` | – | `size(Track.PuntosRiel,1)` | largo de todos los arrays |
 | `arco` | m | `Track.LongitudArco` | abscisa curvilínea acumulada desde el inicio del layout |
-| `tiempo` | s | `Sim.Tiempo` | tiempo de recorrido — **el eje del botón play** |
+| `tiempo` | s | `Sim.Tiempo` | tiempo de recorrido — **el eje del botón play**. Arranca en 0 en **cada elemento** (así lo produce `SimularSobreTrack`); el acumulado del circuito lo suma el consumidor con `resumen.tiempoDeRecorrido` de los anteriores |
 | `x`, `y`, `z` | m | `Track.PuntosHeartline` | heartline: donde va el pasajero |
 | `xRiel`, `yRiel`, `zRiel` | m | `Track.PuntosRiel` | riel: lo que se fabrica |
 | `versorTangente` | – | `Track.VersorTangente` | `[N][3]`, dirección de avance |
@@ -325,6 +338,11 @@ Los tres `salto*` son los que le dicen al usuario, de un vistazo, si el empalme 
 anterior es limpio. Merecen tratamiento visual destacado: son la razón de ser de todo el trabajo de
 continuidad.
 
+Dos campos que no son escalares: `posicionFinal` es un `[x,y,z]` y **`onsetMaximoModelo` es un
+`[Gx,Gy,Gz]`** (copia de `Escala.OnsetMaximo`, el presupuesto de onset por eje del modelo, en G/s).
+`busquedaVelocidad` es un objeto (`convergio`, `evaluaciones`, `motivo`) que documenta la bisección de
+`velocidadInicialMinima`; llega también cuando el cálculo no se pidió.
+
 ### 6.4 `criterios`
 
 `AgregarCriterio.m` ya produce **exactamente** la estructura que necesita la UI. Se exporta tal cual:
@@ -346,6 +364,41 @@ continuidad.
 progreso del criterio sale gratis. `detalle` → tooltip que explica qué hacer si falla. No hace falta
 diseñar nada: el modelo de datos de la verificación ya está bien.
 
+#### 6.4.1 `normativo`
+
+Volcado de `Reporte.Normativo` (`VerificarLimitesNormativos.m`) en camelCase. Es el detalle detrás de
+los criterios `+Gz (Fig. 10)`, `-Gz (Fig. 9)`, `Gy (Fig. 8)`, `+Gx (Fig. 6)`, `-Gx (Fig. 7)`, las tres
+elipses de 7.1.5.1 y los onsets, que ya están resumidos como `criterio` en `posteriores`.
+
+```jsonc
+{
+  "factorTiempo": 5.16,                 // sqrt(lambda_loop): duración modelo → duración real
+  "duracionModelo": 0.597,              // s, del elemento, en tiempo del modelo
+  "duracionRealEquivalente": 3.08,      // s reales
+  "huboAirtimeSostenido": false,        // -Gz sostenido > 3 s (7.1.7.1)
+  "curvaMasGzAplicada": "MasGzTodas",   // o "MasGzReducido" si hubo airtime sostenido
+
+  // Un evento sostenido por eje y sentido. Es el peor nivel G* contra la curva límite:
+  "masGz":   { "curva": "MasGzTodas",  "signo":  1, "nivelCritico": 8.18, "duracionReal": 0.205,
+               "limiteAplicado": 6.0, "exceso": 2.18, "duracionMasLarga": 3.08, "picoG": 8.47 },
+  "menosGz": { /* idem, signo -1; limiteAplicado y exceso son null si no hubo evento de ese signo */ },
+  "gy":      { /* sobre |Gy| */ },
+  "masGx":   { /* ... */ },
+  "menosGx": { /* ... */ },
+
+  "elipse": { "valorMaximoGyGz": 1.65, "valorMaximoGxGz": 1.67, "valorMaximoGxGy": 0.02,   // ≤ 1 pasa
+              "semiejes": [6.6, 3.3, 6.6] },                                             // [Gx, Gy, Gz], límites de 200 ms × 1.1
+  "onsetDeCarga": 0,                     // G/s, solo transiciones de ≤0 G a ≥2 G (7.1.7.2)
+  "onsetNormativoReal": 15,              // G/s, Parametros.OnsetNormativoPorEje(3)
+  "onsetPresupuestoModelo": [25.8, 25.8, 77.5],   // G/s por eje, Escala.OnsetMaximo
+  "onsetMaximoPorEje": [2.66, 1.68, 77.3]         // G/s por eje, medido
+}
+```
+
+`exceso` **positivo** es cuánto se pasó de la curva de la norma en el peor evento; `-Inf` (sin evento
+de ese signo) llega como `null`. Para la UI alcanza con los `criterio` de `posteriores`; este bloque es
+para el panel de detalle normativo y para el arnés de golden files.
+
 ---
 
 ## 7. `resumenLayout`
@@ -366,6 +419,13 @@ diseñar nada: el modelo de datos de la verificación ya está bien.
 ```
 
 `boundingBox` le ahorra al frontend recorrer todos los nodos para encuadrar la cámara al abrir.
+
+Qué curva mide cada cosa (lo fija el exportador, `LayoutAJson.m`): `alturaMaxima` y `alturaMinima` son
+el z **del riel**, absoluto — es la pieza que se fabrica y la que compara `AlturaMinimaSuelo`;
+`boundingBox` abarca **riel y heartline juntas**, porque las dos se dibujan. `longitudTotal` y
+`tiempoTotal` son las sumas de `resumen.longitudRecorrida` y `resumen.tiempoDeRecorrido`;
+`gzMaximaGlobal`, `gzMinimaGlobal` y `gyMaximaAbsolutaGlobal` el máximo/mínimo de los `resumen` de
+cada elemento; `velocidadFinal` la del centro de masa a la salida del último.
 
 ---
 
@@ -389,6 +449,12 @@ física?" es una opinión; con esto, es un test que corre solo.
 | `diveloop-clotoide` | DiveLoop | Clotoide |
 | `diveloop-normativa` | DiveLoop | GNormativaMaxima |
 | `circuito-demolayout` | los cuatro encadenados | Clotoide |
+
+Los genera `GenerarGoldenFiles.m`, que también los valida. El setup de los diez casos sueltos está
+fijado ahí: `ParametrosPorDefecto` con `RadioDelLoop = 0.30`, método A, entrada en `[0 0 1]` a nivel a
+5,0 m/s, y el over-banked turn a 240° (con los 120° por defecto el modo normativo no deja arco). El
+circuito es el de `DemoLayout.m` tal cual. Cada archivo lleva en `meta.versionGenerador` el commit
+que lo produjo; se regeneran cuando cambia la física, nunca a mano.
 
 **Tolerancias por campo, no global.** El orden de acumulación en punto flotante difiere entre MATLAB
 y JS, así que un `assert` de igualdad exacta va a fallar por razones que no son físicas. Punto de
@@ -435,9 +501,21 @@ por chico que sea el margen numérico.
 
 ## 10. Pendientes de decisión
 
-1. **camelCase vs. nombres MATLAB verbatim** (§1.7). Barato ahora, caro después.
-2. **Medir el tamaño real** del JSON del circuito completo antes de decidir si hace falta binario.
+1. **camelCase vs. nombres MATLAB verbatim** (§1.7). El exportador ya traduce a camelCase con una
+   regla mecánica (primera letra en minúscula; las excepciones están en NOMENCLATURA.md §9). Sigue
+   siendo barato de revertir mientras no exista el visualizador.
+2. ~~Medir el tamaño real~~ **Medido** (§1.8): 2,2 MB crudo, 0,73 MB gzip para el circuito de cuatro.
+   No hace falta binario en v1.
 3. **Tolerancias de §8**: los números de arriba son un punto de partida razonado, no medido. Se
    calibran con la primera corrida cruzada real.
-4. **`Reporte.Normativo`**: falta abrir su estructura interna (`ChequeosPosteriores.m`) y detallarla
-   campo por campo como se hizo con `criterios`.
+4. ~~`Reporte.Normativo`~~ **Detallado** en §6.4.1; el exportador lo vuelca entero.
+5. **`parametros.esquema.generales` está vacío** (§4). El bloque 4 de `ParametrosPorDefecto.m`
+   (física, carro, discretización, tolerancias) no tiene una función que lo declare con ternas, y el
+   exportador no inventa la lista. Dos salidas posibles, a elegir:
+   - agregar `ParametrosGenerales.m` (misma forma que `ParametrosDeAceptacion.m`, las unidades y
+     descripciones ya están en NOMENCLATURA.md §3) y que `DescribirParametros` también lo imprima; o
+   - sacar `generales` del esquema y dejar que el panel muestre esos parámetros sin etiqueta.
+   Mientras tanto los *valores* viajan igual en `valores` y `defaults`.
+6. **`nodos.tiempo` por elemento o acumulado** (§6.1). Hoy es `Sim.Tiempo` tal cual, que arranca en 0
+   en cada elemento. Si el botón play prefiere un eje continuo, o se acumula en el exportador (y en el
+   port) o lo suma el consumidor con `resumen.tiempoDeRecorrido`.

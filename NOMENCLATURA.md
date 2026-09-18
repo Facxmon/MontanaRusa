@@ -311,3 +311,41 @@ Qué consume cada modo lo declara `ParametrosDelModo`; qué consume cada element
 | — | `PasosEntreOrtonormalizaciones` | ver bloque 3 | adimensional (entero) | generador §3 | 25 |
 | $\varepsilon_{maq}$ | — | ver bloque 5 | adimensional | energía §4 | $\approx 2.22\times10^{-16}$ |
 | — | `TolNorma` | ver bloques 3 y 5 (aparece en ambos módulos, con el mismo valor por defecto) | m (norma de vector) | generador §3, energía §5 | $10^{-12}$ |
+
+## 9. Claves JSON del contrato del visualizador (`CONTRATO_VISUALIZADOR.md`)
+
+El JSON que escribe `Salida/LayoutAJson.m` usa camelCase (§1.7 del contrato). **Regla general: la clave JSON es el
+nombre MATLAB con la primera letra en minúscula**, sin excepciones en `parametros.valores`, `parametros.defaults`,
+`estadoInicial`, `estadoSalida`, `resumen`, `criterios.previos/posteriores` y `criterios.normativo`
+(`GzMaxima` → `gzMaxima`, `RadioDelLoop` → `radioDelLoop`, `Pasa` → `pasa`). Las unidades son las de las tablas de
+arriba: SI y radianes, nunca grados. Las claves que **no** siguen la regla mecánica son las de `nodos` y las que el
+exportador calcula, y son estas:
+
+| Clave JSON | Nombre en código | Unidad | Notas |
+|---|---|---|---|
+| `nodos.arco` | `Track.LongitudArco` | m | acumulado desde el inicio del layout (arranca en `EstadoEntrada.LongitudAcumulada`) |
+| `nodos.tiempo` | `Sim.Tiempo` | s | arranca en 0 en cada elemento |
+| `nodos.x`, `y`, `z` | `Track.PuntosHeartline(:,1:3)` | m | heartline |
+| `nodos.xRiel`, `yRiel`, `zRiel` | `Track.PuntosRiel(:,1:3)` | m | riel |
+| `nodos.velocidad` | `Sim.VelocidadCentroDeMasa` | m/s | la del centro de masa |
+| `nodos.velocidadRiel` | `Sim.Velocidad` | m/s | la del punto del riel |
+| `nodos.curvatura` | `Track.CurvaturaHeartline` | 1/m | se exporta curvatura y no `Radio` (vale `Inf` en recta) |
+| `nodos.curvaturaRiel` | `Track.Curvatura` | 1/m | ídem, no `RadioRiel` |
+| `nodos.anguloRoll`, `anguloPeralte` | `Track.AnguloRoll`, `Track.AnguloPeralte` | rad | `TablaDeResultados` los exporta en grados; el JSON no |
+| `nodos.puntoDeParada` | `Sim.PuntoDeParada` | índice base 0 | `null` si el carro completa el elemento |
+| `nodos.numeroDeNodos` | `size(Track.PuntosRiel, 1)` | entero | largo de todos los arrays del bloque |
+| `subtramos[].indiceInicio/indiceFin` | `SubTramos(k).IndiceInicio/IndiceFin` | índice base 0 | el exportador resta 1; rango inclusivo |
+| `elementos[].tipo` | `Receta.Nombre` | texto | `'LoopVertical'`, `'Helice'`, `'OverBankedTurn'`, `'DiveLoop'` |
+| `elementos[].indice` | posición en `Layout.Elementos` | índice base 0 | — |
+| `elementos[].parametrosUsados` | `Elemento.Parametros.(Nombre)` para cada `Nombre` que declara `ElementoXxx()` | según parámetro | solo los geométricos del elemento |
+| `parametros.esquema.*[].clave` | `Nombre` de `ParametrosDelModo`, `ElementoXxx()`, `ParametrosDeAceptacion` | — | en camelCase, apunta a `parametros.valores` |
+| `criterios.todosPasan` | `all([Previos.Pasa]) && all([Posteriores.Pasa])` | lógico | lo calcula el exportador |
+| `resumenLayout.alturaMaxima/alturaMinima` | `max/min(Layout.PuntosRiel(:,3))` | m | z del riel, absoluto |
+| `resumenLayout.boundingBox` | mín/máx de riel y heartline juntas | m | `[[xmin,xmax],[ymin,ymax],[zmin,zmax]]` |
+| `resumenLayout.longitudTotal`, `tiempoTotal` | suma de `Resumen.LongitudRecorrida`, `Resumen.TiempoDeRecorrido` | m, s | — |
+| `resumenLayout.gzMaximaGlobal`, `gzMinimaGlobal`, `gyMaximaAbsolutaGlobal` | máx/mín de los `Resumen.*` de cada elemento | G | — |
+| `resumenLayout.velocidadFinal` | `Layout.EstadoActual.Velocidad` | m/s | del centro de masa |
+| `meta.versionGenerador` | `git rev-parse --short HEAD` (+ `-dirty`) | texto | `'desconocido'` si no hay git |
+
+Todo valor `NaN`, `Inf` o `-Inf` se escribe como `null` (§1.6 del contrato); los índices van en base 0; los números
+se redondean a 6 cifras significativas (§1.8).

@@ -40,8 +40,10 @@ que las dos piezas de código tienen que respetar.
 | `GeneradorDeElementos/Fisica/` | cargas por juego de ruedas, resistencia, modos de curvatura, Froude, simulación |
 | `GeneradorDeElementos/Elementos/` | los cuatro elementos, el motor común y los dos métodos de acoplamiento |
 | `GeneradorDeElementos/Verificacion/` | curvas de la norma, chequeos de factibilidad, distancia entre polilíneas |
-| `GeneradorDeElementos/Salida/` | reporte por consola y gráficos |
+| `GeneradorDeElementos/Salida/` | reporte por consola, gráficos y `LayoutAJson.m`, el exportador al contrato del visualizador |
 | `GeneradorDeElementos/LayoutDeVia/` | alta, deshacer, guardar, cargar y re-simular el circuito |
+| `esquema/` | `layout-v1.schema.json` (JSON Schema del contrato), `ejemplo-layout.json` y el validador Node (`validar-layout.js`) |
+| `golden/` | los once casos canónicos del contrato, generados por `GenerarGoldenFiles.m`; son el arnés de validación del port a JS |
 
 Detalle completo en [`documentacion_generador_elementos.md` §2](documentacion_generador_elementos.md#2-arquitectura).
 
@@ -52,6 +54,15 @@ run('analisis_energia.m')     % modelo preliminar sobre una trayectoria de prueb
 run('DemoElemento.m')         % un elemento del generador en detalle: reporte y gráficos
 run('DemoLayout.m')           % los cuatro elementos encadenados en un circuito
 run('TestsValidacion.m')      % dieciseis tests del generador, termina con error si alguno falla
+run('GenerarGoldenFiles.m')   % regenera golden/*.json y los valida contra el esquema (necesita node)
+```
+
+El contrato de datos entre el cálculo y el visualizador web está en [`CONTRATO_VISUALIZADOR.md`](CONTRATO_VISUALIZADOR.md);
+`DemoLayout.m` y `DemoElemento.m` escriben además el layout como `layout_*.json`. Para validar cualquier JSON contra el
+esquema (una vez, `npm install` dentro de `esquema/`):
+
+```bash
+node esquema/validar-layout.js golden layout_circuito.json
 ```
 
 Los parámetros del generador de elementos se configuran en un único lugar:
