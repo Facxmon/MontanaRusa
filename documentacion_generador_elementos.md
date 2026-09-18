@@ -154,13 +154,13 @@ $U_z$ es la componente vertical del versor "arriba del carro" ($U_z = \mathbf{U}
 | Sub-tramo | Qué hace | Cuándo aparece |
 |---|---|---|
 | `AcondicionamientoEntrada` | lleva a cero la componente de curvatura que el elemento no puede representar, y el roll al que el elemento pide | sólo si hace falta |
-| `ClotoideEntrada` | rampa lineal de curvatura desde $\kappa_0$ hasta la que pide el modo | siempre |
+| `ClotoideEntrada` | rampa suave (smoothstep cúbico) de curvatura desde $\kappa_0$ hasta la que pide el modo | siempre |
 | `ArcoPrincipal` | curvatura según el modo elegido | siempre |
-| `ClotoideSalida` | rampa de curvatura de vuelta a cero | siempre |
+| `ClotoideSalida` | rampa suave (Hermite cúbica) de curvatura de vuelta a cero, arrancando con la $d\kappa/ds$ del arco | siempre |
 
 Quedan demarcados por índice de nodo en `Track.SubTramos(k).IndiceInicio/IndiceFin`, se listan en el reporte con su rango de arco, y se distinguen por color en los gráficos.
 
-La clotoide de entrada arranca en la curvatura que traiga el estado de entrada (**clotoide desplazada**), no en cero. Se implementa como una mezcla lineal entre $\kappa_0$ y la curvatura del modo; con el modo `Clotoide` la curvatura objetivo es constante y la mezcla es exactamente una clotoide ($d\kappa/ds$ constante).
+La clotoide de entrada arranca en la curvatura que traiga el estado de entrada (**clotoide desplazada**), no en cero. Se implementa como una mezcla entre $\kappa_0$ y la curvatura del modo evaluada en cada punto, con un **smoothstep cúbico** $f(u) = 3u^2 - 2u^3$ como peso: $d\kappa/ds$ es nula al arrancar y, al terminar, coincide con la del arco, porque el objetivo de la mezcla es la misma función de curvatura que el arco va a seguir. La rampa de salida es una **Hermite cúbica** desde $(\kappa, d\kappa/ds)$ del fin del arco hasta $(0, 0)$; la $d\kappa/ds$ del fin del arco se estima por diferencia hacia atrás sobre el último nodo registrado. Ninguna de las dos es una clotoide de Cornu ($d\kappa/ds$ constante): se llaman así por su rol. El motivo del cambio es el roll helicoidal, que hereda $d\kappa/ds$ en $\phi''$ y con rampas lineales producía un escalón de $G_y$ en cada frontera ([`memoria_de_calculo.md` §7.8](memoria_de_calculo.md#78-rampas-de-curvatura-suaves-por-qué-la-clotoide-lineal-no-alcanza-con-roll-helicoidal)). Durante la rampa de entrada el modo normativo evalúa la curva de la norma con duración **cero** (el límite de evento corto), que es exactamente lo que el arco pide en su primer punto: con el reloj arrancando en la rampa, una rampa de más de 1.0 s de prototipo veía bajar la curva y la curvatura saltaba al entrar al arco.
 
 ### 4.1 Cómo se construye la geometría, paso a paso
 
@@ -196,7 +196,7 @@ La tabla siguiente es la referencia rápida de las tres capas; después va el de
 
 Es lo único que de verdad avanza la vía. `IntegrarTramo` la corre sub-tramo por sub-tramo (acondicionamiento, clotoide de entrada, arco principal, clotoide de salida) y en cada uno repite, mientras quede arco por recorrer:
 
-1. **Evaluar el punto actual** (`PuntoCinematico` + `DerivadaDeVia`): con el estado $y$ de ese nodo se arma el marco del carro (roll aplicado sobre el marco de transporte), se evalúa la curvatura objetivo de ese sub-tramo — constante, mezcla lineal, o según el modo elegido (ver [§5](#5-los-cuatro-modos-de-curvatura)) — y con eso las cargas $G$ y la resistencia al avance. La velocidad que entra a este cálculo es `Punto.VelocidadParaCurvatura`: la velocidad real de la marcha en el método A, o el perfil de velocidad supuesto (interpolado) en el método B — ver [§6](#6-los-dos-métodos-de-acoplamiento).
+1. **Evaluar el punto actual** (`PuntoCinematico` + `DerivadaDeVia`): con el estado $y$ de ese nodo se arma el marco del carro (roll aplicado sobre el marco de transporte), se evalúa la curvatura objetivo de ese sub-tramo — constante, mezcla suave, o según el modo elegido (ver [§5](#5-los-cuatro-modos-de-curvatura)) — y con eso las cargas $G$ y la resistencia al avance. La velocidad que entra a este cálculo es `Punto.VelocidadParaCurvatura`: la velocidad real de la marcha en el método A, o el perfil de velocidad supuesto (interpolado) en el método B — ver [§6](#6-los-dos-métodos-de-acoplamiento).
 2. **Registrar el nodo** (`AgregarNodo`) con todos esos campos: posición, los tres versores, curvatura, roll, velocidad, G's, pérdidas, ángulo girado, tiempo.
 3. **Dar el paso** (`PasoRK4`): integra el sistema completo posición + marco + energía con Runge-Kutta 4 sobre un paso $\Delta s$ = `Parametros.PasoGeneracion` (o menos, si es el último paso del sub-tramo). El vector de estado tiene 15 componentes — posición, tangente, arriba y lateral del transporte paralelo, $v^2$, ángulo girado, tiempo — y sus derivadas son:
    $$\frac{d\mathbf{r}}{ds}=\mathbf{T},\quad \frac{d\mathbf{T}}{ds}=\kappa_U\mathbf{U}_{pt}+\kappa_L\mathbf{L}_{pt},\quad \frac{d\mathbf{U}_{pt}}{ds}=-\kappa_U\mathbf{T},\quad \frac{d\mathbf{L}_{pt}}{ds}=-\kappa_L\mathbf{T}$$
@@ -209,10 +209,10 @@ La curvatura que entra en el paso 1 depende de en qué sub-tramo está la marcha
 
 | Sub-tramo | Curvatura que impone |
 |---|---|
-| `AcondicionamientoEntrada` | rampa lineal de la componente perpendicular hacia 0, manteniendo la paralela |
-| `ClotoideEntrada` | mezcla lineal $(1-f)\kappa_0 + f\,\kappa_{modo}$, con $f$ = fracción recorrida del sub-tramo |
+| `AcondicionamientoEntrada` | rampa smoothstep de la componente perpendicular hacia 0, manteniendo la paralela |
+| `ClotoideEntrada` | mezcla $(1-f)\kappa_0 + f\,\kappa_{modo}$, con $f = 3u^2 - 2u^3$ y $u$ = fracción recorrida del sub-tramo |
 | `ArcoPrincipal` | $\kappa_{modo}$ evaluada en cada paso según la tabla de modos ([§5](#5-los-cuatro-modos-de-curvatura)) |
-| `ClotoideSalida` | rampa lineal desde $\kappa_{fin}$ del arco principal hasta 0 |
+| `ClotoideSalida` | Hermite cúbica desde $(\kappa_{fin}, d\kappa/ds_{fin})$ del arco principal hasta $(0, 0)$ |
 
 #### 4.1.2 Capa 2 — cierre del loop: corrección por secante
 
@@ -342,9 +342,9 @@ El perfil supuesto viaja como **interpolante pchip precompilado**: con interpola
 
 ## 7. Presupuesto de onset y longitudes de transición
 
-$$L_{trans} = \frac{\Delta G\,v}{J_{max}} = \frac{v^3\,|\Delta\kappa|}{g\,J_{max}}$$
+$$L_{trans} = 1.5\,\frac{\Delta G\,v}{J_{max}} = 1.5\,\frac{v^3\,|\Delta\kappa|}{g\,J_{max}}$$
 
-Las dos formas son la misma relación escrita al revés. El presupuesto del modelo sale de multiplicar el de la norma por $\sqrt{\lambda_{loop}}$: un modelo fiel a Froude produce jerk **mayor** que el prototipo, no menor (derivación completa en [`memoria_de_calculo.md` §7.1](memoria_de_calculo.md#71-por-qué-el-criterio-de-onset-cambia-entre-modelo-y-prototipo)).
+Las dos formas son la misma relación escrita al revés; el factor 1.5 es el pico de pendiente del smoothstep cúbico respecto de la rampa lineal de la misma longitud ([`memoria_de_calculo.md` §7.8](memoria_de_calculo.md#78-rampas-de-curvatura-suaves-por-qué-la-clotoide-lineal-no-alcanza-con-roll-helicoidal)). El presupuesto del modelo sale de multiplicar el de la norma por $\sqrt{\lambda_{loop}}$: un modelo fiel a Froude produce jerk **mayor** que el prototipo, no menor (derivación completa en [`memoria_de_calculo.md` §7.1](memoria_de_calculo.md#71-por-qué-el-criterio-de-onset-cambia-entre-modelo-y-prototipo)).
 
 La transición de roll se dimensiona por el onset lateral que produce la rotación sobre el pasajero. Con el smoothstep quíntico $\max|\phi'''| = 60|\Delta\phi|/L^3$, y la G lateral de un punto a distancia $b$ del eje de roll vale $b\,v^2\phi''/g$, así que:
 
@@ -416,7 +416,7 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 | # | Test | Resultado típico |
 |---|---|---|
 | 1 | Conservación de energía sin pérdidas contra $v^2 = v_0^2 - 2gh$ | error relativo $6\times10^{-9}$ |
-| 2 | Curvatura impuesta contra recuperada de la polilínea | error relativo $2\times10^{-5}$ |
+| 2 | Curvatura impuesta contra recuperada de la polilínea | error relativo $7\times10^{-4}$ (límite $10^{-3}$; con rampas lineales era $10^{-5}$: el estimador de tres puntos tiene error $\propto h^2\,d^2\kappa/ds^2$, que en las rampas suaves es máximo donde $\kappa$ es chica) |
 | 3 | Residual del endpoint y desplazamiento lateral | tangente $8.8\times10^{-5}$, desplazamiento lateral dentro del 0.01 % del objetivo |
 | 4 | Continuidad en el empalme | los tres saltos exactamente 0 |
 | 5 | Equivalencia de métodos A y B en modo clotoide | diferencia exactamente 0 |
@@ -426,7 +426,7 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 | 9 | Derivación de la heartline desde el riel: separación constante y $R_h=R_{riel}-d$ | separación exacta a $6\times10^{-16}$ m; diferencia de radios dentro del 0.7 % de $d$ |
 | 10 | Transporte de cuerpo rígido desde el riel | con $d=e=0$ se reduce a la G del punto del riel con error $2\times10^{-16}$ G; con $d$ real la rotación y el cambio de radio aportan hasta 0.49 G |
 | 11 | El riel es el eje de roll | en la transición de roll del dive loop el riel queda exactamente recto, la heartline sale con la curvatura de la hélice $d\phi'^2/(1+d^2\phi'^2)$ (0.0 % de desvío) y la $G_y$ de rotación en la cabeza es exactamente el doble que en la heartline |
-| 12 | El modo normativo pone el $+G_z$ límite en el pasajero, en los cuatro elementos | desvío máximo $\lvert G_z - G_{lim}(t)\rvert$ sobre el arco: 0.003 G (loop), 0.002 G (hélice), 0.000 G (over-banked turn, dive loop) |
+| 12 | El modo normativo pone el $+G_z$ límite en el pasajero, en los cuatro elementos (over-banked turn a 240°: con 180° las rampas suaves le dejan 0.05 s de arco) | desvío máximo $\lvert G_z - G_{lim}(t)\rvert$ sobre el arco: 0.004 G (loop), 0.002 G (hélice), 0.000 G (over-banked turn, dive loop); un arco vacío cuenta como falla |
 | 13 | El dive loop alcanza su $G_y$ objetivo por sub-peralte | $\lvert G_y - \text{objetivo}\rvert < 10^{-4}$ G; sub-peralte hasta 10.7°; cierre $10^{-5}$ rad; elipse 7.1.5.1 en 0.988 y onset lateral pasan |
 | 14 | El factor de seguridad escala el objetivo del modo y no la verificación (`FactorDeSeguridadNormativo` = 1.25, loop y dive loop) | $G_z$ del arco = 6.0/1.25 = 4.80 G dentro de 0.002 G; criterios de objetivo pasan; semiejes de la elipse de §7.1.5.1 sin escalar |
 
@@ -477,6 +477,10 @@ $$G_x = \frac{a_t}{g} + T_z, \qquad a_t = -g\,T_z - \frac{F_{res}}{m} \quad\Long
 ### 12.5 `RadioDeReferencia` es una entrada que en tres de los cuatro modos describe una salida
 
 `RadioDeReferencia` (pisado por `RadioDelLoop` en el caso del loop vertical) es la longitud característica de Froude: fija $\lambda_{loop}$ y con él el presupuesto de onset y la conversión de duraciones contra las curvas normativas. Pero en los modos que dependen de $v$ el radio de cúspide **sale** de la integración. Si el nominal y el alcanzado se apartan, esos dos números se calcularon con la longitud de referencia equivocada. Hay un chequeo posterior que lo detecta y avisa.
+
+### 12.6 El roll helicoidal convierte los saltos de $d\kappa/ds$ en escalones de $G_y$ — resuelto
+
+La ley de roll de la hélice, $\phi_h' = \tan\alpha\cdot\kappa$, hace que $\phi''$ herede $d\kappa/ds$. Con clotoides lineales $d\kappa/ds$ salta en los extremos de cada rampa y el término de Euler $b\,v^2\phi''/g$ producía un **escalón de $G_y$ de $b\tan\alpha\,J_z/v \approx 0.09$ G** en cada frontera del loop vertical: una discontinuidad de aceleración, prohibida por la política de $G_y$ ([`memoria_de_calculo.md` §6.7](memoria_de_calculo.md#67-política-adoptada)). El chequeo de onset lateral fallaba con 124 G/s, un número que crecía como $1/\Delta s$ al refinar el paso —la derivada numérica de un escalón, no un jerk— y el lazo de diseño no lo veía porque dentro del paso $\phi''$ se evaluaba sólo con la parte quíntica. Se resolvió por construcción: rampas de curvatura $C^1$ (smoothstep cúbico a la entrada, Hermite a la salida, [§4](#4-sub-tramos)) y $\phi''$ completado sobre la polilínea antes de medir el onset, así que diseño y verificación ven la misma $G_y$. El onset lateral del loop pasa a 16 G/s con presupuesto 42.6, y las rampas se alargan 1.5×. Detalle y números en [`memoria_de_calculo.md` §7.8](memoria_de_calculo.md#78-rampas-de-curvatura-suaves-por-qué-la-clotoide-lineal-no-alcanza-con-roll-helicoidal).
 
 ---
 

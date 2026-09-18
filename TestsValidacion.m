@@ -55,9 +55,14 @@ CurvaturaRecuperada = CurvaturaDiscretaDePolilinea(Track.PuntosRiel);
 Interiores = (2:size(Track.PuntosRiel,1)-1).';
 
 % Se excluyen los nodos cuyo esquema de 3 puntos cruza una frontera de
-% sub-tramo: ahi dkappa/ds salta y la circunferencia por 3 puntos devuelve un
+% sub-tramo: ahi d2kappa/ds2 salta (dkappa/ds es continua desde que las
+% rampas son smoothstep) y la circunferencia por 3 puntos devuelve un
 % promedio de dos curvaturas distintas. Es una limitacion del estimador
-% discreto, no un error de la geometria generada.
+% discreto, no un error de la geometria generada. El error del estimador
+% es de orden h^2*d2kappa/ds2, y en los extremos de las rampas suaves
+% d2kappa/ds2 es maxima justo donde kappa es chica: por eso el error
+% relativo maximo es del orden de 1e-3 y no de 1e-5 como con rampas
+% lineales (d2kappa/ds2 = 0).
 CruzaFrontera = false(size(Track.PuntosRiel,1), 1);
 for k = 1:numel(Track.SubTramos)-1
     Frontera = Track.SubTramos(k).IndiceFin;
@@ -324,7 +329,10 @@ Resultados = Anotar(Resultados, 'El riel es el eje de roll', ...
 % curvatura en vez de sobre U le erraba al objetivo por 1/sin(beta).
 Parametros = ParametrosBase;
 Parametros.ModoCurvatura = 'GNormativaMaxima';
-Parametros.AnguloDelGiro = deg2rad(180);   % con 120 grados las clotoides consumen todo el giro a esta v
+% Con 120 grados las rampas consumen todo el giro del over-banked turn a
+% esta velocidad, y con 180 le dejan 0.05 s de arco: se usan 240 para que
+% el arco tenga entidad. Un arco vacio es una falla del test, no un error.
+Parametros.AnguloDelGiro = deg2rad(240);
 Constructores = {@ElementoLoopVertical, @ElementoOverBankedTurn, @ElementoHelice, @ElementoDiveLoop};
 Estado = EstadoInicial([0 0 1.0], [1 0 0], [0 0 1], 6.0, Parametros);
 
@@ -335,6 +343,11 @@ for i = 1:numel(Constructores)
     [~, ElementoNormativo, ReporteNormativo] = Constructores{i}(Estado, Parametros);
     TrackN = ElementoNormativo.Track;  SimN = ElementoNormativo.Sim;
     IndiceArco = find(strcmp({TrackN.SubTramos.Nombre}, 'ArcoPrincipal'), 1);
+    if isempty(IndiceArco) || TrackN.SubTramos(IndiceArco).IndiceFin < TrackN.SubTramos(IndiceArco).IndiceInicio
+        PeorDesvio = Inf;
+        Detalles{end+1} = sprintf('%s SIN ARCO (las rampas consumen todo el giro)', ElementoNormativo.Nombre); %#ok<SAGROW>
+        continue
+    end
     RangoArco  = TrackN.SubTramos(IndiceArco).IndiceInicio : TrackN.SubTramos(IndiceArco).IndiceFin;
     DuracionReal = (SimN.Tiempo(RangoArco) - SimN.Tiempo(RangoArco(1))) * ElementoNormativo.Diagnostico.Escala.RaizLambdaLoop;
     Objetivo = arrayfun(@(D) LimiteNormativo(ElementoNormativo.Receta.CurvaLimiteGz, D), DuracionReal);

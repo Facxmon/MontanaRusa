@@ -7,10 +7,16 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
 %   Sub-tramos, en orden:
 %     AcondicionamientoEntrada  lleva a cero la curvatura fuera del plano de
 %                               referencia y el roll al que el elemento pide
-%     ClotoideEntrada           rampa de curvatura desde kappa_0 (clotoide
-%                               desplazada si la entrada ya venia curvada)
+%     ClotoideEntrada           rampa de curvatura desde kappa_0 (desplazada
+%                               si la entrada ya venia curvada)
 %     ArcoPrincipal             curvatura segun el modo elegido
 %     ClotoideSalida            rampa de curvatura de vuelta a cero
+%
+%   Las rampas de curvatura son suaves (smoothstep a la entrada, Hermite a
+%   la salida) y no lineales: dkappa/ds es continua en todas las fronteras,
+%   asi que el roll helicoidal (phi' = tan(alfa)*kappa) queda C2 y la G
+%   lateral no da escalones. Se las sigue llamando clotoides por su rol,
+%   no por su ley; ver MezclaDeClotoide y RampaDeSalida.
 %
 %   Todos los elementos son el mismo objeto geometrico: un giro de un angulo
 %   dado alrededor de un eje, con una ley de roll encima. Lo que los distingue
@@ -159,6 +165,9 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
             AjusteCierre = AjusteCierre + ResidualCierre;
         end
 
+        % phi'' completo y G lateral corregida sobre la polilinea, antes de
+        % medir el onset: el lazo tiene que ver la misma G que la simulacion.
+        Recorrido.Registro = CompletarAceleracionRoll(Recorrido.Registro, Parametros);
         [OnsetMedido, OnsetLateralMedido] = OnsetDelRecorrido(Recorrido.Registro);
         if ~isempty(Recorrido.Aviso)
             break
@@ -206,10 +215,10 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
     Track.Curvatura               = Registro.Curvatura;
     Track.AnguloRoll              = Registro.AnguloRoll;
     Track.VelocidadRoll           = Registro.VelocidadRoll;
-    % La parte helicoidal del roll aporta a phi' pero su phi'' depende de
-    % dkappa/ds, que no esta disponible dentro del paso: se recupera derivando
-    % phi' sobre la polilinea ya construida.
-    Track.AceleracionRoll         = gradient(Registro.VelocidadRoll, Registro.Arco);
+    % phi'' completo: la parte helicoidal la recupero CompletarAceleracionRoll
+    % derivando phi' sobre la polilinea, y es el mismo phi'' que vio el lazo
+    % de onset.
+    Track.AceleracionRoll         = Registro.AceleracionRoll;
     Track.AnguloGirado            = Registro.AnguloGirado;
     Track.SubTramos               = Recorrido.SubTramos;
     Track.VelocidadDeDiseno       = EstadoEntrada.Velocidad;
@@ -415,10 +424,20 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
         CurvaturaObjetivo*sin(AnguloObjetivo) - CurvaturaInicialArco*sin(AnguloInicial), Plan.Onset, Parametros);
     Recorrido.LongitudClotoideEntrada = LongitudEntrada;
 
+    % La rampa apunta a la curvatura del modo con duracion CERO: el modo
+    % normativo trata el arco como un unico evento sostenido que empieza al
+    % arrancar el arco, asi que durante la rampa el objetivo es el limite de
+    % evento corto, el mismo que el arco va a pedir en su primer punto. Si
+    % el reloj de la rampa arrancara en su propio inicio (como antes), una
+    % rampa de mas de 1.0 s de prototipo -- la helice a 6 m/s la tiene --
+    % veria bajar la curva de la norma y la curvatura saltaria hacia arriba
+    % al arrancar el arco: una rotura C0, no de dkappa/ds. Con la referencia
+    % en +Inf la duracion queda en cero en toda la rampa (CurvaturaDelModo
+    % la acota por abajo) y el empalme con el arco es exacto.
     ArcoInicio = Arco;
-    TiempoReferencia = y(15);
+    TiempoReferenciaRampa = Inf;
     Contexto.FuncionCurvatura = @(Punto) MezclaDeClotoide(Punto, ArcoInicio, LongitudEntrada, ...
-                                    CurvaturaInicialArco, Plan, TiempoReferencia);
+                                    CurvaturaInicialArco, Plan, TiempoReferenciaRampa);
 
     Indice = Recorrido.Registro.NumeroDeNodos + 1;
     [Recorrido.Registro, y, Arco] = IntegrarTramo(Recorrido.Registro, y, Arco, Contexto, LongitudEntrada, []);
@@ -434,9 +453,13 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     TiempoReferenciaArco = y(15);
     Contexto.FuncionCurvatura = @(Punto) CurvaturaDelModoProyectada(Punto, Plan, TiempoReferenciaArco);
 
-    ArcoQueFalta = @(Punto) (Plan.Receta.GiroObjetivo - AjusteCierre ...
+    % La rampa de salida arranca con la pendiente dkappa/ds que traiga el
+    % arco (rampa de Hermite, ver RampaDeSalida), y su giro depende de esa
+    % pendiente: se la estima con el ultimo nodo registrado, que es por lo
+    % que la prediccion recibe tambien el Registro.
+    ArcoQueFalta = @(Punto, Registro) (Plan.Receta.GiroObjetivo - AjusteCierre ...
                              - (Punto.AnguloGirado - AnguloGiradoInicio) ...
-                             - GiroDeLaClotoideDeSalida(Punto, Plan)) / max(Punto.Curvatura, eps);
+                             - GiroDeLaRampaDeSalida(Punto, Registro, Plan)) / max(Punto.Curvatura, eps);
 
     Indice = Recorrido.Registro.NumeroDeNodos + 1;
     [Recorrido.Registro, y, Arco] = IntegrarTramo(Recorrido.Registro, y, Arco, Contexto, 50, ArcoQueFalta);
@@ -454,6 +477,7 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     LongitudSalida = LongitudDeClotoidePorEjes(PuntoFinArco.Velocidad, PuntoFinArco.CurvaturaArribaCarro, ...
                                                PuntoFinArco.CurvaturaLateralCarro, Plan.Onset, Parametros);
     Recorrido.LongitudClotoideSalida = LongitudSalida;
+    DerivadaCurvaturaFinArco = DerivadaCurvaturaEnElUltimoTramo(PuntoFinArco, Recorrido.Registro, Parametros);
 
     % Si el modo desalineo la curvatura respecto de la direccion de la
     % Receta (sub-peralte), la rampa de salida conserva ese desvio: cambiar
@@ -462,7 +486,8 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
                   - PuntoFinArco.AnguloCurvaturaDesdeArriba;
     ArcoInicio = Arco;
     Contexto.FuncionCurvatura = @(Punto) ProyectarCurvatura( ...
-        CurvaturaFinArco * (1 - FraccionDeTramo(Punto.Arco, ArcoInicio, LongitudSalida)), ...
+        RampaDeSalida(FraccionDeTramo(Punto.Arco, ArcoInicio, LongitudSalida), ...
+                      CurvaturaFinArco, DerivadaCurvaturaFinArco, LongitudSalida), ...
         AnguloDeCurvatura(Punto) + DesvioFinArco);
 
     Indice = Recorrido.Registro.NumeroDeNodos + 1;
@@ -514,7 +539,9 @@ function [CurvaturaArriba, CurvaturaLateral] = CurvaturaDeAcondicionamiento(Punt
 %CURVATURADEACONDICIONAMIENTO Rampa a cero la componente de curvatura de
 %   entrada que es perpendicular a la direccion que el elemento impone, y
 %   mantiene la componente paralela, que la clotoide de entrada va a retomar.
-    Fraccion = FraccionDeTramo(Punto.Arco, ArcoInicio, Plan.LongitudAcondicionamiento);
+%   La rampa es un smoothstep, como las demas: dkappa/ds continua en los dos
+%   extremos (ver MezclaDeClotoide para el por que).
+    Fraccion = Smoothstep(FraccionDeTramo(Punto.Arco, ArcoInicio, Plan.LongitudAcondicionamiento));
     CurvaturaPerpendicular = (1 - Fraccion) * Plan.CurvaturaPerpendicular;
     Angulo = Plan.Beta + Plan.Receta.DesfasajeDeCurvatura;
     CurvaturaArriba  = Plan.CurvaturaParalela*cos(Angulo) - CurvaturaPerpendicular*sin(Angulo);
@@ -530,13 +557,26 @@ function [CurvaturaArriba, CurvaturaLateral] = CurvaturaDelModoProyectada(Punto,
 end
 
 function [CurvaturaArriba, CurvaturaLateral] = MezclaDeClotoide(Punto, ArcoInicio, Longitud, CurvaturaInicial, Plan, TiempoReferencia)
-%MEZCLADECLOTOIDE Rampa lineal entre la curvatura de entrada y la que pide el
-%   modo. Con el modo Clotoide la curvatura objetivo es constante y esto es
-%   exactamente una clotoide: dkappa/ds constante. Se mezclan las dos
-%   COMPONENTES y no el modulo, para que si el modo desalinea la curvatura
-%   respecto de U la direccion tambien entre en rampa y no salte al arrancar
-%   el arco.
-    Fraccion = FraccionDeTramo(Punto.Arco, ArcoInicio, Longitud);
+%MEZCLADECLOTOIDE Rampa suave entre la curvatura de entrada y la que pide el
+%   modo. Se mezclan las dos COMPONENTES y no el modulo, para que si el modo
+%   desalinea la curvatura respecto de U la direccion tambien entre en rampa
+%   y no salte al arrancar el arco.
+%
+%   La mezcla es un smoothstep cubico y no una rampa lineal, y el motivo es
+%   el roll: la parte helicoidal vale dphi/ds = tan(alfa)*kappa, asi que
+%   d2phi/ds2 hereda dkappa/ds y el termino de Euler de la G lateral,
+%   b*v^2*phi''/g, hereda sus saltos. Con la rampa lineal dkappa/ds saltaba
+%   en los dos extremos de la transicion y Gy daba un escalon de
+%   b*tan(alfa)*J_z/v (~0.1 G con los defaults), que es una discontinuidad
+%   de G y viola la continuidad C2 del roll que exige la memoria (seccion
+%   6.7). Con el smoothstep dkappa/ds es continua: nula al arrancar (la
+%   curvatura de entrada es constante) y, al terminar, igual a la del modo
+%   en el arco, porque el objetivo de la mezcla es la MISMA funcion de
+%   curvatura que el arco va a seguir. El precio es que el pico de
+%   dkappa/ds es 1.5 veces el de la rampa lineal de la misma longitud; lo
+%   paga LongitudDeClotoide. Ya no es una clotoide en sentido estricto
+%   (dkappa/ds no es constante); el sub-tramo conserva el nombre.
+    Fraccion = Smoothstep(FraccionDeTramo(Punto.Arco, ArcoInicio, Longitud));
     [ArribaObjetivo, LateralObjetivo] = CurvaturaDelModoProyectada(Punto, Plan, TiempoReferencia);
     AnguloEntrada = Punto.AnguloRoll + Punto.AnguloCurvaturaDesdeArriba;
     [ArribaInicial, LateralInicial]   = ProyectarCurvatura(CurvaturaInicial, AnguloEntrada);
@@ -544,13 +584,67 @@ function [CurvaturaArriba, CurvaturaLateral] = MezclaDeClotoide(Punto, ArcoInici
     CurvaturaLateral = (1 - Fraccion)*LateralInicial + Fraccion*LateralObjetivo;
 end
 
-function Giro = GiroDeLaClotoideDeSalida(Punto, Plan)
-%GIRODELACLOTOIDEDESALIDA Angulo que va a girar la clotoide de salida si el
-%   arco terminara en este punto. Con la rampa lineal es el area del
-%   triangulo: kappa/2 * L.
+function Fraccion = Smoothstep(u)
+%SMOOTHSTEP 3u^2 - 2u^3: vale 0 en 0 y 1 en 1, con derivada nula en los dos
+%   extremos. Pendiente maxima 1.5 en u = 0.5.
+    Fraccion = u.^2 .* (3 - 2*u);
+end
+
+function Curvatura = RampaDeSalida(Fraccion, CurvaturaInicial, DerivadaInicial, Longitud)
+%RAMPADESALIDA Curvatura de la rampa de salida: Hermite cubica desde
+%   (kappa, dkappa/ds) del fin del arco hasta (0, 0). Arranca con la
+%   pendiente que traia el arco, para que dkappa/ds -- y con ella phi'' y la
+%   G lateral -- no salten en la frontera, y termina con pendiente nula, asi
+%   que el elemento siguiente arranca de kappa = 0 con dkappa/ds = 0 y su
+%   propia rampa (que tambien arranca con pendiente nula) empalma C1.
+    u = Fraccion;
+    Pendiente = PendienteAcotada(DerivadaInicial, CurvaturaInicial, Longitud);
+    Curvatura = CurvaturaInicial * (2*u.^3 - 3*u.^2 + 1) + Pendiente * (u.^3 - 2*u.^2 + u);
+end
+
+function Pendiente = PendienteAcotada(DerivadaInicial, CurvaturaInicial, Longitud)
+%PENDIENTEACOTADA Pendiente inicial de la Hermite, en unidades de u, acotada
+%   a +-3*kappa. Por debajo de -3*kappa la Hermite cruza por debajo de cero
+%   antes del final, y una curvatura negativa invertiria el sentido de
+%   giro; por encima de +3*kappa sobrepasa mucho la curvatura del arco y la
+%   rampa deja de ser una descarga. Son casos extremos (dkappa/ds del arco
+%   muy grande contra kappa) que con los presupuestos de onset no aparecen;
+%   si aparecen, la rampa deja de ser C1 en esa frontera, que es preferible
+%   a una via que se da vuelta.
+    Pendiente = max(min(DerivadaInicial*Longitud, 3*CurvaturaInicial), -3*CurvaturaInicial);
+end
+
+function Derivada = DerivadaCurvaturaEnElUltimoTramo(Punto, Registro, Parametros)
+%DERIVADACURVATURAENELULTIMOTRAMO dkappa/ds al final del arco, estimada por
+%   diferencia hacia atras entre el punto actual y un nodo registrado.
+%   Dentro del paso no hay dkappa/ds analitica (en los modos que dependen
+%   de v la curvatura es funcion de la marcha). El nodo se elige a por lo
+%   menos medio paso de generacion: el ultimo registrado puede estar a un
+%   paso acortado -- microns, si un sub-tramo termino justo ahi -- y una
+%   diferencia sobre esa distancia es ruido amplificado.
+    n = Registro.NumeroDeNodos;
+    DistanciaMinima = 0.5*Parametros.PasoGeneracion;
+    k = n;
+    while k >= 1 && Punto.Arco - Registro.Arco(k) < DistanciaMinima
+        k = k - 1;
+    end
+    if k < 1
+        Derivada = 0;
+        return
+    end
+    Derivada = (Punto.Curvatura - Registro.Curvatura(k)) / (Punto.Arco - Registro.Arco(k));
+end
+
+function Giro = GiroDeLaRampaDeSalida(Punto, Registro, Plan)
+%GIRODELARAMPADESALIDA Angulo que va a girar la rampa de salida si el arco
+%   terminara en este punto: la integral de la Hermite de RampaDeSalida,
+%   L*(kappa/2 + Pendiente/12), con la misma cota sobre la pendiente. Con
+%   dkappa/ds = 0 se reduce al triangulo kappa/2*L de la rampa lineal.
     Longitud = LongitudDeClotoidePorEjes(Punto.Velocidad, Punto.CurvaturaArribaCarro, ...
                                          Punto.CurvaturaLateralCarro, Plan.Onset, Plan.Parametros);
-    Giro = 0.5 * Punto.Curvatura * Longitud;
+    Pendiente = PendienteAcotada(DerivadaCurvaturaEnElUltimoTramo(Punto, Registro, Plan.Parametros), ...
+                                 Punto.Curvatura, Longitud);
+    Giro = Longitud * (0.5*Punto.Curvatura + Pendiente/12);
 end
 
 function Longitud = LongitudDeClotoidePorEjes(Velocidad, DeltaCurvaturaArriba, DeltaCurvaturaLateral, Onset, Parametros)
@@ -637,6 +731,32 @@ function Peralte = AnguloDePeralte(VersorTangente, VersorArribaCarro)
     Peralte(NormaHorizontal < 1e-9) = NaN;   % tangente vertical: no esta definido
 end
 
+function Registro = CompletarAceleracionRoll(Registro, Parametros)
+%COMPLETARACELERACIONROLL Completa phi'' sobre la polilinea y corrige la G lateral.
+%   Dentro del paso PuntoCinematico solo conoce el phi'' de la transicion
+%   quintica: la parte helicoidal vale tan(alfa)*dkappa/ds y dkappa/ds no
+%   esta disponible ahi. Sobre la polilinea ya construida phi' completo si
+%   esta registrado (DerivadaDeVia le suma tan(alfa)*kappa), asi que se lo
+%   deriva, se reemplaza el phi'' de cada nodo y se corrige la G lateral
+%   registrada con el termino de Euler que faltaba, b*v^2*Delta(phi'')/g,
+%   en los dos brazos. Con esto la G de diseno que ve el lazo de onset y la
+%   que reporta Diagnostico son las mismas que va a medir SimularSobreTrack
+%   (salvo la velocidad re-simulada). Lo unico que sigue usando el phi''
+%   incompleto es lo que se evalua dentro del paso: la carga de las ruedas
+%   guia en la resistencia (Crr*|Gy|*peso, de segundo orden) y el Gy
+%   objetivo del dive loop si tuviera helice (con los defaults no la tiene).
+    n = Registro.NumeroDeNodos;
+    if n < 3
+        return
+    end
+    Arco = Registro.Arco(1:n);
+    AceleracionCompleta = DerivadaPorArco(Registro.VelocidadRoll(1:n), Arco);
+    Termino = Registro.Velocidad(1:n).^2 .* (AceleracionCompleta - Registro.AceleracionRoll(1:n)) / Parametros.Gravedad;
+    Registro.AceleracionRoll(1:n)      = AceleracionCompleta;
+    Registro.GLateralHeartline(1:n)    = Registro.GLateralHeartline(1:n)    + Parametros.DistanciaHeartline*Termino;
+    Registro.GLateralVerificacion(1:n) = Registro.GLateralVerificacion(1:n) + BrazoDeVerificacion(Parametros)*Termino;
+end
+
 function [OnsetVertical, OnsetLateral] = OnsetDelRecorrido(Registro)
 %ONSETDELRECORRIDO Tasa de aparicion de la G vertical y de la lateral en el
 %   punto de verificacion, medidas sobre el recorrido recien generado. Se
@@ -657,9 +777,15 @@ end
 
 function Longitud = LongitudDeClotoide(Velocidad, DeltaCurvatura, Onset, Parametros)
 %LONGITUDDECLOTOIDE L = DeltaG*v/Onset, escrita en funcion de la curvatura.
-%   DeltaG = v^2*DeltaKappa/g, de modo que L = v^3*|DeltaKappa|/(g*Onset).
-%   Es la misma relacion que dkappa/ds = Onset*g/v^3, escrita al reves.
-    Longitud = Velocidad^3 * abs(DeltaCurvatura) / (Parametros.Gravedad * Onset);
+%   DeltaG = v^2*DeltaKappa/g, de modo que para una rampa lineal
+%   L = v^3*|DeltaKappa|/(g*Onset): es la relacion dkappa/ds = Onset*g/v^3
+%   escrita al reves. La rampa es un smoothstep (MezclaDeClotoide,
+%   RampaDeSalida), cuyo pico de dkappa/ds es 1.5 veces el de la lineal de
+%   la misma longitud, asi que para respetar el mismo presupuesto en el
+%   pico la longitud lleva ese factor. El lazo de onset de GenerarGeometria
+%   corrige lo que quede (variacion de v y de Uz dentro de la rampa).
+    FactorSmoothstep = 1.5;
+    Longitud = FactorSmoothstep * Velocidad^3 * abs(DeltaCurvatura) / (Parametros.Gravedad * Onset);
     Longitud = max(Longitud, 2*Parametros.PasoGeneracion);
 end
 

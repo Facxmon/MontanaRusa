@@ -4,10 +4,13 @@ function [Registro, y, Arco, PasosDados] = IntegrarTramo(Registro, y, Arco, Cont
 %   tramo siguiente, de modo que la lista de nodos no tenga duplicados. El
 %   ultimo nodo del elemento lo agrega el generador.
 %
-%   DistanciaHastaParar es opcional y devuelve, para el punto actual, cuanto
-%   arco falta para el corte. Cuando falta menos que un paso se acorta el
-%   ultimo paso para caer justo: si no, el corte queda cuantizado por el paso
-%   y el residual de cierre del loop no puede bajar de kappa*ds.
+%   DistanciaHastaParar es opcional y devuelve, para el punto actual y el
+%   registro de nodos ya integrados, cuanto arco falta para el corte. Cuando
+%   falta menos que un paso se acorta el ultimo paso para caer justo: si
+%   no, el corte queda cuantizado por el paso y el residual de cierre del
+%   loop no puede bajar de kappa*ds. Recibe el registro porque la
+%   prediccion del giro de la rampa de salida necesita dkappa/ds, que se
+%   estima con el ultimo nodo.
 
     Parametros  = Contexto.Parametros;
     ArcoInicial = Arco;
@@ -20,7 +23,7 @@ function [Registro, y, Arco, PasosDados] = IntegrarTramo(Registro, y, Arco, Cont
         UltimoPaso = false;
 
         if ~isempty(DistanciaHastaParar)
-            Restante = DistanciaHastaParar(Punto);
+            Restante = DistanciaHastaParar(Punto, Registro);
             if Restante <= 0
                 break
             elseif Restante < Paso

@@ -787,6 +787,27 @@ A $v=4.3$ m/s con G pico de 4 ($R = 63$ cm):
 
 El arco domina ampliamente: las clotoides son alrededor del 10 % del total. Esto **refuerza la decisión de no sacrificar continuidad para ahorrar longitud** — se ahorra poco y se pierde fabricabilidad, vida a fatiga y cumplimiento normativo.
 
+
+### 7.8 Rampas de curvatura suaves: por qué la clotoide lineal no alcanza con roll helicoidal
+
+Las derivaciones de §7.2 y §7.3 valen para una clotoide **lineal** ($d\kappa/ds$ constante) y suponen que el único efecto de la rampa es el onset de $G_z$. Con el loop helicoidal aparece un segundo efecto que la clotoide lineal no puede satisfacer.
+
+**El problema.** La parte helicoidal del roll no es un smoothstep: para que el eje "arriba" del carro siga al vector curvatura mientras el plano del giro rota, el roll avanza con el giro acumulado, $\phi_h = \tan\alpha\cdot\theta$, o sea $\phi_h' = \tan\alpha\cdot\kappa$ ([`documentacion_generador_elementos.md` §4.2](documentacion_generador_elementos.md#42-el-loop-no-es-plano)). Entonces $\phi_h'' = \tan\alpha\cdot d\kappa/ds$: **la aceleración de roll hereda la derivada de la curvatura**. En una clotoide lineal $d\kappa/ds$ salta en los dos extremos de la rampa, así que $\phi''$ salta, y por §3.5 el término de Euler de la G lateral, $b\,v^2\phi''/g$, salta con él:
+
+$$\Delta G_y = \frac{b\,v^2\tan\alpha}{g}\,\Delta\!\left(\frac{d\kappa}{ds}\right) = \frac{b\,\tan\alpha\,J_z}{v}$$
+
+usando $d\kappa/ds = J_z\,g/v^3$ de §7.3. Con los valores por defecto ($b = 0.03$ m, $\tan\alpha = 0.111$, $J_z = 127.9$ G/s en el modelo, $v = 4.6$ m/s) da **0.093 G**: un escalón de aceleración lateral en cada frontera de rampa, que es exactamente lo que §3.8 y §6.7 prohíben para $G_y$ (roll $C^2$). La verificación numérica lo reportaba como un onset de $G_y$ de 124 G/s que crecía como $1/\Delta s$ al refinar el paso: la derivada numérica de una discontinuidad, no un jerk físico. El lazo de diseño no lo veía porque dentro del paso de integración $d\kappa/ds$ no está disponible y $\phi''$ se evaluaba sólo con la parte quíntica.
+
+**La solución adoptada: rampas $C^1$ en curvatura.** Si $d\kappa/ds$ es continua, $\phi''$ es continua y el escalón desaparece por construcción. Se reemplaza la mezcla lineal por un **smoothstep cúbico** $f(u) = 3u^2 - 2u^3$ en la rampa de entrada (mezcla entre $\kappa_0$ y la curvatura del modo evaluada en el punto, así que al terminar la rampa $d\kappa/ds$ coincide automáticamente con la del arco) y por una **Hermite cúbica** en la rampa de salida, que arranca con $(\kappa, d\kappa/ds)$ del fin del arco y termina en $(0, 0)$. Toda rampa termina con pendiente nula, de modo que el elemento siguiente empalma $C^1$ también en la junta. Es la decisión que Pendrill y Eager (§6.5) recomiendan por otra vía: jerk **finito y continuo**, snap acotado.
+
+**El precio.** El pico de $d\kappa/ds$ del smoothstep es $1.5$ veces el de la rampa lineal de la misma longitud ($f'(1/2) = 3/2$), así que para respetar el mismo presupuesto en el pico:
+
+$$L_{trans} = 1.5\,\frac{\Delta G\,v}{J} = 1.5\,\frac{v^3\,|\Delta\kappa|}{g\,J}$$
+
+Las tablas de §7.6 y §7.7 están calculadas para la rampa lineal y hay que multiplicarlas por 1.5. El jerk de $G_z$ pasa de un rectángulo (constante durante toda la clotoide) a una joroba que toca el presupuesto en el medio de la rampa; el área bajo la curva —el $\Delta G$— es la misma. En el loop vertical con los valores por defecto las rampas pasan de 0.20 a 0.28 m y el onset de $G_y$ medido baja de 124 G/s a 16 G/s (presupuesto 42.6), ya sin dependencia del paso en las fronteras de rampa. Las transiciones se siguen llamando "clotoides" en el código por su rol; su ley ya no es la de Cornu.
+
+**Queda un residuo, del mismo origen, en el modo normativo.** La curva límite de la Fig. 10 es lineal por tramos, así que el objetivo $G_z(t)$ tiene quiebres en 1.0 y 2.0 s de prototipo; $\kappa(s)$ los hereda, $d\kappa/ds$ salta ahí y $\phi''$ también. Es un escalón de $G_y$ de $\sim 0.01$ G, un orden de magnitud menor que el de las rampas; su tratamiento se documenta en [`documentacion_generador_elementos.md` §5](documentacion_generador_elementos.md#5-los-cuatro-modos-de-curvatura).
+
 ---
 
 ## 8. Resumen de criterios adoptados
@@ -794,7 +815,8 @@ El arco domina ampliamente: las clotoides son alrededor del 10 % del total. Esto
 | Criterio | Valor | Origen |
 |---|---|---|
 | Continuidad de la curva | $\mathcal{G}^2$ por longitud de arco | Decisión de diseño |
-| Continuidad del roll | $C^2$ vía smoothstep quíntico | Derivación de heartline, [§3.8](#38-consecuencias-sobre-la-continuidad-del-roll) |
+| Continuidad del roll | $C^2$ vía smoothstep quíntico en la transición; la parte helicoidal exige rampas de curvatura $C^1$ | Derivación de heartline, [§3.8](#38-consecuencias-sobre-la-continuidad-del-roll) y [§7.8](#78-rampas-de-curvatura-suaves-por-qué-la-clotoide-lineal-no-alcanza-con-roll-helicoidal) |
+| Rampas de curvatura | smoothstep cúbico a la entrada, Hermite cúbica a la salida: $d\kappa/ds$ continua, $L = 1.5\,\Delta G\,v/J$ | [§7.8](#78-rampas-de-curvatura-suaves-por-qué-la-clotoide-lineal-no-alcanza-con-roll-helicoidal) |
 | Marco de referencia | Transporte paralelo + $\phi(s)$ explícito | [§2.2](#22-marco-de-transporte-paralelo) |
 | Escalado | Froude, $\lambda = 22$ **[SIN VERIFICAR]** (provisorio) | [§4](#4-semejanza-de-froude) |
 | Límite $+G_z$ | Curva de Fig. 10, dependiente de duración | F2291-06a **[SIN VERIFICAR]** |
