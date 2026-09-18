@@ -287,7 +287,7 @@
         "lambdaCarro": { "$ref": "#/$defs/numero" },
         "distorsion": { "$ref": "#/$defs/numero" },
         "carrosEquivalentes": { "$ref": "#/$defs/numero" },
-        "onsetMaximoModelo": { "$ref": "#/$defs/numero" },
+        "onsetMaximoModelo": { "$ref": "#/$defs/vector3", "description": "G/s por eje [Gx, Gy, Gz]: presupuesto de onset del modelo (Escala.OnsetMaximo), no un escalar" },
         "velocidadInicialMinima": { "$ref": "#/$defs/numero", "description": "null si calcularVelocidadMinima estaba en false" }
       }
     },

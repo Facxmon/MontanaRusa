@@ -16,7 +16,10 @@
     "valores": {
       "modoCurvatura": "Clotoide",
       "metodoDeAcoplamiento": "A",
-      "radioDelLoop": 0.3
+      "radioDelLoop": 0.3,
+      "radioDeReferencia": 0.3,
+      "gMinimaCuspide": 0.5,
+      "masa": 0.15
     },
     "esquema": {
       "modo": {
@@ -61,14 +64,19 @@
       ]
     },
     "defaults": {
-      "radioDelLoop": 0.11
+      "modoCurvatura": "Clotoide",
+      "metodoDeAcoplamiento": "A",
+      "radioDeReferencia": 0.21,
+      "radioDelLoop": 0.11,
+      "gMinimaCuspide": 0.5,
+      "masa": 0.15
     }
   },
   "estadoInicial": {
     "posicion": [
       0,
       0,
-      1.0
+      0.99
     ],
     "versorTangente": [
       1,
@@ -92,53 +100,53 @@
       "nodos": {
         "numeroDeNodos": 5,
         "arco": [
-          0.0,
+          0,
           0.05,
           0.1,
           0.15,
           0.2
         ],
         "tiempo": [
-          0.0,
+          0,
           0.012,
           0.024,
           0.036,
           0.048
         ],
         "x": [
-          0.0,
+          0,
           0.059601,
           0.116826,
           0.169393,
           0.215207
         ],
         "y": [
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
+          0,
+          0,
+          0,
+          0,
+          0
         ],
         "z": [
-          1.0,
+          1,
           1.00598,
           1.023682,
           1.052399,
           1.090988
         ],
         "xRiel": [
-          0.0,
+          0,
           0.057614,
           0.112931,
           0.163746,
           0.208033
         ],
         "yRiel": [
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
+          0,
+          0,
+          0,
+          0,
+          0
         ],
         "zRiel": [
           0.99,
@@ -149,83 +157,83 @@
         ],
         "versorTangente": [
           [
-            1.0,
-            0.0,
-            0.0
+            1,
+            0,
+            0
           ],
           [
-            1.0,
-            0.0,
-            0.0
+            1,
+            0,
+            0
           ],
           [
-            1.0,
-            0.0,
-            0.0
+            1,
+            0,
+            0
           ],
           [
-            1.0,
-            0.0,
-            0.0
+            1,
+            0,
+            0
           ],
           [
-            1.0,
-            0.0,
-            0.0
+            1,
+            0,
+            0
           ]
         ],
         "versorArribaCarro": [
           [
-            0.0,
-            0.0,
-            1.0
+            0,
+            0,
+            1
           ],
           [
-            0.0,
-            0.0,
-            1.0
+            0,
+            0,
+            1
           ],
           [
-            0.0,
-            0.0,
-            1.0
+            0,
+            0,
+            1
           ],
           [
-            0.0,
-            0.0,
-            1.0
+            0,
+            0,
+            1
           ],
           [
-            0.0,
-            0.0,
-            1.0
+            0,
+            0,
+            1
           ]
         ],
         "versorLateral": [
           [
-            0.0,
-            1.0,
-            0.0
+            0,
+            1,
+            0
           ],
           [
-            0.0,
-            1.0,
-            0.0
+            0,
+            1,
+            0
           ],
           [
-            0.0,
-            1.0,
-            0.0
+            0,
+            1,
+            0
           ],
           [
-            0.0,
-            1.0,
-            0.0
+            0,
+            1,
+            0
           ],
           [
-            0.0,
-            1.0,
-            0.0
+            0,
+            1,
+            0
           ]
         ],
         "velocidad": [
@@ -236,21 +244,21 @@
           4.46
         ],
         "gx": [
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
+          0,
+          0,
+          0,
+          0,
+          0
         ],
         "gy": [
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
+          0,
+          0,
+          0,
+          0,
+          0
         ],
         "gz": [
-          1.0,
+          1,
           1.4,
           1.8,
           2.2,
@@ -271,18 +279,18 @@
           3.448
         ],
         "anguloRoll": [
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
+          0,
+          0,
+          0,
+          0,
+          0
         ],
         "anguloPeralte": [
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
+          0,
+          0,
+          0,
+          0,
+          0
         ],
         "puntoDeParada": null
       },
@@ -306,13 +314,18 @@
       "resumen": {
         "longitudRecorrida": 0.2,
         "gzMaxima": 2.6,
-        "gyMaximaAbsoluta": 0.0,
+        "gyMaximaAbsoluta": 0,
         "radioMinimo": 0.3,
         "velocidadInicialMinima": null,
         "posicionFinal": [
-          0.29,
-          0.0,
-          1.02
+          0.208033,
+          0,
+          1.077955
+        ],
+        "onsetMaximoModelo": [
+          25,
+          25,
+          75
         ]
       },
       "criterios": {
@@ -334,9 +347,9 @@
       },
       "estadoSalida": {
         "posicion": [
-          0.29,
-          0.0,
-          1.02
+          0.208033,
+          0,
+          1.077955
         ],
         "versorTangente": [
           1,
@@ -358,21 +371,21 @@
     "tiempoTotal": 0.048,
     "velocidadFinal": 4.46,
     "gzMaximaGlobal": 2.6,
-    "gyMaximaAbsolutaGlobal": 0.0,
-    "alturaMaxima": 1.02,
-    "alturaMinima": 1.0,
+    "gyMaximaAbsolutaGlobal": 0,
+    "alturaMaxima": 1.077955,
+    "alturaMinima": 0.99,
     "boundingBox": [
       [
-        0.0,
-        0.29
+        0,
+        0.215207
       ],
       [
-        0.0,
-        0.0
+        0,
+        0
       ],
       [
         0.99,
-        1.02
+        1.090988
       ]
     ],
     "todosLosCriteriosPasan": true

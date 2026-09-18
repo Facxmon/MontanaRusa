@@ -1,0 +1,14 @@
+{
+  "name": "montanarusa-esquema",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Validador del contrato del visualizador (layout-v1.schema.json) contra los JSON que exporta LayoutAJson.m",
+  "type": "module",
+  "scripts": {
+    "validar": "node validar-layout.js"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  }
+}
