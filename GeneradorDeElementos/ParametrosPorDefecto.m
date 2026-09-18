@@ -220,7 +220,7 @@ Parametros.DistanciaHeartlineACabeza = 0.030;   % [m]
 %   'Ambos'  corre los dos y reporta la comparacion. Solo para el reporte:
 %            la geometria que queda es la del metodo A.
 Parametros.MetodoDeAcoplamiento    = 'A';
-Parametros.CalcularVelocidadMinima = true;   % biseccion de v0 minima; cuesta decenas de generaciones
+Parametros.CalcularVelocidadMinima = false;   % biseccion de v0 minima; cuesta decenas de generaciones
 
 %% ------------------------ Escalado (Froude) ---------------------------
 % lambda NO es una propiedad del modelo sino de un emparejamiento entre una

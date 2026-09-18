@@ -1,0 +1,358 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joacoozores/MontanaRusa/esquema/layout-v1.schema.json",
+  "title": "Layout de montaña rusa — contrato del visualizador v1",
+  "description": "Contrato de datos entre el generador de geometría (MATLAB hoy, JS mañana) y el visualizador web. Ver CONTRATO_VISUALIZADOR.md para el razonamiento de cada decisión. Unidades: SI y radianes, siempre. Todo valor no finito se serializa como null.",
+  "type": "object",
+  "required": ["meta", "parametros", "estadoInicial", "elementos", "resumenLayout"],
+  "additionalProperties": false,
+
+  "properties": {
+    "meta": { "$ref": "#/$defs/meta" },
+    "parametros": { "$ref": "#/$defs/parametros" },
+    "estadoInicial": { "$ref": "#/$defs/estado" },
+    "elementos": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/elemento" }
+    },
+    "resumenLayout": { "$ref": "#/$defs/resumenLayout" }
+  },
+
+  "$defs": {
+
+    "numero": {
+      "description": "Número finito, o null si el valor original era NaN o Infinity.",
+      "type": ["number", "null"]
+    },
+
+    "arrayDeNumeros": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/numero" }
+    },
+
+    "vector3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "number" }
+    },
+
+    "arrayDeVectores3": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/vector3" }
+    },
+
+    "declaracionDeParametro": {
+      "description": "Terna autodescriptiva que produce DeclaracionDeParametros / ParametrosDelModo / ParametrosDeAceptacion. Es lo que permite que el panel de parámetros del frontend se genere solo.",
+      "type": "object",
+      "required": ["clave", "unidad", "descripcion"],
+      "additionalProperties": false,
+      "properties": {
+        "clave": { "type": "string", "description": "Nombre del campo dentro de parametros.valores" },
+        "unidad": { "type": "string", "description": "Unidad SI, o '-' si es adimensional o una cadena" },
+        "descripcion": { "type": "string" }
+      }
+    },
+
+    "meta": {
+      "type": "object",
+      "required": ["versionContrato", "generadoPor", "unidades"],
+      "additionalProperties": false,
+      "properties": {
+        "versionContrato": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Semver. El consumidor rechaza un MAJOR distinto del que conoce."
+        },
+        "generadoPor": { "enum": ["matlab", "js"] },
+        "versionGenerador": { "type": "string", "description": "Hash de commit del repo que produjo el archivo" },
+        "generadoEn": { "type": "string", "format": "date-time" },
+        "unidades": {
+          "type": "object",
+          "description": "Hace el archivo autodescriptivo sin consultar la documentación.",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+
+    "parametros": {
+      "type": "object",
+      "required": ["valores", "esquema", "defaults"],
+      "additionalProperties": false,
+      "properties": {
+        "valores": {
+          "description": "ParametrosPorDefecto() con los overrides de esta corrida, aplanado y en camelCase.",
+          "type": "object",
+          "required": ["modoCurvatura", "metodoDeAcoplamiento"],
+          "properties": {
+            "modoCurvatura": {
+              "enum": ["AceleracionNormalConstante", "Clotoide", "FuerzaGConstante", "GNormativaMaxima"]
+            },
+            "metodoDeAcoplamiento": { "enum": ["A", "B", "Ambos"] }
+          },
+          "additionalProperties": true
+        },
+
+        "esquema": {
+          "description": "Metadatos de los parámetros, extraídos de las declaraciones del propio MATLAB. Nunca se escribe a mano.",
+          "type": "object",
+          "required": ["modo", "elementos", "aceptacion", "generales"],
+          "additionalProperties": false,
+          "properties": {
+            "modo": {
+              "type": "object",
+              "required": ["nombre", "opciones", "parametros"],
+              "additionalProperties": false,
+              "properties": {
+                "nombre": { "type": "string" },
+                "opciones": { "type": "array", "items": { "type": "string" } },
+                "nota": { "type": "string" },
+                "parametros": { "type": "array", "items": { "$ref": "#/$defs/declaracionDeParametro" } }
+              }
+            },
+            "elementos": {
+              "description": "Una entrada por constructor de CatalogoDeElementos(), llamado sin argumentos.",
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/declaracionDeParametro" }
+              }
+            },
+            "aceptacion": { "type": "array", "items": { "$ref": "#/$defs/declaracionDeParametro" } },
+            "generales": { "type": "array", "items": { "$ref": "#/$defs/declaracionDeParametro" } }
+          }
+        },
+
+        "defaults": {
+          "description": "ParametrosPorDefecto() sin overrides. Alimenta el botón de resetear.",
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+
+    "estado": {
+      "description": "Contrato de Estado de EstadoInicial.m. La posición viaja sobre el RIEL; la velocidad es la del centro de masa sobre la heartline.",
+      "type": "object",
+      "required": ["posicion", "versorTangente", "versorArribaCarro", "velocidad"],
+      "additionalProperties": false,
+      "properties": {
+        "posicion": { "$ref": "#/$defs/vector3" },
+        "versorTangente": { "$ref": "#/$defs/vector3" },
+        "versorArribaCarro": { "$ref": "#/$defs/vector3" },
+        "versorLateral": { "$ref": "#/$defs/vector3" },
+        "vectorCurvatura": { "$ref": "#/$defs/vector3" },
+        "derivadaCurvatura": { "$ref": "#/$defs/numero" },
+        "anguloRoll": { "$ref": "#/$defs/numero" },
+        "velocidadRoll": { "$ref": "#/$defs/numero" },
+        "aceleracionRoll": { "$ref": "#/$defs/numero" },
+        "longitudAcumulada": { "$ref": "#/$defs/numero" },
+        "velocidad": { "type": "number" },
+        "energiaTotal": { "$ref": "#/$defs/numero" }
+      }
+    },
+
+    "elemento": {
+      "type": "object",
+      "required": ["indice", "tipo", "parametrosUsados", "nodos", "subtramos", "resumen", "criterios", "estadoSalida"],
+      "additionalProperties": false,
+      "properties": {
+        "indice": { "type": "integer", "minimum": 0 },
+        "tipo": {
+          "description": "Receta.Nombre del elemento.",
+          "enum": ["LoopVertical", "Helice", "OverBankedTurn", "DiveLoop"]
+        },
+        "parametrosUsados": {
+          "description": "Solo los parámetros geométricos que este elemento efectivamente consumió.",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "nodos": { "$ref": "#/$defs/nodos" },
+        "subtramos": { "type": "array", "items": { "$ref": "#/$defs/subtramo" } },
+        "resumen": { "$ref": "#/$defs/resumenElemento" },
+        "criterios": { "$ref": "#/$defs/criterios" },
+        "estadoSalida": { "$ref": "#/$defs/estado" }
+      }
+    },
+
+    "nodos": {
+      "description": "Arrays columnares. TODOS los arrays de este objeto tienen exactamente numeroDeNodos elementos — el consumidor puede asumirlo sin verificar. Formato columnar y no array de objetos porque se mapea directo a Float32Array / BufferAttribute.",
+      "type": "object",
+      "required": [
+        "numeroDeNodos", "arco", "tiempo",
+        "x", "y", "z", "xRiel", "yRiel", "zRiel",
+        "versorTangente", "versorArribaCarro", "versorLateral",
+        "velocidad", "gx", "gy", "gz",
+        "curvatura", "curvaturaRiel", "anguloRoll", "anguloPeralte"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "numeroDeNodos": { "type": "integer", "minimum": 2 },
+
+        "arco":   { "$ref": "#/$defs/arrayDeNumeros", "description": "m — abscisa curvilínea acumulada desde el inicio del layout" },
+        "tiempo": { "$ref": "#/$defs/arrayDeNumeros", "description": "s — el eje temporal del botón play" },
+
+        "x": { "$ref": "#/$defs/arrayDeNumeros", "description": "m — heartline, donde va el pasajero" },
+        "y": { "$ref": "#/$defs/arrayDeNumeros" },
+        "z": { "$ref": "#/$defs/arrayDeNumeros" },
+
+        "xRiel": { "$ref": "#/$defs/arrayDeNumeros", "description": "m — riel, la curva que se fabrica y se integra" },
+        "yRiel": { "$ref": "#/$defs/arrayDeNumeros" },
+        "zRiel": { "$ref": "#/$defs/arrayDeNumeros" },
+
+        "versorTangente":    { "$ref": "#/$defs/arrayDeVectores3", "description": "dirección de avance" },
+        "versorArribaCarro": { "$ref": "#/$defs/arrayDeVectores3", "description": "asiento → cabeza. NO es derivable de la curva: el roll es un grado de libertad independiente." },
+        "versorLateral":     { "$ref": "#/$defs/arrayDeVectores3", "description": "L = T × U" },
+
+        "velocidad":     { "$ref": "#/$defs/arrayDeNumeros", "description": "m/s — del centro de masa; la que usa la animación" },
+        "velocidadRiel": { "$ref": "#/$defs/arrayDeNumeros", "description": "m/s — del punto sobre el riel" },
+        "aceleracionTangencial": { "$ref": "#/$defs/arrayDeNumeros", "description": "m/s^2" },
+
+        "gx": { "$ref": "#/$defs/arrayDeNumeros", "description": "G — longitudinal, en el punto de verificación" },
+        "gy": { "$ref": "#/$defs/arrayDeNumeros", "description": "G — lateral" },
+        "gz": { "$ref": "#/$defs/arrayDeNumeros", "description": "G — vertical del carro, incluida la gravedad" },
+
+        "jerkGx": { "$ref": "#/$defs/arrayDeNumeros", "description": "G/s" },
+        "jerkGy": { "$ref": "#/$defs/arrayDeNumeros" },
+        "jerkGz": { "$ref": "#/$defs/arrayDeNumeros" },
+
+        "gyCabeza": { "$ref": "#/$defs/arrayDeNumeros", "description": "G — variante conservadora, brazo d + e" },
+        "gzCabeza": { "$ref": "#/$defs/arrayDeNumeros" },
+
+        "curvatura":     { "$ref": "#/$defs/arrayDeNumeros", "description": "1/m — de la heartline. Se exporta curvatura y NO radio porque el radio vale Infinity en recta y JSON no lo admite." },
+        "curvaturaRiel": { "$ref": "#/$defs/arrayDeNumeros", "description": "1/m — del riel" },
+
+        "anguloRoll":    { "$ref": "#/$defs/arrayDeNumeros", "description": "rad (NO grados) — contra el marco de transporte paralelo" },
+        "anguloPeralte": { "$ref": "#/$defs/arrayDeNumeros", "description": "rad (NO grados)" },
+
+        "fuerzaNormal": { "$ref": "#/$defs/arrayDeNumeros", "description": "N" },
+        "energiaTotal": { "$ref": "#/$defs/arrayDeNumeros", "description": "J" },
+
+        "puntoDeParada": {
+          "description": "Índice base 0 donde el carro se quedó sin energía, o null si completó el elemento.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      }
+    },
+
+    "subtramo": {
+      "description": "Tramo con nombre dentro del elemento. Índices BASE 0 (el exportador MATLAB resta 1).",
+      "type": "object",
+      "required": ["nombre", "indiceInicio", "indiceFin"],
+      "additionalProperties": false,
+      "properties": {
+        "nombre": { "type": "string", "examples": ["ClotoideEntrada", "ArcoPrincipal", "ClotoideSalida"] },
+        "indiceInicio": { "type": "integer", "minimum": 0 },
+        "indiceFin": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "resumenElemento": {
+      "description": "Volcado plano de Reporte.Resumen en camelCase. Alimenta el panel numérico lateral.",
+      "type": "object",
+      "required": ["longitudRecorrida", "gzMaxima", "gyMaximaAbsoluta", "radioMinimo"],
+      "additionalProperties": true,
+      "properties": {
+        "metodo": { "type": "string" },
+        "longitudRecorrida": { "$ref": "#/$defs/numero" },
+        "longitudDeMaterial": { "$ref": "#/$defs/numero" },
+        "alturaMaxima": { "$ref": "#/$defs/numero" },
+        "radioMinimo": { "$ref": "#/$defs/numero", "description": "de la heartline" },
+        "radioMinimoRiel": { "$ref": "#/$defs/numero" },
+        "fuerzaNormalMaxima": { "$ref": "#/$defs/numero" },
+        "velocidadMinima": { "$ref": "#/$defs/numero" },
+        "tiempoDeRecorrido": { "$ref": "#/$defs/numero" },
+        "energiaDisipadaRodadura": { "$ref": "#/$defs/numero" },
+        "energiaDisipadaArrastre": { "$ref": "#/$defs/numero" },
+        "gzMaxima": { "$ref": "#/$defs/numero" },
+        "gzMinima": { "$ref": "#/$defs/numero" },
+        "gyMaximaAbsoluta": { "$ref": "#/$defs/numero" },
+        "gzMaximaCabeza": { "$ref": "#/$defs/numero" },
+        "gyMaximaAbsolutaCabeza": { "$ref": "#/$defs/numero" },
+        "brazoDeVerificacion": { "$ref": "#/$defs/numero" },
+        "peralteFinal": { "$ref": "#/$defs/numero", "description": "rad" },
+        "peralteMaximo": { "$ref": "#/$defs/numero", "description": "rad" },
+        "residualCierrePitch": { "$ref": "#/$defs/numero" },
+        "residualCierreTangente": { "$ref": "#/$defs/numero" },
+        "posicionFinal": { "$ref": "#/$defs/vector3" },
+        "desplazamientoLateral": { "$ref": "#/$defs/numero" },
+        "desplazamientoLateralObjetivo": { "$ref": "#/$defs/numero" },
+        "inclinacionHelicoidal": { "$ref": "#/$defs/numero" },
+        "saltoDeTangente": { "$ref": "#/$defs/numero", "description": "continuidad del empalme con el elemento anterior" },
+        "saltoDeCurvatura": { "$ref": "#/$defs/numero" },
+        "saltoDePosicion": { "$ref": "#/$defs/numero" },
+        "lambdaLoop": { "$ref": "#/$defs/numero" },
+        "lambdaCarro": { "$ref": "#/$defs/numero" },
+        "distorsion": { "$ref": "#/$defs/numero" },
+        "carrosEquivalentes": { "$ref": "#/$defs/numero" },
+        "onsetMaximoModelo": { "$ref": "#/$defs/numero" },
+        "velocidadInicialMinima": { "$ref": "#/$defs/numero", "description": "null si calcularVelocidadMinima estaba en false" }
+      }
+    },
+
+    "criterio": {
+      "description": "Espejo exacto de lo que produce AgregarCriterio.m. margen negativo se lee directo como cuánto falta.",
+      "type": "object",
+      "required": ["nombre", "sentido", "pasa", "valor", "limite", "margen", "unidad"],
+      "additionalProperties": false,
+      "properties": {
+        "nombre": { "type": "string" },
+        "sentido": { "enum": ["MenorOIgual", "MayorOIgual", "Informativo"] },
+        "pasa": { "type": "boolean", "description": "Sin tolerancia en los golden files: un veredicto que cambia es un bug." },
+        "valor": { "$ref": "#/$defs/numero" },
+        "limite": { "$ref": "#/$defs/numero" },
+        "margen": { "$ref": "#/$defs/numero" },
+        "unidad": { "type": "string" },
+        "detalle": { "type": "string", "description": "Tooltip que explica qué hacer si falla." }
+      }
+    },
+
+    "criterios": {
+      "type": "object",
+      "required": ["previos", "posteriores", "todosPasan"],
+      "additionalProperties": false,
+      "properties": {
+        "previos": { "type": "array", "items": { "$ref": "#/$defs/criterio" } },
+        "posteriores": { "type": "array", "items": { "$ref": "#/$defs/criterio" } },
+        "normativo": {
+          "description": "PENDIENTE: abrir la estructura de Reporte.Normativo (ChequeosPosteriores.m) y detallarla campo por campo.",
+          "type": ["object", "null"],
+          "additionalProperties": true
+        },
+        "todosPasan": { "type": "boolean" }
+      }
+    },
+
+    "resumenLayout": {
+      "type": "object",
+      "required": ["numeroDeElementos", "longitudTotal", "boundingBox", "todosLosCriteriosPasan"],
+      "additionalProperties": false,
+      "properties": {
+        "numeroDeElementos": { "type": "integer", "minimum": 1 },
+        "longitudTotal": { "$ref": "#/$defs/numero" },
+        "tiempoTotal": { "$ref": "#/$defs/numero" },
+        "velocidadFinal": { "$ref": "#/$defs/numero" },
+        "gzMaximaGlobal": { "$ref": "#/$defs/numero" },
+        "gzMinimaGlobal": { "$ref": "#/$defs/numero" },
+        "gyMaximaAbsolutaGlobal": { "$ref": "#/$defs/numero" },
+        "alturaMaxima": { "$ref": "#/$defs/numero" },
+        "alturaMinima": { "$ref": "#/$defs/numero" },
+        "boundingBox": {
+          "description": "[[xmin,xmax],[ymin,ymax],[zmin,zmax]] — le ahorra al frontend recorrer todos los nodos para encuadrar la cámara.",
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "number" }
+          }
+        },
+        "todosLosCriteriosPasan": { "type": "boolean" }
+      }
+    }
+  }
+}

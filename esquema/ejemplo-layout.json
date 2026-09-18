@@ -1,0 +1,380 @@
+{
+  "meta": {
+    "versionContrato": "1.0.0",
+    "generadoPor": "matlab",
+    "versionGenerador": "ejemplo",
+    "generadoEn": "2026-09-18T14:22:31Z",
+    "unidades": {
+      "longitud": "m",
+      "tiempo": "s",
+      "angulo": "rad",
+      "aceleracion": "G",
+      "curvatura": "1/m"
+    }
+  },
+  "parametros": {
+    "valores": {
+      "modoCurvatura": "Clotoide",
+      "metodoDeAcoplamiento": "A",
+      "radioDelLoop": 0.3
+    },
+    "esquema": {
+      "modo": {
+        "nombre": "Clotoide",
+        "opciones": [
+          "AceleracionNormalConstante",
+          "Clotoide",
+          "FuerzaGConstante",
+          "GNormativaMaxima"
+        ],
+        "nota": "",
+        "parametros": [
+          {
+            "clave": "radioDeReferencia",
+            "unidad": "m",
+            "descripcion": "radio de la heartline en el arco"
+          }
+        ]
+      },
+      "elementos": {
+        "LoopVertical": [
+          {
+            "clave": "radioDelLoop",
+            "unidad": "m",
+            "descripcion": "radio de la heartline en la cuspide"
+          }
+        ]
+      },
+      "aceptacion": [
+        {
+          "clave": "gMinimaCuspide",
+          "unidad": "G",
+          "descripcion": "holgura minima de Gz en la cuspide"
+        }
+      ],
+      "generales": [
+        {
+          "clave": "masa",
+          "unidad": "kg",
+          "descripcion": "masa del conjunto"
+        }
+      ]
+    },
+    "defaults": {
+      "radioDelLoop": 0.11
+    }
+  },
+  "estadoInicial": {
+    "posicion": [
+      0,
+      0,
+      1.0
+    ],
+    "versorTangente": [
+      1,
+      0,
+      0
+    ],
+    "versorArribaCarro": [
+      0,
+      0,
+      1
+    ],
+    "velocidad": 4.5
+  },
+  "elementos": [
+    {
+      "indice": 0,
+      "tipo": "LoopVertical",
+      "parametrosUsados": {
+        "radioDelLoop": 0.3
+      },
+      "nodos": {
+        "numeroDeNodos": 5,
+        "arco": [
+          0.0,
+          0.05,
+          0.1,
+          0.15,
+          0.2
+        ],
+        "tiempo": [
+          0.0,
+          0.012,
+          0.024,
+          0.036,
+          0.048
+        ],
+        "x": [
+          0.0,
+          0.059601,
+          0.116826,
+          0.169393,
+          0.215207
+        ],
+        "y": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "z": [
+          1.0,
+          1.00598,
+          1.023682,
+          1.052399,
+          1.090988
+        ],
+        "xRiel": [
+          0.0,
+          0.057614,
+          0.112931,
+          0.163746,
+          0.208033
+        ],
+        "yRiel": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "zRiel": [
+          0.99,
+          0.995781,
+          1.012892,
+          1.040653,
+          1.077955
+        ],
+        "versorTangente": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "versorArribaCarro": [
+          [
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "versorLateral": [
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ]
+        ],
+        "velocidad": [
+          4.5,
+          4.49,
+          4.48,
+          4.47,
+          4.46
+        ],
+        "gx": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "gy": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "gz": [
+          1.0,
+          1.4,
+          1.8,
+          2.2,
+          2.6
+        ],
+        "curvatura": [
+          3.333,
+          3.333,
+          3.333,
+          3.333,
+          3.333
+        ],
+        "curvaturaRiel": [
+          3.448,
+          3.448,
+          3.448,
+          3.448,
+          3.448
+        ],
+        "anguloRoll": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "anguloPeralte": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "puntoDeParada": null
+      },
+      "subtramos": [
+        {
+          "nombre": "ClotoideEntrada",
+          "indiceInicio": 0,
+          "indiceFin": 1
+        },
+        {
+          "nombre": "ArcoPrincipal",
+          "indiceInicio": 1,
+          "indiceFin": 3
+        },
+        {
+          "nombre": "ClotoideSalida",
+          "indiceInicio": 3,
+          "indiceFin": 4
+        }
+      ],
+      "resumen": {
+        "longitudRecorrida": 0.2,
+        "gzMaxima": 2.6,
+        "gyMaximaAbsoluta": 0.0,
+        "radioMinimo": 0.3,
+        "velocidadInicialMinima": null,
+        "posicionFinal": [
+          0.29,
+          0.0,
+          1.02
+        ]
+      },
+      "criterios": {
+        "previos": [
+          {
+            "nombre": "Radio minimo fabricable",
+            "sentido": "MayorOIgual",
+            "pasa": true,
+            "valor": 0.3,
+            "limite": 0.05,
+            "margen": 0.25,
+            "unidad": "m",
+            "detalle": "Si falla, la impresora no llega."
+          }
+        ],
+        "posteriores": [],
+        "normativo": null,
+        "todosPasan": true
+      },
+      "estadoSalida": {
+        "posicion": [
+          0.29,
+          0.0,
+          1.02
+        ],
+        "versorTangente": [
+          1,
+          0,
+          0
+        ],
+        "versorArribaCarro": [
+          0,
+          0,
+          1
+        ],
+        "velocidad": 4.46
+      }
+    }
+  ],
+  "resumenLayout": {
+    "numeroDeElementos": 1,
+    "longitudTotal": 0.2,
+    "tiempoTotal": 0.048,
+    "velocidadFinal": 4.46,
+    "gzMaximaGlobal": 2.6,
+    "gyMaximaAbsolutaGlobal": 0.0,
+    "alturaMaxima": 1.02,
+    "alturaMinima": 1.0,
+    "boundingBox": [
+      [
+        0.0,
+        0.29
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.99,
+        1.02
+      ]
+    ],
+    "todosLosCriteriosPasan": true
+  }
+}
