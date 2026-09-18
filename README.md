@@ -44,6 +44,7 @@ que las dos piezas de código tienen que respetar.
 | `GeneradorDeElementos/LayoutDeVia/` | alta, deshacer, guardar, cargar y re-simular el circuito |
 | `esquema/` | `layout-v1.schema.json` (JSON Schema del contrato), `ejemplo-layout.json` y el validador Node (`validar-layout.js`) |
 | `golden/` | los once casos canónicos del contrato, generados por `GenerarGoldenFiles.m`; son el arnés de validación del port a JS |
+| `web/` | el visualizador web (Vite + TypeScript + Three.js): lee los `golden/*.json` y dibuja la vía en 3D con resumen y criterios; ver [`web/README.md`](web/README.md) |
 
 Detalle completo en [`documentacion_generador_elementos.md` §2](documentacion_generador_elementos.md#2-arquitectura).
 
@@ -57,7 +58,8 @@ run('TestsValidacion.m')      % dieciseis tests del generador, termina con error
 run('GenerarGoldenFiles.m')   % regenera golden/*.json y los valida contra el esquema (necesita node)
 ```
 
-El contrato de datos entre el cálculo y el visualizador web está en [`CONTRATO_VISUALIZADOR.md`](CONTRATO_VISUALIZADOR.md);
+El visualizador web se corre con `cd web && npm install && npm run dev` (y se publica solo en GitHub Pages en cada push a
+`main`). El contrato de datos entre el cálculo y el visualizador está en [`CONTRATO_VISUALIZADOR.md`](CONTRATO_VISUALIZADOR.md);
 `DemoLayout.m` y `DemoElemento.m` escriben además el layout como `layout_*.json`. Para validar cualquier JSON contra el
 esquema (una vez, `npm install` dentro de `esquema/`):
 
@@ -78,6 +80,7 @@ Los parámetros del generador de elementos se configuran en un único lugar:
 | Verificación normativa contra ASTM F2291 | Implementada; valores de la norma sin verificar contra el texto original (ver [`memoria_de_calculo.md` §11](memoria_de_calculo.md#11-datos-pendientes-de-verificación)) |
 | Análisis energético (`analisis_energia.m`) | Modelo preliminar, corre sobre trayectoria de prueba; falta importar geometría real y pasar a RK4 (ver [`documentacion_analisis_energia.md` §15](documentacion_analisis_energia.md#15-limitaciones-actuales--próximos-pasos)) |
 | Dimensionamiento del carro y del loop | Decisión de similitud tomada (modelo distorsionado); dimensiones definitivas sin cerrar (ver [`memoria_de_calculo.md` §10](memoria_de_calculo.md#10-pendientes-que-bloquean-el-dimensionamiento)) |
+| Visualizador web (`web/`) | v1: vía 3D coloreada por magnitud, resumen y criterios, leyendo los golden files; sin animación ni edición de parámetros todavía (ver [`web/DISENO.md`](web/DISENO.md)) |
 | Modelo de N carros, elemento conector, modo inverso, backend web | Fuera de alcance actual (ver [`documentacion_generador_elementos.md` §15](documentacion_generador_elementos.md#15-otras-limitaciones-y-próximos-pasos)) |
 
 ## Nomenclatura

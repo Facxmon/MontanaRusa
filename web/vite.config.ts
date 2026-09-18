@@ -12,5 +12,7 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: true,
+    // Three.js entero va en un solo chunk (~500 kB minificado, 130 kB gzip): es esperable.
+    chunkSizeWarningLimit: 600,
   },
 });
