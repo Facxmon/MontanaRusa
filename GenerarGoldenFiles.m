@@ -26,8 +26,11 @@
 % fallan verifica que el port tambien los haga fallar, y el veredicto `pasa`
 % se compara sin tolerancia.
 %
-% Al final corre el validador de esquema (esquema/validar-layout.js) si node
-% esta disponible.
+% Los archivos se generan en una carpeta temporal y se copian a golden/ al
+% final: si se escribieran de a uno sobre los versionados, a partir del
+% segundo el arbol de git ya estaria sucio y meta.versionGenerador saldria
+% con "-dirty" aunque el codigo sea exactamente el del commit. Al final corre
+% el validador de esquema (esquema/validar-layout.js) si node esta disponible.
 
 clear; clc
 Raiz = fileparts(mfilename('fullpath'));
@@ -37,6 +40,8 @@ CarpetaGolden = fullfile(Raiz, 'golden');
 if ~isfolder(CarpetaGolden)
     mkdir(CarpetaGolden);
 end
+CarpetaTemporal = tempname;
+mkdir(CarpetaTemporal);
 
 %% ===================== CASOS DE UN ELEMENTO ===========================
 VelocidadDeEntrada = 5.0;    % [m/s]
@@ -74,7 +79,7 @@ for i = 1:size(Casos, 1)
     [Estado, Elemento, Reporte] = Casos{i, 2}(Estado, Parametros, Layout);
     Layout = LayoutAgregarElemento(Layout, Elemento, Estado, Reporte);
 
-    Archivos{i} = fullfile(CarpetaGolden, [Casos{i, 1} '.json']);
+    Archivos{i} = fullfile(CarpetaTemporal, [Casos{i, 1} '.json']);
     Documento = LayoutAJson(Layout, Archivos{i});
     ImprimirFila(Casos{i, 1}, Elemento.Nombre, Casos{i, 3}, Documento, Archivos{i});
 end
@@ -98,9 +103,17 @@ for i = 1:numel(Secuencia)
     Layout = LayoutAgregarElemento(Layout, Elemento, Estado, Reporte);
 end
 
-Archivos{end} = fullfile(CarpetaGolden, 'circuito-demolayout.json');
+Archivos{end} = fullfile(CarpetaTemporal, 'circuito-demolayout.json');
 Documento = LayoutAJson(Layout, Archivos{end});
 ImprimirFila('circuito-demolayout', 'los cuatro', 'Clotoide', Documento, Archivos{end});
+
+%% ===================== COPIA A golden/ =================================
+for i = 1:numel(Archivos)
+    [~, Nombre, Extension] = fileparts(Archivos{i});
+    copyfile(Archivos{i}, fullfile(CarpetaGolden, [Nombre Extension]));
+end
+rmdir(CarpetaTemporal, 's');
+fprintf('\n%d archivos copiados a %s\n', numel(Archivos), CarpetaGolden);
 
 %% ===================== VALIDACION ======================================
 Validador = fullfile(Raiz, 'esquema', 'validar-layout.js');
