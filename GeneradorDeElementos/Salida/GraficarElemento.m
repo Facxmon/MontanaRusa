@@ -150,8 +150,13 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     %            es CONSTANTE; solo crece por la torsion que mete la
     %            inclinacion helicoidal, a razon dphi/dtheta = tan(alfa).
     %   peralte  inclinacion de U contra la vertical del plano que contiene a
-    %            T. En un loop vale 0, salta a +-180 al invertirse y no esta
-    %            definido con T vertical (NaN): es lo que se ve en la via.
+    %            T, en MODULO: 0 derecho, 180 invertido, y el lado lo dice
+    %            phi. Se dibuja el modulo porque el angulo con signo vive en
+    %            (-180, 180] y en un loop el carro pasa por 180 justo en la
+    %            cuspide: el signo cambiaba con el ruido y la curva saltaba
+    %            de +180 a -180 ahi. En modulo el loop lee 0 -> 180 -> 0.
+    %            No esta definido con T vertical (NaN): es lo que se ve
+    %            en la via.
     %   psi      angulo entre el vector curvatura y U, en el plano normal del
     %            carro: el desalineamiento entre "hacia donde apunta el
     %            pasajero" y "hacia donde esta el centro instantaneo de
@@ -161,15 +166,15 @@ function Figuras = GraficarElemento(Elemento, Reporte)
     Figuras(end+1) = figure('Name', 'Perfil de roll');
     subplot(2,1,1)
     plot(Arco, rad2deg(Track.AnguloRoll), 'LineWidth', 2); grid on; hold on
-    plot(Arco, rad2deg(Track.AnguloPeralte), 'LineWidth', 2)
+    plot(Arco, rad2deg(abs(Track.AnguloPeralte)), 'LineWidth', 2)
     plot(Arco, rad2deg(Track.AnguloCurvaturaDesdeArriba), 'LineWidth', 2)
     MarcarSubTramos(Track, Arco);
     ylabel('grados')
     legend('\phi: roll contra el marco de transporte (constante si la curva es plana; crece con la torsion helicoidal)', ...
-           'Peralte: U contra la vertical del plano de T (lo que se ve en la via; \pm180 invertido; NaN con T vertical)', ...
+           '|Peralte|: U contra la vertical del plano de T, en modulo (lo que se ve en la via; 0 derecho, 180 invertido, el lado lo da \phi; NaN con T vertical)', ...
            '\psi: vector curvatura contra U (0 = el pasajero mira al centro de giro; \neq 0 en giros peraltados y sub-peralte)', ...
            'Location', 'best')
-    title({'Tres angulos, tres referencias: \phi contra el marco de transporte, peralte contra la vertical, \psi contra el vector curvatura', ...
+    title({'Tres angulos, tres referencias: \phi contra el marco de transporte, |peralte| contra la vertical, \psi contra el vector curvatura', ...
            sprintf('Inclinacion helicoidal tan(\\alpha) = %.3f: es la pendiente d\\phi/d\\theta, lo unico que hace crecer a \\phi', ...
                    Track.InclinacionHelicoidal)})
 

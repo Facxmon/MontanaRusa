@@ -717,6 +717,12 @@ function Peralte = AnguloDePeralte(VersorTangente, VersorArribaCarro)
 %   marco de transporte, que va girando por su cuenta a razon de la torsion.
 %   Un roll de 50 grados con peralte casi nulo significa que giro la
 %   referencia, no el carro.
+%
+%   Vive en (-pi, pi], asi que con el carro invertido el signo lo decide el
+%   ruido y el numero salta entre +pi y -pi (en la cuspide de un loop, por
+%   ejemplo). El reporte lo usa con signo donde el signo importa (peralte
+%   final, sub-peralte de salida del dive loop); el grafico de roll dibuja
+%   el modulo, que es continuo.
 
     NumeroDeNodos = size(VersorTangente, 1);
     Horizontal = [VersorTangente(:,1), VersorTangente(:,2), zeros(NumeroDeNodos,1)];

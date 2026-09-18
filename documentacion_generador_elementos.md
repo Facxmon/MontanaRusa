@@ -467,6 +467,8 @@ $$G_{abajo} = \frac{v_{abajo}^2}{gR} + 1 = \frac{v_{arriba}^2}{gR} - 1 + 6 = G_{
 
 Por eso se reporta y grafica también `Track.AnguloPeralte`, que es el mismo roll medido **contra la vertical** —el que se ve mirando la vía— y termina en cero. Los dos aparecen juntos en el gráfico de roll, y la vista 3D de orientación dibuja los versores $\mathbf{U}$ y $\mathbf{L}$ sobre la trayectoria, que es la forma directa de ver hacia dónde apunta el carro.
 
+`Track.AnguloPeralte` vive en $(-\pi, \pi]$ (es un `atan2`), y con el carro invertido el signo lo decide el ruido: en la cúspide de un loop saltaba entre +180° y −180° y el gráfico mostraba una inversión que no existe. **El gráfico dibuja el módulo**, $\lvert\text{peralte}\rvert$: 0 derecho, 180 invertido, continuo a lo largo de todo el elemento (el loop lee 0 → 180 → 0; el único escalón es el físico de la referencia al pasar la tangente por la vertical, y con la inclinación helicoidal ni siquiera es un escalón sino una rampa de unos grados por nodo). El lado del peralte lo da $\phi$, que sí es continuo por construcción. Se descartó "desenvolver" el ángulo con signo: en un loop helicoidal la referencia gira 360° y la curva terminaría en 360; y plegarla en ±180 le cambia el signo al peralte de salida del dive loop según el sentido con el que se llegó a la inversión, que en el caso plano lo decide el ruido numérico. El campo con signo se conserva tal cual para el reporte (peralte final, sub-peralte de salida del dive loop) y la tabla de resultados.
+
 ### 12.4 $G_x$ casi no depende de la aceleración tangencial
 
 Parece raro que $G_x$ salga casi plana cuando la aceleración tangencial varía mucho a lo largo del recorrido. Sale de la definición:

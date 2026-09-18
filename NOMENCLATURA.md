@@ -57,7 +57,7 @@ Esta es la desambiguación adoptada; se aplica en todo el texto reescrito.
 | $\phi'''$ | — | $d^3\phi/ds^3$ | rad/m³ | generador §7 | usado sólo en la fórmula de $L_{roll}$ |
 | $\theta_{girado}$ | `AnguloGirado` | ángulo total que giró la tangente desde el arranque del elemento | rad | generador §4.1 | componente 14 del vector de estado $y$ |
 | Track.AnguloRoll | `Track.AnguloRoll` | ver $\phi$ arriba: registro a lo largo de todo el Track | rad | generador §12.3 | crece con la torsión aunque el carro salga derecho |
-| Track.AnguloPeralte | `Track.AnguloPeralte` | roll medido contra la **vertical** (el que se ve mirando la vía) | rad | generador §12.3 | distinto de `Track.AnguloRoll`; ver bloque 4 |
+| Track.AnguloPeralte | `Track.AnguloPeralte` | roll medido contra la **vertical** (el que se ve mirando la vía) | rad | generador §12.3 | distinto de `Track.AnguloRoll`; ver bloque 4. Vive en $(-\pi,\pi]$: el gráfico de roll dibuja su módulo (generador §12.3) |
 | $\beta_{peralte}$ | `PeralteDeLaHelice`, `PeralteDelGiro` | peralte de diseño de un elemento de giro horizontal | rad | generador §5 (recetas) | parámetro de entrada, no confundir con $\beta$ (transporte) |
 
 ## 2. Cinemática y dinámica
