@@ -17,6 +17,8 @@ export class Escena {
   private readonly controles: OrbitControls;
   private readonly contenedor: HTMLElement;
   private readonly grilla: THREE.GridHelper;
+  private readonly reloj = new THREE.Clock();
+  private readonly porCuadro: ((dt: number) => void)[] = [];
 
   constructor(contenedor: HTMLElement) {
     this.contenedor = contenedor;
@@ -56,13 +58,28 @@ export class Escena {
   /** Arranca o pausa el loop de render (pausado mientras la vista 3D esta oculta). */
   activar(activa: boolean): void {
     if (activa) {
+      this.reloj.getDelta();
       this.renderer.setAnimationLoop(() => {
+        const dt = this.reloj.getDelta();
+        for (const fn of this.porCuadro) fn(dt);
         this.controles.update();
         this.renderer.render(this.scene, this.camara);
       });
     } else {
       this.renderer.setAnimationLoop(null);
     }
+  }
+
+  /** Registra algo que se actualiza en cada cuadro (dt en segundos). */
+  enCadaCuadro(fn: (dt: number) => void): void {
+    this.porCuadro.push(fn);
+  }
+
+  /** Mueve el centro de la orbita a un punto conservando la posicion relativa de la camara. */
+  centrarEn(punto: THREE.Vector3): void {
+    const desplazamiento = new THREE.Vector3().subVectors(this.camara.position, this.controles.target);
+    this.controles.target.copy(punto);
+    this.camara.position.copy(punto).add(desplazamiento);
   }
 
   private ajustarTamano(): void {

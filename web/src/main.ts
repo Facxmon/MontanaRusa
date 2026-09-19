@@ -4,6 +4,7 @@
 import { cargarIndice, cargarLayout } from './contrato/cargar';
 import { parametrosDesdeContrato } from './contrato/parametrosDesdeContrato';
 import { MAGNITUD_INICIAL } from './contrato/magnitudes';
+import { Carro } from './escena/carro';
 import { Escena } from './escena/escena';
 import { Via } from './escena/via';
 import { crearEstado } from './estado';
@@ -14,6 +15,7 @@ import { montarDiseno } from './paneles/diseno';
 import { montarElementos } from './paneles/elementos';
 import { montarErrores } from './paneles/errores';
 import { montarLeyenda } from './paneles/leyenda';
+import { montarReproductor } from './paneles/reproductor';
 import { disenoDesdeLayout, montarParametros } from './paneles/parametros';
 import { montarResumenElemento, montarResumenLayout } from './paneles/resumen';
 import { montarSelectorDeCaso } from './paneles/selectorDeCaso';
@@ -51,6 +53,7 @@ const estado = crearEstado({
 
 const escena = new Escena(seccion('vista3d'));
 const via = new Via(escena.scene);
+const carro = new Carro(escena.scene);
 
 montarErrores(seccion('errores'), estado);
 montarSelectorDeCaso(seccion('selectorDeCaso'), estado);
@@ -61,6 +64,7 @@ montarElementos(seccion('elementos'), estado);
 montarResumenElemento(seccion('resumenElemento'), estado);
 montarCriterios(seccion('criterios'), estado);
 montarSelectorDeVista(seccion('selectorDeVista'), estado);
+montarReproductor(seccion('reproductor'), estado, escena, carro);
 montarPanelDeGraficos(seccion('graficos'), estado);
 montarSelectorDePanel(seccion('selectorDePanel'), estado);
 montarDiseno(seccion('diseno'), estado, abrirDiseno);
@@ -113,8 +117,10 @@ estado.suscribir((nuevo, anterior) => {
 // mientras no se ve.
 const vista3d = seccion('vista3d');
 const graficos = seccion('graficos');
+const reproductor = seccion('reproductor');
 function aplicarVista(vista: string): void {
   vista3d.hidden = vista !== 'via3d';
+  reproductor.style.display = vista === 'via3d' ? '' : 'none';
   graficos.hidden = vista !== 'graficos';
   escena.activar(vista === 'via3d');
 }
