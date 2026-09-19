@@ -6,6 +6,7 @@ import { MAGNITUD_INICIAL } from './contrato/magnitudes';
 import { Escena } from './escena/escena';
 import { Via } from './escena/via';
 import { crearEstado } from './estado';
+import { montarPanelDeGraficos } from './graficos/panelDeGraficos';
 import { montarCriterios } from './paneles/criterios';
 import { montarElementos } from './paneles/elementos';
 import { montarErrores } from './paneles/errores';
@@ -13,6 +14,7 @@ import { montarLeyenda } from './paneles/leyenda';
 import { montarResumenElemento, montarResumenLayout } from './paneles/resumen';
 import { montarSelectorDeCaso } from './paneles/selectorDeCaso';
 import { montarSelectorDeMagnitud } from './paneles/selectorDeMagnitud';
+import { montarSelectorDeVista } from './paneles/selectorDeVista';
 
 const BASE = import.meta.env.BASE_URL;
 const urlDelIndice = `${BASE}golden/indice.json`;
@@ -32,6 +34,9 @@ const estado = crearEstado({
   elemento: null,
   error: null,
   cargando: false,
+  vista: 'via3d',
+  pestana: 'g',
+  ejeX: 'arco',
 });
 
 const escena = new Escena(seccion('vista3d'));
@@ -45,6 +50,22 @@ montarResumenLayout(seccion('resumenLayout'), estado);
 montarElementos(seccion('elementos'), estado);
 montarResumenElemento(seccion('resumenElemento'), estado);
 montarCriterios(seccion('criterios'), estado);
+montarSelectorDeVista(seccion('selectorDeVista'), estado);
+montarPanelDeGraficos(seccion('graficos'), estado);
+
+// El area principal muestra la via o los graficos; la escena se pausa
+// mientras no se ve.
+const vista3d = seccion('vista3d');
+const graficos = seccion('graficos');
+function aplicarVista(vista: string): void {
+  vista3d.hidden = vista !== 'via3d';
+  graficos.hidden = vista !== 'graficos';
+  escena.activar(vista === 'via3d');
+}
+aplicarVista(estado.get().vista);
+estado.suscribir((nuevo, anterior) => {
+  if (nuevo.vista !== anterior.vista) aplicarVista(nuevo.vista);
+});
 
 // La escena reacciona al estado igual que un panel.
 estado.suscribir((nuevo, anterior) => {

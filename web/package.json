@@ -12,7 +12,8 @@
     "tipos": "node scripts/generar-tipos.mjs"
   },
   "dependencies": {
-    "three": "^0.170.0"
+    "three": "^0.170.0",
+    "uplot": "^1.6.32"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

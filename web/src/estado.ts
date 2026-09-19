@@ -3,6 +3,9 @@
 
 import type { ClaveDeMagnitud } from './contrato/magnitudes';
 import type { Layout } from './contrato/tipos';
+import type { EjeX, Pestana } from './graficos/series';
+
+export type Vista = 'via3d' | 'graficos';
 
 export interface DatosDeEstado {
   /** Casos disponibles (nombres de golden/indice.json). */
@@ -19,6 +22,12 @@ export interface DatosDeEstado {
   error: string | null;
   /** true mientras se carga un caso. */
   cargando: boolean;
+  /** Que ocupa el area principal: la via en 3D o los graficos. */
+  vista: Vista;
+  /** Pestana de graficos activa. */
+  pestana: Pestana;
+  /** Eje horizontal de los graficos. */
+  ejeX: EjeX;
 }
 
 export type Suscriptor = (estado: DatosDeEstado, anterior: DatosDeEstado) => void;

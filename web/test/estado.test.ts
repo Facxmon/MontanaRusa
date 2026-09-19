@@ -9,6 +9,9 @@ const inicial: DatosDeEstado = {
   elemento: null,
   error: null,
   cargando: false,
+  vista: 'via3d',
+  pestana: 'g',
+  ejeX: 'arco',
 };
 
 describe('crearEstado', () => {

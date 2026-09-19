@@ -50,10 +50,19 @@ export class Escena {
 
     this.ajustarTamano();
     new ResizeObserver(() => this.ajustarTamano()).observe(contenedor);
-    this.renderer.setAnimationLoop(() => {
-      this.controles.update();
-      this.renderer.render(this.scene, this.camara);
-    });
+    this.activar(true);
+  }
+
+  /** Arranca o pausa el loop de render (pausado mientras la vista 3D esta oculta). */
+  activar(activa: boolean): void {
+    if (activa) {
+      this.renderer.setAnimationLoop(() => {
+        this.controles.update();
+        this.renderer.render(this.scene, this.camara);
+      });
+    } else {
+      this.renderer.setAnimationLoop(null);
+    }
   }
 
   private ajustarTamano(): void {

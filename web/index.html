@@ -10,7 +10,11 @@
   <body>
     <div id="app">
       <div id="errores"></div>
-      <main id="vista3d" aria-label="Vista 3D de la vía"></main>
+      <main id="principal">
+        <nav id="selectorDeVista" class="pestanas" role="tablist" aria-label="Vista"></nav>
+        <div id="vista3d" aria-label="Vista 3D de la vía"></div>
+        <div id="graficos" aria-label="Gráficos" hidden></div>
+      </main>
       <aside id="panel" aria-label="Datos del layout">
         <header id="cabecera">
           <h1>Montaña rusa en miniatura</h1>
