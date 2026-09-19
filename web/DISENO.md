@@ -89,3 +89,42 @@ Gráficos 2D (G contra tiempo). Portada de presentación y video. Comparación e
 - `npm run build`: `tsc --noEmit` + Vite. Corre en el Action.
 - Manual: abrir los 11 casos en el navegador, confirmar que se ven las dos curvas, que el color cambia con
   la magnitud, que los criterios coinciden con los del JSON.
+
+---
+
+# Iteración 2 (2026-09-19)
+
+Decisiones del usuario: lo más importante eran los gráficos y los parámetros editables; sin cámara
+on-board, el carro se ve desde afuera; la vía queda como línea/tubo; el port de la física se hace
+porque los parámetros editables lo necesitan.
+
+## Qué se agregó
+
+| Pieza | Dónde | Qué hace |
+|---|---|---|
+| Gráficos 2D | `src/graficos/` (uPlot) | Espejo de `GraficarElemento.m`: G por eje con banda admisible, límite a 200 ms y límite aplicable nodo a nodo; jerk contra el presupuesto de onset; velocidad, aceleración tangencial y energía; roll y peralte; curvatura del riel y de la heartline contra el radio fabricable. Eje horizontal: arco, tiempo del modelo o tiempo del prototipo. Franjas con los subtramos (o los elementos, en la vista del layout). |
+| Port de la física | `src/nucleo/` | Reescritura en TypeScript, archivo por archivo, del generador de MATLAB. `test/golden-port.test.ts` reconstruye los once golden y coinciden dentro del redondeo del export (6e-6 relativo). Corre en el navegador entre 0,3 y 3 s por caso. |
+| Parámetros editables | `src/paneles/parametros.ts`, `diseno.ts`, `src/nucleo/worker.ts` | Pestaña "Diseño": estado inicial, secuencia de elementos y el formulario generado desde `parametros.esquema`. Cada cambio recalcula en un Web Worker y el resultado entra al visualizador como si fuera un golden. Reset a defaults y descarga del JSON del contrato. |
+| Carro | `src/escena/carro.ts`, `src/paneles/reproductor.ts` | Caja con las dimensiones del carro orientada con T, L, U, recorriendo la vía en el tiempo acumulado; play/pausa, barra, velocidad de reproducción, "seguir" (centro de la órbita), HUD con t, elemento, v y G. |
+
+## Decisiones de diseño de esta iteración
+
+- **El visualizador no sabe de dónde viene el layout.** Un golden y un diseño calculado en el navegador
+  son el mismo objeto del contrato (`nucleo/exportar.ts` es el equivalente de `LayoutAJson.m`). Eso es
+  lo que el contrato prometía y lo que hace que todo el frontend siga igual.
+- **El port es literal.** Mismos nombres, misma estructura, mismo orden de operaciones donde afecta el
+  redondeo (potencias agrupadas como MATLAB), y primitivas numéricas con la semántica exacta de MATLAB
+  (`pchip`, `gradient`, `interp1`, colon, `unique`, `sprintf`), verificadas contra valores generados
+  por MATLAB (`test/fixtures/matlab-referencia.json`).
+- **El formulario sale del esquema del JSON**, no de una lista en la web: si MATLAB o el port declaran
+  un parámetro nuevo, aparece solo.
+- **El cálculo va en un Web Worker** para que la interfaz no se congele; un pedido superado se descarta.
+
+## Pendientes conocidos
+
+- `esquema.modo.parametros` trae solo el modo actual: al cambiar de modo el formulario muestra los
+  parámetros del modo nuevo recién después del recálculo (es rápido).
+- `MetodoDeAcoplamiento = 'Ambos'` calcula solo el método A (la comparación se imprime en MATLAB y no
+  tiene lugar en la web todavía).
+- La vía es un tubo único; trocha real, durmientes y estructura quedan para más adelante.
+- Compartir un diseño por URL (parámetros en el hash, contrato §9) no está hecho; hoy se descarga el JSON.

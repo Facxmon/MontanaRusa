@@ -32,6 +32,8 @@ npm run tipos      # regenera src/contrato/tipos.ts desde ../esquema/layout-v1.s
 | `src/contrato/` | `tipos.ts` (generado desde el esquema, no editar), `cargar.ts` (fetch + rechazo de MAJOR ≠ 1), `magnitudes.ts` (qué columnas se pueden colorear) |
 | `src/escena/` | `geometriaDeVia.ts` (tubo, heartline, uniones y colores como arrays planos, sin Three.js), `colores.ts` (escalas), `escena.ts` y `via.ts` (Three.js) |
 | `src/paneles/` | DOM plano: selector de caso y de magnitud, leyenda, resumen, elementos, criterios, errores |
+| `src/graficos/` | gráficos 2D con uPlot: `series.ts` (puro, qué series lleva cada figura), `figura.ts` (wrapper), `panelDeGraficos.ts` |
+| `src/nucleo/` | el port de la física a TypeScript (ver `DISENO.md`, iteración 2), `worker.ts` y `cliente.ts` para calcular fuera del hilo de la interfaz, `exportar.ts` (el equivalente de `LayoutAJson.m`) |
 | `src/estado.ts` | estado mínimo con suscripción |
 | `plugins/golden.ts` | sirve y emite `golden/` e `indice.json` |
 | `test/` | vitest |
@@ -48,7 +50,17 @@ npm run tipos      # regenera src/contrato/tipos.ts desde ../esquema/layout-v1.s
 `golden/` o el esquema. Una sola vez, en el repo: Settings → Pages → Source: **GitHub Actions**. La URL
 queda `https://<usuario>.github.io/MontanaRusa/` (`base` en `vite.config.ts`).
 
-## Fuera de la v1
+## Qué hay (iteración 2)
 
-Play con el carro animado y cámara on-board (los datos ya viajan: `tiempo` y los versores), panel de
-parámetros editable (necesita el port de la física a `src/nucleo/`), gráficos 2D, portada de presentación.
+Vía 3D coloreada por magnitud, gráficos 2D (G con bandas normativas, jerk, cinemática, roll, curvatura),
+pestaña Diseño con parámetros editables que recalculan la vía en el navegador (Web Worker sobre el port
+de la física), carro recorriendo la vía con play/pausa, y descarga del JSON del contrato.
+
+`npm test` incluye `test/golden-port.test.ts`: el port reconstruye los once golden y tienen que coincidir
+dentro de 6e-6 relativo. Si cambia la física en MATLAB, se regeneran los golden y ese test dice qué hay
+que portear.
+
+## Pendiente
+
+Portada de presentación y video, compartir un diseño por URL, trocha real y estructura en la vía,
+comparación de métodos A/B en la web.

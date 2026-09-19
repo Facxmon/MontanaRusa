@@ -80,7 +80,8 @@ Los parámetros del generador de elementos se configuran en un único lugar:
 | Verificación normativa contra ASTM F2291 | Implementada; valores de la norma sin verificar contra el texto original (ver [`memoria_de_calculo.md` §11](memoria_de_calculo.md#11-datos-pendientes-de-verificación)) |
 | Análisis energético (`analisis_energia.m`) | Modelo preliminar, corre sobre trayectoria de prueba; falta importar geometría real y pasar a RK4 (ver [`documentacion_analisis_energia.md` §15](documentacion_analisis_energia.md#15-limitaciones-actuales--próximos-pasos)) |
 | Dimensionamiento del carro y del loop | Decisión de similitud tomada (modelo distorsionado); dimensiones definitivas sin cerrar (ver [`memoria_de_calculo.md` §10](memoria_de_calculo.md#10-pendientes-que-bloquean-el-dimensionamiento)) |
-| Visualizador web (`web/`) | v1: vía 3D coloreada por magnitud, resumen y criterios, leyendo los golden files; sin animación ni edición de parámetros todavía (ver [`web/DISENO.md`](web/DISENO.md)) |
+| Visualizador web (`web/`) | Vía 3D coloreada por magnitud, gráficos 2D, carro animado, y parámetros editables que recalculan en el navegador sobre el port de la física a TypeScript, validado contra los golden files (ver [`web/DISENO.md`](web/DISENO.md)) |
+| Port de la física a TypeScript (`web/src/nucleo/`) | Completo: los once golden se reproducen dentro del redondeo del export; el arnés es `web/test/golden-port.test.ts` |
 | Modelo de N carros, elemento conector, modo inverso, backend web | Fuera de alcance actual (ver [`documentacion_generador_elementos.md` §15](documentacion_generador_elementos.md#15-otras-limitaciones-y-próximos-pasos)) |
 
 ## Nomenclatura

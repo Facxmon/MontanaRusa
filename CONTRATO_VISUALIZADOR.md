@@ -461,6 +461,14 @@ fijado ahí: `ParametrosPorDefecto` con `RadioDelLoop = 0.30`, método A, entrad
 circuito es el de `DemoLayout.m` tal cual. Cada archivo lleva en `meta.versionGenerador` el commit
 que lo produjo; se regeneran cuando cambia la física, nunca a mano.
 
+**Resultado de la primera corrida cruzada (2026-09-19).** El núcleo porteado a TypeScript
+(`web/src/nucleo/`) reproduce los once casos con el mismo número de nodos, los mismos veredictos y todas
+las magnitudes dentro del redondeo del export (ver §10, punto 3). La tabla de abajo queda como
+referencia de lo que se esperaba; lo que efectivamente se usa es 6e-6 relativo + 1e-9 absoluto, porque
+los golden tienen 6 cifras y no se puede exigir más que eso. Las "trampas conocidas" de más abajo se
+confirmaron todas menos una: `fzero` no aparece en el repo (la bisección de `VelocidadInicialMinima`
+es a mano), así que no hubo que portear un Brent.
+
 **Tolerancias por campo, no global.** El orden de acumulación en punto flotante difiere entre MATLAB
 y JS, así que un `assert` de igualdad exacta va a fallar por razones que no son físicas. Punto de
 partida a calibrar con la primera corrida real:
@@ -510,8 +518,13 @@ por chico que sea el margen numérico.
    (primera letra en minúscula); las excepciones están en NOMENCLATURA.md §9.
 2. ~~Medir el tamaño real~~ **Medido** (§1.8): 2,2 MB crudo, 0,73 MB gzip para el circuito de cuatro.
    No hace falta binario en v1.
-3. **Tolerancias de §8**: los números de arriba son un punto de partida razonado, no medido. Se
-   calibran con la primera corrida cruzada real.
+3. ~~Tolerancias de §8~~ **Calibradas con la primera corrida cruzada** (2026-09-19, `web/test/golden-port.test.ts`):
+   el port en TypeScript reproduce los once golden con el mismo número de nodos, los mismos veredictos
+   `pasa` y toda magnitud dentro de **6e-6 relativo + 1e-9 absoluto**. Ese número no lo fija el port
+   sino el export: los golden llevan 6 cifras significativas (§1.8), así que ninguna tolerancia puede
+   ser más fina que media unidad de la sexta cifra. Las diferencias propias del port (orden de
+   acumulación en punto flotante) quedan muy por debajo; si hiciera falta afinar, habría que exportar
+   los golden con más cifras.
 4. ~~`Reporte.Normativo`~~ **Detallado** en §6.4.1; el exportador lo vuelca entero.
 5. ~~`parametros.esquema.generales` está vacío~~ **Resuelto** (2026-09-18): `ParametrosGenerales.m`
    declara el bloque 4 con ternas, `DescribirParametros` lo imprime como cuarto grupo y el
