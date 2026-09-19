@@ -12,6 +12,11 @@ const inicial: DatosDeEstado = {
   vista: 'via3d',
   pestana: 'g',
   ejeX: 'arco',
+  fuente: 'golden',
+  diseno: null,
+  calculando: false,
+  ultimoCalculoMs: null,
+  panel: 'resultados',
 };
 
 describe('crearEstado', () => {
