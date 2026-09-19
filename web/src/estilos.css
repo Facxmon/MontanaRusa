@@ -259,3 +259,61 @@ summary { cursor: pointer; font-size: 12.5px; color: var(--texto); padding: 4px 
   font-size: 11.5px;
   color: var(--texto-suave);
 }
+
+/* ---------- panel de diseno ---------- */
+.pestanas-panel { align-self: flex-start; }
+#panelResultados, #panelDiseno { display: flex; flex-direction: column; gap: 18px; }
+#panelResultados[hidden], #panelDiseno[hidden] { display: none; }
+
+.boton {
+  padding: 6px 12px;
+  background: var(--fondo);
+  color: var(--texto);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+.boton:hover { border-color: var(--texto-suave); }
+.boton.primario { border-color: var(--acento); color: var(--acento); }
+.boton.chico { padding: 2px 7px; font-size: 12px; }
+.botonera { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
+.campos { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.campo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.campo-etiqueta { color: var(--texto); overflow-wrap: anywhere; }
+.campo-etiqueta small { color: var(--texto-suave); }
+.campo input[type="number"], .campo input[type="text"] {
+  width: 96px;
+  padding: 4px 6px;
+  background: var(--fondo);
+  color: var(--texto);
+  border: 1px solid var(--borde);
+  border-radius: 4px;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12px;
+  text-align: right;
+}
+.campo select { width: auto; padding: 4px 6px; font-size: 12px; }
+.campo-vector { display: inline-flex; gap: 4px; }
+.campo-vector input[type="number"] { width: 62px; }
+.campo-caja { display: inline-flex; flex-direction: column; gap: 3px; }
+.campo-fila { display: inline-flex; gap: 4px; align-items: center; font-family: var(--mono); font-size: 11px; color: var(--texto-suave); }
+.campo-fila input[type="number"] { width: 62px; }
+.campo-anulable { display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+.campo-vacio { font-size: 11.5px; color: var(--texto-suave); }
+
+.parametros-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.parametros-cabecera h2 { margin: 0; }
+
+.secuencia { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.secuencia-fila { display: flex; align-items: center; gap: 6px; }
+.secuencia-fila select { flex: 1; width: auto; padding: 4px 6px; font-size: 12.5px; }
+.secuencia-numero { width: 20px; color: var(--texto-suave); font-family: var(--mono); font-size: 12px; }

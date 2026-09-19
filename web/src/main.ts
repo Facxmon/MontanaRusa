@@ -2,18 +2,23 @@
 // al estado. El flujo esta descrito en DISENO.md.
 
 import { cargarIndice, cargarLayout } from './contrato/cargar';
+import { parametrosDesdeContrato } from './contrato/parametrosDesdeContrato';
 import { MAGNITUD_INICIAL } from './contrato/magnitudes';
 import { Escena } from './escena/escena';
 import { Via } from './escena/via';
 import { crearEstado } from './estado';
 import { montarPanelDeGraficos } from './graficos/panelDeGraficos';
+import { ClienteDeCalculo, PedidoSuperado } from './nucleo/cliente';
 import { montarCriterios } from './paneles/criterios';
+import { montarDiseno } from './paneles/diseno';
 import { montarElementos } from './paneles/elementos';
 import { montarErrores } from './paneles/errores';
 import { montarLeyenda } from './paneles/leyenda';
+import { disenoDesdeLayout, montarParametros } from './paneles/parametros';
 import { montarResumenElemento, montarResumenLayout } from './paneles/resumen';
 import { montarSelectorDeCaso } from './paneles/selectorDeCaso';
 import { montarSelectorDeMagnitud } from './paneles/selectorDeMagnitud';
+import { montarSelectorDePanel } from './paneles/selectorDePanel';
 import { montarSelectorDeVista } from './paneles/selectorDeVista';
 
 const BASE = import.meta.env.BASE_URL;
@@ -37,6 +42,11 @@ const estado = crearEstado({
   vista: 'via3d',
   pestana: 'g',
   ejeX: 'arco',
+  fuente: 'golden',
+  diseno: null,
+  calculando: false,
+  ultimoCalculoMs: null,
+  panel: 'resultados',
 });
 
 const escena = new Escena(seccion('vista3d'));
@@ -52,6 +62,52 @@ montarResumenElemento(seccion('resumenElemento'), estado);
 montarCriterios(seccion('criterios'), estado);
 montarSelectorDeVista(seccion('selectorDeVista'), estado);
 montarPanelDeGraficos(seccion('graficos'), estado);
+montarSelectorDePanel(seccion('selectorDePanel'), estado);
+montarDiseno(seccion('diseno'), estado, abrirDiseno);
+montarParametros(seccion('parametros'), estado);
+
+// Panel lateral: resultados o diseno.
+const panelResultados = seccion('panelResultados');
+const panelDiseno = seccion('panelDiseno');
+function aplicarPanel(panel: string): void {
+  panelResultados.hidden = panel !== 'resultados';
+  panelDiseno.hidden = panel !== 'diseno';
+}
+aplicarPanel(estado.get().panel);
+estado.suscribir((nuevo, anterior) => {
+  if (nuevo.panel !== anterior.panel) aplicarPanel(nuevo.panel);
+});
+
+// Diseno propio: arranca del layout cargado y se recalcula en el worker con cada cambio.
+const cliente = new ClienteDeCalculo('js');
+function abrirDiseno(): void {
+  const { layout } = estado.get();
+  if (!layout) return;
+  const diseno = disenoDesdeLayout(layout, parametrosDesdeContrato(layout.parametros.valores as Record<string, unknown>));
+  estado.set({ diseno, fuente: 'diseno', caso: null, panel: 'diseno' });
+}
+
+let temporizador: ReturnType<typeof setTimeout> | null = null;
+function recalcular(): void {
+  const { diseno } = estado.get();
+  if (!diseno) return;
+  estado.set({ calculando: true, error: null });
+  cliente
+    .calcular(diseno)
+    .then(({ layout, ms }) => {
+      estado.set({ layout, calculando: false, ultimoCalculoMs: ms, elemento: null });
+    })
+    .catch((error: Error) => {
+      if (error instanceof PedidoSuperado) return;
+      estado.set({ calculando: false, error: `Diseño: ${error.message}` });
+    });
+}
+estado.suscribir((nuevo, anterior) => {
+  if (nuevo.fuente !== 'diseno' || !nuevo.diseno) return;
+  if (nuevo.diseno === anterior.diseno && nuevo.fuente === anterior.fuente) return;
+  if (temporizador) clearTimeout(temporizador);
+  temporizador = setTimeout(recalcular, 400);
+});
 
 // El area principal muestra la via o los graficos; la escena se pausa
 // mientras no se ve.

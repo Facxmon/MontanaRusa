@@ -4,8 +4,11 @@
 import type { ClaveDeMagnitud } from './contrato/magnitudes';
 import type { Layout } from './contrato/tipos';
 import type { EjeX, Pestana } from './graficos/series';
+import type { EntradaDeDiseno } from './nucleo/calcular';
 
 export type Vista = 'via3d' | 'graficos';
+export type Fuente = 'golden' | 'diseno';
+export type PanelLateral = 'resultados' | 'diseno';
 
 export interface DatosDeEstado {
   /** Casos disponibles (nombres de golden/indice.json). */
@@ -28,6 +31,16 @@ export interface DatosDeEstado {
   pestana: Pestana;
   /** Eje horizontal de los graficos. */
   ejeX: EjeX;
+  /** De donde salio el layout: un golden file o un diseno calculado en el navegador. */
+  fuente: Fuente;
+  /** El diseno editable (parametros, estado inicial, secuencia), o null si nunca se abrio uno. */
+  diseno: EntradaDeDiseno | null;
+  /** true mientras el worker calcula. */
+  calculando: boolean;
+  /** Duracion del ultimo calculo, en ms, o null. */
+  ultimoCalculoMs: number | null;
+  /** Pestana del panel lateral. */
+  panel: PanelLateral;
 }
 
 export type Suscriptor = (estado: DatosDeEstado, anterior: DatosDeEstado) => void;

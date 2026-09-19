@@ -10,8 +10,14 @@ export function montarSelectorDeCaso(contenedor: HTMLElement, estado: Estado): v
     const selector = el('select', {
       id: 'caso',
       disabled: cargando,
-      onChange: (evento: Event) => estado.set({ caso: (evento.target as HTMLSelectElement).value, elemento: null }),
+      onChange: (evento: Event) => estado.set({ caso: (evento.target as HTMLSelectElement).value, elemento: null, fuente: 'golden' }),
     });
+    if (caso === null) {
+      const propio = el('option', { value: '' }, 'Diseño propio');
+      propio.selected = true;
+      propio.disabled = true;
+      selector.append(propio);
+    }
     for (const nombre of casos) {
       const opcion = el('option', { value: nombre }, nombre);
       if (nombre === caso) opcion.selected = true;

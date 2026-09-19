@@ -21,12 +21,19 @@
           <p class="subtitulo">Vía generada en MATLAB, leída del contrato JSON v1</p>
         </header>
         <section id="selectorDeCaso"></section>
-        <section id="selectorDeMagnitud"></section>
-        <section id="leyenda"></section>
-        <section id="resumenLayout"></section>
-        <section id="elementos"></section>
-        <section id="resumenElemento"></section>
-        <section id="criterios"></section>
+        <nav id="selectorDePanel" class="pestanas pestanas-panel" role="tablist" aria-label="Panel"></nav>
+        <div id="panelResultados">
+          <section id="selectorDeMagnitud"></section>
+          <section id="leyenda"></section>
+          <section id="resumenLayout"></section>
+          <section id="elementos"></section>
+          <section id="resumenElemento"></section>
+          <section id="criterios"></section>
+        </div>
+        <div id="panelDiseno" hidden>
+          <section id="diseno"></section>
+          <section id="parametros"></section>
+        </div>
       </aside>
     </div>
     <script type="module" src="/src/main.ts"></script>

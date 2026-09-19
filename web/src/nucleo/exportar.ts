@@ -166,8 +166,8 @@ function esquemaDeParametros(P: Parametros): Contrato.Parametros['esquema'] {
   };
 }
 
-/** Redondeo recursivo a 6 cifras significativas de todos los numeros no enteros de indice. */
-function redondearTodo(valor: unknown, clave = ''): unknown {
+/** Redondeo recursivo a 6 cifras significativas de todos los numeros que no son indices ni conteos. */
+export function redondearTodo(valor: unknown, clave = ''): unknown {
   if (typeof valor === 'number') {
     if (['numeroDeNodos', 'indice', 'indiceInicio', 'indiceFin', 'numeroDeElementos', 'puntoDeParada'].includes(clave)) return valor;
     return seis(valor);
