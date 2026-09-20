@@ -5,11 +5,19 @@
 
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
+import { fuenteDeCanvas, tema } from '../tema';
+
+/**
+ * Colores simbolicos de las series: series.ts no toca el DOM (se testea en
+ * Node), asi que describe QUE color lleva cada serie y aca se resuelve al
+ * valor del tema (tokens.css) en el momento de dibujar.
+ */
+export type ColorDeSerie = 'serie1' | 'serie2' | 'serie3' | 'limite' | 'admisibleTrazo' | 'admisibleRelleno' | 'cero';
 
 export interface SerieDeFigura {
   etiqueta: string;
   valores: (number | null)[];
-  color: string;
+  color: ColorDeSerie;
   /** Ancho de trazo en px; las referencias van finas. */
   ancho?: number;
   /** Patron de trazos, p. ej. [6, 4] para las lineas de referencia. */
@@ -28,7 +36,7 @@ export interface BandaEntreSeries {
   /** Indices (base 0 dentro de `series`) de la serie superior e inferior. */
   superior: number;
   inferior: number;
-  color: string;
+  color: ColorDeSerie;
 }
 
 export interface DatosDeFigura {
@@ -41,10 +49,25 @@ export interface DatosDeFigura {
   bandas?: BandaEntreSeries[];
 }
 
-const COLOR_TEXTO = '#9aa3b2';
-const COLOR_GRILLA = 'rgba(154, 163, 178, 0.14)';
-const COLOR_FRANJA = ['rgba(255, 255, 255, 0.025)', 'rgba(255, 255, 255, 0.06)'];
-const FUENTE = '11px system-ui, sans-serif';
+function colorDeSerie(color: ColorDeSerie): string {
+  const t = tema();
+  switch (color) {
+    case 'serie1':
+      return t.serie1;
+    case 'serie2':
+      return t.serie2;
+    case 'serie3':
+      return t.serie3;
+    case 'limite':
+      return t.serieLimite;
+    case 'admisibleTrazo':
+      return t.serieAdmisibleTrazo;
+    case 'admisibleRelleno':
+      return t.serieAdmisibleRelleno;
+    case 'cero':
+      return t.serieCero;
+  }
+}
 
 export class Figura {
   private grafico: uPlot | null = null;
@@ -70,6 +93,9 @@ export class Figura {
   mostrar(datos: DatosDeFigura): void {
     this.destruir();
     this.franjas = datos.franjas;
+    const t = tema();
+    const fuente = fuenteDeCanvas();
+    const grilla = { stroke: t.graficoGrilla, width: 1 };
 
     const opciones: uPlot.Options = {
       ...this.tamano(),
@@ -83,27 +109,27 @@ export class Figura {
       axes: [
         {
           label: datos.etiquetaX,
-          stroke: COLOR_TEXTO,
-          labelFont: FUENTE,
-          font: FUENTE,
-          grid: { stroke: COLOR_GRILLA, width: 1 },
-          ticks: { stroke: COLOR_GRILLA, width: 1 },
+          stroke: t.graficoTexto,
+          labelFont: fuente,
+          font: fuente,
+          grid: grilla,
+          ticks: grilla,
         },
         {
           label: datos.etiquetaY,
-          stroke: COLOR_TEXTO,
-          labelFont: FUENTE,
-          font: FUENTE,
+          stroke: t.graficoTexto,
+          labelFont: fuente,
+          font: fuente,
           size: 60,
-          grid: { stroke: COLOR_GRILLA, width: 1 },
-          ticks: { stroke: COLOR_GRILLA, width: 1 },
+          grid: grilla,
+          ticks: grilla,
         },
       ],
       series: [
         { label: datos.etiquetaX },
         ...datos.series.map((s) => ({
           label: s.etiqueta,
-          stroke: s.color,
+          stroke: colorDeSerie(s.color),
           width: s.ancho ?? 1.6,
           dash: s.trazos,
           spanGaps: false,
@@ -111,7 +137,7 @@ export class Figura {
           value: (_u: uPlot, v: number | null) => (v === null ? '—' : formatearValor(v)),
         })),
       ],
-      bands: (datos.bandas ?? []).map((b) => ({ series: [b.superior + 1, b.inferior + 1] as [number, number], fill: b.color })),
+      bands: (datos.bandas ?? []).map((b) => ({ series: [b.superior + 1, b.inferior + 1] as [number, number], fill: colorDeSerie(b.color) })),
       hooks: {
         drawClear: [(u) => this.dibujarFranjas(u)],
       },
@@ -130,8 +156,10 @@ export class Figura {
   private dibujarFranjas(u: uPlot): void {
     if (this.franjas.length === 0) return;
     const { ctx, bbox } = u;
+    const t = tema();
+    const fondos = [t.graficoFranjaA, t.graficoFranjaB];
     ctx.save();
-    ctx.font = `${10 * devicePixelRatio}px system-ui, sans-serif`;
+    ctx.font = fuenteDeCanvas(devicePixelRatio);
     ctx.textBaseline = 'top';
     this.franjas.forEach((franja, i) => {
       const x0 = u.valToPos(franja.desde, 'x', true);
@@ -139,9 +167,9 @@ export class Figura {
       const izquierda = Math.max(bbox.left, Math.min(x0, x1));
       const derecha = Math.min(bbox.left + bbox.width, Math.max(x0, x1));
       if (derecha <= izquierda) return;
-      ctx.fillStyle = COLOR_FRANJA[i % 2]!;
+      ctx.fillStyle = fondos[i % 2]!;
       ctx.fillRect(izquierda, bbox.top, derecha - izquierda, bbox.height);
-      ctx.fillStyle = COLOR_TEXTO;
+      ctx.fillStyle = t.graficoTexto;
       const texto = franja.etiqueta;
       if (ctx.measureText(texto).width < derecha - izquierda - 6) {
         ctx.fillText(texto, izquierda + 3 * devicePixelRatio, bbox.top + 3 * devicePixelRatio);

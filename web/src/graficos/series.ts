@@ -31,11 +31,12 @@ export const PESTANAS: { clave: Pestana; etiqueta: string }[] = [
   { clave: 'curvatura', etiqueta: 'Curvatura' },
 ];
 
-// Paleta validada (dataviz, modo oscuro): series 1-3 y colores de estado.
-const SERIE = ['#3987e5', '#d95926', '#199e70'] as const;
-const LIMITE = '#d03b3b';
-const ADMISIBLE_TRAZO = 'rgba(12, 163, 12, 0.55)';
-const ADMISIBLE_RELLENO = 'rgba(12, 163, 12, 0.10)';
+// Colores simbolicos (figura.ts los resuelve con el tema): series 1-3 y estados.
+const SERIE = ['serie1', 'serie2', 'serie3'] as const;
+const LIMITE = 'limite';
+const ADMISIBLE_TRAZO = 'admisibleTrazo';
+const ADMISIBLE_RELLENO = 'admisibleRelleno';
+const COLOR_CERO = 'cero';
 const NIVELES_PARA_GRAFICAR = 400;
 const RAD_A_GRADOS = 180 / Math.PI;
 
@@ -299,7 +300,6 @@ export function figurasDeCinematica(columnas: Columnas, ejeX: EjeX): DatosDeFigu
   ];
 }
 
-const COLOR_CERO = 'rgba(154, 163, 178, 0.6)';
 
 export function figurasDeRoll(columnas: Columnas, ejeX: EjeX): DatosDeFigura[] {
   return [

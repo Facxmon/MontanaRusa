@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import type { ClaveDeMagnitud } from '../contrato/magnitudes';
 import { magnitudPorClave } from '../contrato/magnitudes';
 import type { Layout } from '../contrato/tipos';
+import { tema } from '../tema';
 import { rangoDeMagnitud } from './colores';
 import {
   aplanarNodos,
@@ -73,7 +74,7 @@ export class Via {
     geometriaUniones.setAttribute('position', new THREE.BufferAttribute(uniones(this.nodos, UNION_CADA_N_NODOS), 3));
     this.unionesLineas = new THREE.LineSegments(
       geometriaUniones,
-      new THREE.LineBasicMaterial({ color: 0x8a94a6, transparent: true, opacity: 0.6 }),
+      new THREE.LineBasicMaterial({ color: new THREE.Color(tema().escenaUniones), transparent: true, opacity: 0.6 }),
     );
     this.grupo.add(this.unionesLineas);
 

@@ -7,6 +7,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { tema } from '../tema';
 
 export type BoundingBox = [[number, number], [number, number], [number, number]];
 
@@ -22,7 +23,8 @@ export class Escena {
 
   constructor(contenedor: HTMLElement) {
     this.contenedor = contenedor;
-    this.scene.background = new THREE.Color(0x0f1115);
+    const t = tema();
+    this.scene.background = new THREE.Color(t.escenaFondo);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -36,16 +38,16 @@ export class Escena {
     this.controles.enableDamping = true;
     this.controles.dampingFactor = 0.08;
 
-    this.scene.add(new THREE.HemisphereLight(0xdfe6f2, 0x1a1d24, 1.1));
-    const sol = new THREE.DirectionalLight(0xffffff, 1.4);
+    this.scene.add(new THREE.HemisphereLight(new THREE.Color(t.escenaCielo), new THREE.Color(t.escenaSuelo), 1.1));
+    const sol = new THREE.DirectionalLight(new THREE.Color(t.escenaSol), 1.4);
     sol.position.set(2, -3, 5);
     this.scene.add(sol);
-    const contraluz = new THREE.DirectionalLight(0x8aa4c8, 0.5);
+    const contraluz = new THREE.DirectionalLight(new THREE.Color(t.escenaContraluz), 0.5);
     contraluz.position.set(-3, 2, 1);
     this.scene.add(contraluz);
 
     // Piso en z = 0: cuadricula de 10 cm sobre 4 x 4 m. Si la via lo cruza, se ve.
-    this.grilla = new THREE.GridHelper(4, 40, 0x3a4150, 0x232833);
+    this.grilla = new THREE.GridHelper(4, 40, new THREE.Color(t.escenaGrillaFuerte), new THREE.Color(t.escenaGrilla));
     this.grilla.rotation.x = Math.PI / 2;
     this.scene.add(this.grilla);
     this.scene.add(new THREE.AxesHelper(0.25));
