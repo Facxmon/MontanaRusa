@@ -2,6 +2,7 @@
    tokens.css: aca no hay literales (ver "Fase 0" en DISENO.md). */
 
 @import './tokens.css';
+@import './fuentes.css';
 
 * { box-sizing: border-box; }
 
