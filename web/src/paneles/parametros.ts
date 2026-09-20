@@ -6,21 +6,11 @@
 import type { DeclaracionDeParametro, Layout } from '../contrato/tipos';
 import type { Estado } from '../estado';
 import { instanciasDesdeTipos, type EntradaDeDiseno } from '../nucleo/calcular';
-import { ParametrosPorDefecto } from '../nucleo/parametros';
+import { OPCIONES_DE_PARAMETRO, PARAMETROS_ANULABLES, ParametrosPorDefecto } from '../nucleo/parametros';
 import type { NombreDeParametro, Parametros } from '../nucleo/tipos';
 import { el } from './dom';
 
 const RAD_A_GRADOS = 180 / Math.PI;
-
-/** Enumeraciones que el esquema no distingue de un texto libre. */
-const OPCIONES: Partial<Record<NombreDeParametro, string[]>> = {
-  SentidoDelGiro: ['Derecha', 'Izquierda'],
-  PuntoDeVerificacionNormativa: ['Heartline', 'Cabeza'],
-  MetodoDeAcoplamiento: ['A', 'B', 'Ambos'],
-};
-
-/** Los que en MATLAB admiten [] (vacio = derivar). */
-const ANULABLES: NombreDeParametro[] = ['OnsetMaximoModelo', 'InclinacionHelicoidalImpuesta'];
 
 function pascal(clave: string): NombreDeParametro {
   return (clave[0]!.toUpperCase() + clave.slice(1)) as NombreDeParametro;
@@ -50,7 +40,7 @@ function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: 
   const etiqueta = el('span', { class: 'campo-etiqueta', title: declaracion.descripcion }, declaracion.clave, unidad !== '-' ? el('small', {}, ` [${unidad}]`) : null);
   let control: HTMLElement;
 
-  const opciones = OPCIONES[nombre];
+  const opciones = nombre === 'ModoCurvatura' ? undefined : OPCIONES_DE_PARAMETRO[nombre];
   if (opciones) {
     const selector = el('select', { onChange: (e: Event) => actualizar(nombre, (e.target as HTMLSelectElement).value) });
     for (const opcion of opciones) {
@@ -63,7 +53,7 @@ function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: 
     const casilla = el('input', { type: 'checkbox', onChange: (e: Event) => actualizar(nombre, (e.target as HTMLInputElement).checked) });
     casilla.checked = valor;
     control = casilla;
-  } else if (ANULABLES.includes(nombre)) {
+  } else if (PARAMETROS_ANULABLES.includes(nombre)) {
     control = campoAnulable(nombre, declaracion, valor, actualizar);
   } else if (typeof valor === 'number') {
     control = entradaNumerica(valor, declaracion.unidad, (v) => actualizar(nombre, v));

@@ -12,6 +12,7 @@
     "tipos": "node scripts/generar-tipos.mjs"
   },
   "dependencies": {
+    "fflate": "^0.8.3",
     "three": "^0.170.0",
     "uplot": "^1.6.32"
   },
