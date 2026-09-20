@@ -164,3 +164,17 @@ todo lo demás es la base sobre la que se apoyan las fases siguientes (modelo, c
   contenedor que muestra un número que cambia le reserva el ancho (`ch`) y usa `tabular-nums`.
 - **El tema se elige con `data-tema` en `<html>`**, y `color-scheme` lo sigue. Hoy está fijo en
   `oscuro`; el claro llega en la fase 4.
+
+---
+
+# Fase 1 (2026-09-20): parámetros por instancia y serialización única
+
+## MATLAB como subconjunto (decisión tomada, regla dura)
+
+El núcleo en TypeScript deja de ser un port uno a uno en un solo sentido: admite **ajustes por
+instancia de elemento** (dos `Helice` con radios distintos en la misma secuencia), cosa que MATLAB, con
+sus `Parametros` globales, no hace. **MATLAB no cambia.** JS es un superconjunto que se reduce
+exactamente a MATLAB cuando ninguna instancia trae ajustes: `golden-port.test.ts` y `golden/` no se
+tocan y tienen que seguir en verde, y un cambio en JS que los rompa está mal por definición. MATLAB
+sigue siendo la referencia normativa y la memoria de cálculo para el caso de parámetros globales. Está
+escrito también en `CONTRATO_VISUALIZADOR.md` §8.

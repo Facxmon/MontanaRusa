@@ -469,6 +469,14 @@ los golden tienen 6 cifras y no se puede exigir más que eso. Las "trampas conoc
 confirmaron todas menos una: `fzero` no aparece en el repo (la bisección de `VelocidadInicialMinima`
 es a mano), así que no hubo que portear un Brent.
 
+**MATLAB es la referencia normativa; JS es un superconjunto (decidido 2026-09-20).** El núcleo en
+TypeScript admite ajustes de parámetros **por instancia** de elemento (dos hélices con radios distintos
+en la misma secuencia; §6, campos `ajustes` e `inertes`), cosa que MATLAB, con sus `Parametros`
+globales, no hace. La regla es que con `ajustes` vacíos en todas las instancias el resultado tiene que
+ser **idéntico** al de MATLAB: los golden se siguen generando con MATLAB, `golden-port.test.ts` no se
+toca, y un cambio en JS que los rompa está mal por definición. MATLAB no cambia y sigue siendo la
+memoria de cálculo para el caso de parámetros globales, que es al que JS se reduce exactamente.
+
 **Tolerancias por campo, no global.** El orden de acumulación en punto flotante difiere entre MATLAB
 y JS, así que un `assert` de igualdad exacta va a fallar por razones que no son físicas. Punto de
 partida a calibrar con la primera corrida real:
