@@ -51,19 +51,40 @@ export function instanciasDesdeTipos(tipos: NombreDeElemento[]): InstanciaDeElem
   return tipos.map((tipo, i) => ({ id: `e${i + 1}`, tipo, ajustes: {} }));
 }
 
-export function calcularLayout(entrada: EntradaDeDiseno, versionGenerador = 'js'): Contrato.Layout {
+/** Avance del calculo: se llama despues de cada elemento de la secuencia con cuantos van, cuantos son y el tipo del que termino. */
+export type AlAvanzar = (hecho: number, total: number, tipo: string) => void;
+
+/**
+ * Un fallo del nucleo dentro de un elemento de la secuencia: el mensaje
+ * lleva el numero y el tipo ("Elemento 2 (Helice): ...") e `indice` (base 0)
+ * identifica la instancia, para que la interfaz pueda resaltar su fila.
+ */
+export class ErrorDeElemento extends Error {
+  constructor(readonly indice: number, readonly tipo: string, causa: Error) {
+    super(`Elemento ${indice + 1} (${tipo}): ${causa.message}`);
+    this.name = 'ErrorDeElemento';
+  }
+}
+
+export function calcularLayout(entrada: EntradaDeDiseno, versionGenerador = 'js', alAvanzar?: AlAvanzar): Contrato.Layout {
   if (entrada.secuencia.length === 0) throw new Error('La secuencia no tiene elementos: agregar al menos uno.');
   let Estado = EstadoInicial(entrada.posicion, entrada.tangente, entrada.arriba, entrada.velocidad, entrada.parametros);
   let Layout = LayoutNuevo(Estado, entrada.parametros);
   const instancias: InstanciaExportada[] = [];
-  for (const inst of entrada.secuencia) {
+  const total = entrada.secuencia.length;
+  entrada.secuencia.forEach((inst, i) => {
     const constructor = CONSTRUCTORES[inst.tipo];
     if (!constructor) throw new Error(`Elemento desconocido: ${String(inst.tipo)}`);
-    const { Parametros: P, Inertes } = AjustarParametros(entrada.parametros, inst.ajustes, inst.tipo);
-    const [Salida, Elemento, Reporte] = constructor(Estado, P, Layout);
-    Estado = Salida;
-    Layout = LayoutAgregarElemento(Layout, Elemento, Estado, Reporte);
-    instancias.push({ ajustes: inst.ajustes, inertes: Inertes });
-  }
+    try {
+      const { Parametros: P, Inertes } = AjustarParametros(entrada.parametros, inst.ajustes, inst.tipo);
+      const [Salida, Elemento, Reporte] = constructor(Estado, P, Layout);
+      Estado = Salida;
+      Layout = LayoutAgregarElemento(Layout, Elemento, Estado, Reporte);
+      instancias.push({ ajustes: inst.ajustes, inertes: Inertes });
+    } catch (error) {
+      throw new ErrorDeElemento(i, inst.tipo, error as Error);
+    }
+    alAvanzar?.(i + 1, total, inst.tipo);
+  });
   return exportarLayout(Layout, { versionGenerador, instancias });
 }

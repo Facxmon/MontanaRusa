@@ -14,13 +14,15 @@ import { Escena } from './escena/escena';
 import { Via } from './escena/via';
 import { crearEstado } from './estado';
 import { montarPanelDeGraficos } from './graficos/panelDeGraficos';
-import { ClienteDeCalculo, PedidoSuperado } from './nucleo/cliente';
+import { CalculoAbortado, ClienteDeCalculo, PedidoSuperado } from './nucleo/cliente';
+import { montarAtajos } from './paneles/atajos';
 import { montarCriterios } from './paneles/criterios';
 import { montarDiseno } from './paneles/diseno';
 import { el } from './paneles/dom';
 import { montarElementos } from './paneles/elementos';
 import { montarBarra } from './paneles/barra';
 import { montarErrores } from './paneles/errores';
+import { leerAutoGenerar, montarGenerar } from './paneles/generar';
 import { montarLeyenda } from './paneles/leyenda';
 import { montarReproductor } from './paneles/reproductor';
 import { montarParametros } from './paneles/parametros';
@@ -78,6 +80,7 @@ function armarDom() {
     app,
     errores,
     barra,
+    principal,
     selectorDeVista,
     vista3d,
     reproductor,
@@ -119,8 +122,11 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     fuente: 'golden',
     diseno: null,
     instancia: null,
+    disenoCalculado: null,
     calculando: false,
+    progreso: null,
     ultimoCalculoMs: null,
+    autoGenerar: leerAutoGenerar(),
     panel: 'resultados',
   });
 
@@ -156,35 +162,63 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     if (nuevo.panel !== anterior.panel) aplicarPanel(nuevo.panel);
   });
 
-  // Diseno propio: arranca del layout cargado y se recalcula en el worker con cada cambio.
+  // Diseno propio: arranca del layout cargado. El calculo es explicito
+  // (Generar); "auto-generar" restaura el recalculo con debounce por edicion.
   const cliente = new ClienteDeCalculo('js');
   function abrirDiseno(): void {
     const { layout } = estado.get();
     if (!layout) return;
     const diseno = disenoDesdeLayout(layout);
-    estado.set({ diseno, instancia: diseno.secuencia[0]?.id ?? null, fuente: 'diseno', caso: null, panel: 'diseno' });
+    // El layout en pantalla ya es el de este diseno: Generar arranca sin cambios pendientes.
+    estado.set({ diseno, disenoCalculado: diseno, instancia: diseno.secuencia[0]?.id ?? null, fuente: 'diseno', caso: null, panel: 'diseno' });
+  }
+
+  // Cada Generar lleva un numero: la promesa de un pedido viejo (superado o
+  // detenido para arrancar este) no toca el estado cuando se resuelve.
+  let pedidoDeCalculo = 0;
+  function generar(): void {
+    const { diseno, disenoCalculado, calculando } = estado.get();
+    if (!diseno || diseno === disenoCalculado) return;
+    if (calculando) cliente.abortar(); // el worker estaba ocupado con el diseno anterior: no vale la pena esperarlo
+    const pedido = ++pedidoDeCalculo;
+    estado.set({ calculando: true, progreso: { hecho: 0, total: diseno.secuencia.length, tipo: '' }, error: null });
+    cliente
+      .calcular(diseno, (progreso) => {
+        if (pedido === pedidoDeCalculo) estado.set({ progreso });
+      })
+      .then(({ layout, ms }) => {
+        if (pedido !== pedidoDeCalculo || destruido) return;
+        estado.set({ layout, disenoCalculado: diseno, calculando: false, progreso: null, ultimoCalculoMs: ms, elemento: null });
+      })
+      .catch((error: Error) => {
+        if (pedido !== pedidoDeCalculo || destruido) return;
+        // Superado o detenido: estado.layout no se toca, sigue el ultimo completo.
+        if (error instanceof PedidoSuperado || error instanceof CalculoAbortado) {
+          estado.set({ calculando: false, progreso: null });
+          return;
+        }
+        estado.set({ calculando: false, progreso: null, error: `Diseño: ${error.message}` });
+      });
+  }
+  function detener(): void {
+    if (!estado.get().calculando) return;
+    cliente.abortar();
   }
 
   let temporizador: ReturnType<typeof setTimeout> | null = null;
-  function recalcular(): void {
-    const { diseno } = estado.get();
-    if (!diseno) return;
-    estado.set({ calculando: true, error: null });
-    cliente
-      .calcular(diseno)
-      .then(({ layout, ms }) => {
-        estado.set({ layout, calculando: false, ultimoCalculoMs: ms, elemento: null });
-      })
-      .catch((error: Error) => {
-        if (error instanceof PedidoSuperado) return;
-        estado.set({ calculando: false, error: `Diseño: ${error.message}` });
-      });
-  }
   estado.suscribir((nuevo, anterior) => {
-    if (nuevo.fuente !== 'diseno' || !nuevo.diseno) return;
-    if (nuevo.diseno === anterior.diseno && nuevo.fuente === anterior.fuente) return;
+    if (!nuevo.autoGenerar || nuevo.fuente !== 'diseno' || !nuevo.diseno) return;
+    if (nuevo.diseno === anterior.diseno && nuevo.autoGenerar === anterior.autoGenerar) return;
     if (temporizador) clearTimeout(temporizador);
-    temporizador = setTimeout(recalcular, 400);
+    temporizador = setTimeout(generar, 400);
+  });
+
+  montarGenerar(zonas.derecha, estado, { generar, detener });
+  const destruirAtajos = montarAtajos({ generar, detener });
+
+  // Mientras calcula, el layout viejo sigue visible, atenuado, en vez de blanquearse.
+  estado.suscribir((nuevo, anterior) => {
+    if (nuevo.calculando !== anterior.calculando) dom.principal.classList.toggle('calculando', nuevo.calculando);
   });
 
   // El area principal muestra la via o los graficos; la escena se pausa
@@ -262,6 +296,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
       if (destruido) return;
       destruido = true;
       if (temporizador) clearTimeout(temporizador);
+      destruirAtajos();
       cliente.terminar();
       destruirReproductor();
       destruirGraficos();

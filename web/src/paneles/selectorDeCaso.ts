@@ -9,7 +9,9 @@ export function montarSelectorDeCaso(contenedor: HTMLElement, estado: Estado): v
     vaciar(contenedor);
     const selector = el('select', {
       disabled: cargando,
-      onChange: (evento: Event) => estado.set({ caso: (evento.target as HTMLSelectElement).value, elemento: null, fuente: 'golden' }),
+      // Volver a un golden cierra el diseno propio (queda en localStorage hasta que se edite otro).
+      onChange: (evento: Event) =>
+        estado.set({ caso: (evento.target as HTMLSelectElement).value, elemento: null, fuente: 'golden', diseno: null, disenoCalculado: null, instancia: null }),
     });
     if (caso === null) {
       const propio = el('option', { value: '' }, 'Diseño propio');

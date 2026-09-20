@@ -1,8 +1,8 @@
 // Panel de diseno: de donde sale el layout (golden o diseno propio), el
 // estado inicial y la secuencia de instancias de elemento, que es la
 // navegacion principal: elegir una fila abre sus parametros en el
-// formulario de al lado (parametros.ts). Editar cualquier cosa dispara el
-// recalculo en el worker.
+// formulario de al lado (parametros.ts). Editar cambia el borrador
+// (estado.diseno); calcular es explicito, con Generar.
 
 import type { Estado } from '../estado';
 import { nuevoIdDeInstancia, type EntradaDeDiseno, type InstanciaDeElemento } from '../nucleo/calcular';
@@ -22,8 +22,10 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
   // actualiza en el lugar por el mismo motivo: llega mientras se tipea.
   let cambioPropio = false;
   let lineaDeEstado: HTMLElement | null = null;
-  const textoDeEstado = ({ calculando, ultimoCalculoMs }: { calculando: boolean; ultimoCalculoMs: number | null }) =>
-    calculando ? 'Calculando…' : `Diseño propio calculado en el navegador${ultimoCalculoMs !== null ? ` en ${(ultimoCalculoMs / 1000).toFixed(2)} s` : ''}. Cada cambio recalcula.`;
+  const textoDeEstado = ({ calculando, ultimoCalculoMs, autoGenerar }: { calculando: boolean; ultimoCalculoMs: number | null; autoGenerar: boolean }) =>
+    calculando
+      ? 'Calculando…'
+      : `Diseño propio calculado en el navegador${ultimoCalculoMs !== null ? ` en ${(ultimoCalculoMs / 1000).toFixed(2)} s` : ''}. ${autoGenerar ? 'Cada cambio recalcula (auto-generar).' : 'Generar (Ctrl+Enter) calcula los cambios.'}`;
 
   const dibujar = () => {
     const { layout, diseno, fuente, caso, instancia } = estado.get();
@@ -155,7 +157,7 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {
-    if (lineaDeEstado && (nuevo.calculando !== anterior.calculando || nuevo.ultimoCalculoMs !== anterior.ultimoCalculoMs)) {
+    if (lineaDeEstado && (nuevo.calculando !== anterior.calculando || nuevo.ultimoCalculoMs !== anterior.ultimoCalculoMs || nuevo.autoGenerar !== anterior.autoGenerar)) {
       lineaDeEstado.textContent = textoDeEstado(nuevo);
     }
     if (cambioPropio) return;

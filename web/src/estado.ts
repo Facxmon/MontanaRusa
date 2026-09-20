@@ -37,10 +37,19 @@ export interface DatosDeEstado {
   diseno: EntradaDeDiseno | null;
   /** Id de la instancia de elemento elegida en el panel de diseno, o null si ninguna. */
   instancia: string | null;
+  /**
+   * El diseno al que corresponde el layout en pantalla, o null si el layout
+   * no salio de un diseno. Generar esta habilitado cuando diseno !== disenoCalculado.
+   */
+  disenoCalculado: EntradaDeDiseno | null;
   /** true mientras el worker calcula. */
   calculando: boolean;
+  /** Avance del calculo en curso (elementos hechos / total), o null. */
+  progreso: { hecho: number; total: number; tipo: string } | null;
   /** Duracion del ultimo calculo, en ms, o null. */
   ultimoCalculoMs: number | null;
+  /** Recalcular solo con cada edicion (debounce), como antes de la fase 2. Apagado por defecto. */
+  autoGenerar: boolean;
   /** Pestana del panel lateral. */
   panel: PanelLateral;
 }

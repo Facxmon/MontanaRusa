@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { analizarLayout } from '../src/contrato/cargar';
 import { parametrosDesdeContrato } from '../src/contrato/parametrosDesdeContrato';
-import { calcularLayout, instanciasDesdeTipos, nuevoIdDeInstancia } from '../src/nucleo/calcular';
+import { calcularLayout, ErrorDeElemento, instanciasDesdeTipos, nuevoIdDeInstancia } from '../src/nucleo/calcular';
 import { textoDelLayout } from '../src/nucleo/descargar';
 import { ParametrosPorDefecto } from '../src/nucleo/parametros';
 
@@ -52,5 +52,34 @@ describe('calcularLayout', () => {
     expect(() =>
       calcularLayout({ parametros: ParametrosPorDefecto(), posicion: [0, 0, 1], tangente: [1, 0, 0], arriba: [0, 0, 1], velocidad: 5, secuencia: [] }),
     ).toThrowError(/secuencia/);
+  });
+
+  it('alAvanzar se llama despues de cada elemento con hecho, total y tipo', () => {
+    const parametros = ParametrosPorDefecto();
+    parametros.PasoGeneracion = 0.01;
+    parametros.PasoSimulacion = 0.01;
+    const avances: [number, number, string][] = [];
+    calcularLayout(
+      { parametros, posicion: [0, 0, 1], tangente: [1, 0, 0], arriba: [0, 0, 1], velocidad: 5, secuencia: instanciasDesdeTipos(['LoopVertical', 'Helice']) },
+      'test',
+      (hecho, total, tipo) => avances.push([hecho, total, tipo]),
+    );
+    expect(avances).toEqual([[1, 2, 'LoopVertical'], [2, 2, 'Helice']]);
+  });
+
+  it('un fallo dentro de un elemento dice cual fue y conserva el indice', () => {
+    const parametros = ParametrosPorDefecto();
+    parametros.PasoGeneracion = 0.01;
+    parametros.PasoSimulacion = 0.01;
+    parametros.PuntoDeVerificacionNormativa = 'Rodilla' as never;
+    let error: unknown;
+    try {
+      calcularLayout({ parametros, posicion: [0, 0, 1], tangente: [1, 0, 0], arriba: [0, 0, 1], velocidad: 5, secuencia: instanciasDesdeTipos(['LoopVertical']) }, 'test');
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(ErrorDeElemento);
+    expect((error as ErrorDeElemento).indice).toBe(0);
+    expect((error as Error).message).toMatch(/^Elemento 1 \(LoopVertical\): PuntoDeVerificacionNormativa/);
   });
 });

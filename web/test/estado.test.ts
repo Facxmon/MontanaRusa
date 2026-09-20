@@ -15,8 +15,11 @@ const inicial: DatosDeEstado = {
   fuente: 'golden',
   diseno: null,
   instancia: null,
+  disenoCalculado: null,
   calculando: false,
+  progreso: null,
   ultimoCalculoMs: null,
+  autoGenerar: false,
   panel: 'resultados',
 };
 

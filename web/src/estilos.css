@@ -75,6 +75,39 @@ html, body {
 .boton-barra:hover:not(:disabled) { background: var(--superficie-2); border-color: var(--borde-sutil); }
 .boton-barra:disabled { color: var(--texto-3); cursor: default; }
 .boton-barra:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
+.barra-opcion { display: inline-flex; align-items: center; gap: var(--esp-1); font-size: var(--texto-sm); color: var(--texto-2); white-space: nowrap; cursor: pointer; }
+.barra-opcion input { accent-color: var(--acento); margin: 0; }
+
+/* Generar / Detener: grande, con color de acento; el relleno es el progreso. */
+.boton-generar {
+  position: relative;
+  overflow: hidden;
+  height: var(--esp-6);
+  padding: 0 var(--esp-4);
+  font-weight: 600;
+  color: var(--acento);
+  border-color: var(--acento);
+}
+.boton-generar:hover:not(:disabled) { background: var(--acento-suave); border-color: var(--acento); }
+.boton-generar:disabled { color: var(--texto-3); border-color: var(--borde-sutil); }
+.boton-generar.calculando { color: var(--texto-1); border-color: var(--borde-fuerte); }
+.boton-generar > * { position: relative; }
+.generar-progreso {
+  position: absolute !important;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--acento-suave);
+  transition: width var(--dur-media) var(--curva);
+}
+.generar-icono { display: inline-flex; }
+.generar-punto { display: none; width: var(--esp-2); height: var(--esp-2); border-radius: 50%; background: var(--acento); }
+.boton-generar.pendiente .generar-punto { display: inline-block; }
+.generar-contador { font-family: var(--mono); font-weight: 400; font-size: var(--texto-xs); color: var(--texto-2); font-variant-numeric: tabular-nums; }
+.generar-contador[hidden] { display: none; }
+
+/* Mientras calcula, el layout anterior sigue visible, atenuado. */
+.principal.calculando .vista3d, .principal.calculando .graficos { opacity: 0.6; }
+.vista3d, .graficos { transition: opacity var(--dur-media) var(--curva); }
 
 .principal {
   position: relative;
