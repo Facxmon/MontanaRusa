@@ -62,8 +62,10 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
       el('input', {
         type: 'number', step: 'any', value: String(Number(valor.toPrecision(10))),
         onChange: (e: Event) => {
-          const v = Number((e.target as HTMLInputElement).value);
+          const campo = e.target as HTMLInputElement;
+          const v = Number(campo.value);
           if (!Number.isFinite(v)) return;
+          campo.defaultValue = campo.value; // confirmado (ver atajos.ts)
           cambioPropio = true;
           alCambiar(v);
           cambioPropio = false;

@@ -13,10 +13,12 @@ import { Carro } from './escena/carro';
 import { Escena } from './escena/escena';
 import { Via } from './escena/via';
 import { crearEstado } from './estado';
+import { Historial, type EntradaDeHistorial } from './historial';
 import { montarPanelDeGraficos } from './graficos/panelDeGraficos';
 import { CalculoAbortado, ClienteDeCalculo, PedidoSuperado } from './nucleo/cliente';
 import { montarAtajos } from './paneles/atajos';
 import { montarCriterios } from './paneles/criterios';
+import { montarDeshacer } from './paneles/deshacer';
 import { montarDiseno } from './paneles/diseno';
 import { el } from './paneles/dom';
 import { montarElementos } from './paneles/elementos';
@@ -213,8 +215,41 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     temporizador = setTimeout(generar, 400);
   });
 
+  // Deshacer / rehacer: el historial guarda solo disenos y se alimenta de
+  // cada cambio de estado.diseno que no venga de el mismo. Abrir o cerrar un
+  // diseno (null <-> diseno) arranca un historial nuevo. Opera sobre el
+  // borrador: despues de deshacer, Generar vuelve a marcar cambios
+  // pendientes y no se recalcula solo.
+  const historial = new Historial();
+  let aplicandoHistorial = false;
+  const botonesDeHistorial = montarDeshacer(zonas.izquierda, historial, { deshacer, rehacer });
+  estado.suscribir((nuevo, anterior) => {
+    if (nuevo.diseno === anterior.diseno || aplicandoHistorial) return;
+    if (!nuevo.diseno || !anterior.diseno) historial.vaciar();
+    else historial.registrar(anterior.diseno, nuevo.diseno);
+    botonesDeHistorial.actualizar();
+  });
+  function aplicarPaso(entrada: EntradaDeHistorial | null): void {
+    if (!entrada) return;
+    const { instancia } = estado.get();
+    // Se elige la instancia del cambio (si sigue existiendo) para que se vea el campo volver.
+    const elegida = entrada.instancia && entrada.diseno.secuencia.some((i) => i.id === entrada.instancia) ? entrada.instancia : instancia;
+    aplicandoHistorial = true;
+    estado.set({ diseno: entrada.diseno, instancia: elegida, panel: 'diseno' });
+    aplicandoHistorial = false;
+    botonesDeHistorial.actualizar();
+  }
+  function deshacer(): void {
+    const { diseno } = estado.get();
+    if (diseno) aplicarPaso(historial.deshacer(diseno));
+  }
+  function rehacer(): void {
+    const { diseno } = estado.get();
+    if (diseno) aplicarPaso(historial.rehacer(diseno));
+  }
+
   montarGenerar(zonas.derecha, estado, { generar, detener });
-  const destruirAtajos = montarAtajos({ generar, detener });
+  const destruirAtajos = montarAtajos({ generar, detener, deshacer, rehacer });
 
   // Mientras calcula, el layout viejo sigue visible, atenuado, en vez de blanquearse.
   estado.suscribir((nuevo, anterior) => {

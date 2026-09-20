@@ -51,9 +51,12 @@ function entradaNumerica(valor: number, unidad: string, alCambiar: (v: number) =
     step: 'any',
     value: String(enGrados ? Number((valor * RAD_A_GRADOS).toPrecision(10)) : Number(valor.toPrecision(10))),
     onChange: (evento: Event) => {
-      const texto = (evento.target as HTMLInputElement).value;
+      const campo = evento.target as HTMLInputElement;
+      const texto = campo.value;
       const numero = Number(texto);
       if (texto.trim() === '' || !Number.isFinite(numero)) return;
+      // Confirmado: defaultValue marca lo que ya esta en el diseno (atajos.ts decide con eso a quien va Ctrl+Z).
+      campo.defaultValue = texto;
       alCambiar(enGrados ? numero / RAD_A_GRADOS : numero);
     },
   });
@@ -102,7 +105,14 @@ function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: 
       )),
     ));
   } else if (typeof valor === 'string') {
-    control = el('input', { type: 'text', value: valor, onChange: (e: Event) => actualizar(nombre, (e.target as HTMLInputElement).value) });
+    control = el('input', {
+      type: 'text', value: valor,
+      onChange: (e: Event) => {
+        const campo = e.target as HTMLInputElement;
+        campo.defaultValue = campo.value;
+        actualizar(nombre, campo.value);
+      },
+    });
   } else {
     control = el('span', { class: 'ayuda' }, String(valor));
   }
