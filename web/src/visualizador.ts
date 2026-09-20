@@ -19,6 +19,7 @@ import { montarCriterios } from './paneles/criterios';
 import { montarDiseno } from './paneles/diseno';
 import { el } from './paneles/dom';
 import { montarElementos } from './paneles/elementos';
+import { montarBarra } from './paneles/barra';
 import { montarErrores } from './paneles/errores';
 import { montarLeyenda } from './paneles/leyenda';
 import { montarReproductor } from './paneles/reproductor';
@@ -36,11 +37,14 @@ const urlDelCaso = (caso: string) => `${BASE}golden/${encodeURIComponent(caso)}.
 /** Los nodos del visualizador: la estructura que antes estaba en index.html. */
 function armarDom() {
   const errores = el('div', { class: 'errores' });
+  // La barra de aplicacion cruza todo el ancho: archivo a la izquierda, la
+  // vista en el centro, generar a la derecha (cada grupo lo monta su modulo).
+  const barra = el('header', { class: 'barra', role: 'toolbar', 'aria-label': 'Barra de aplicación' });
   const selectorDeVista = el('nav', { class: 'pestanas selector-de-vista', role: 'tablist', 'aria-label': 'Vista' });
   const vista3d = el('div', { class: 'vista3d', 'aria-label': 'Vista 3D de la vía' });
   const reproductor = el('div', { class: 'reproductor', 'aria-label': 'Reproducción', hidden: true });
   const graficos = el('div', { class: 'graficos', 'aria-label': 'Gráficos', hidden: true });
-  const principal = el('main', { class: 'principal' }, selectorDeVista, vista3d, reproductor, graficos);
+  const principal = el('main', { class: 'principal' }, vista3d, reproductor, graficos);
 
   const selectorDeCaso = el('section');
   const selectorDePanel = el('nav', { class: 'pestanas pestanas-panel', role: 'tablist', 'aria-label': 'Panel' });
@@ -69,10 +73,11 @@ function armarDom() {
     panelDiseno,
   );
 
-  const app = el('div', { class: 'visualizador' }, errores, principal, panel);
+  const app = el('div', { class: 'visualizador' }, errores, barra, principal, panel);
   return {
     app,
     errores,
+    barra,
     selectorDeVista,
     vista3d,
     reproductor,
@@ -122,6 +127,9 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   const escena = new Escena(dom.vista3d);
   const via = new Via(escena.scene);
   const carro = new Carro(escena.scene);
+
+  const zonas = montarBarra(dom.barra);
+  zonas.centro.append(dom.selectorDeVista);
 
   montarErrores(dom.errores, estado);
   montarSelectorDeCaso(dom.selectorDeCaso, estado);
