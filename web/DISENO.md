@@ -122,8 +122,10 @@ porque los parámetros editables lo necesitan.
 
 ## Pendientes conocidos
 
-- `esquema.modo.parametros` trae solo el modo actual: al cambiar de modo el formulario muestra los
-  parámetros del modo nuevo recién después del recálculo (es rápido).
+- ~~`esquema.modo.parametros` trae solo el modo actual: al cambiar de modo el formulario muestra los
+  parámetros del modo nuevo recién después del recálculo.~~ Resuelto en la fase 1: el formulario deriva
+  las cuatro listas del núcleo (`ParametrosDelModo(modo)`, `DECLARACIONES_DE_ELEMENTOS`, …), que
+  `parametros.test.ts` verifica idénticas al esquema de los golden.
 - `MetodoDeAcoplamiento = 'Ambos'` calcula solo el método A (la comparación se imprime en MATLAB y no
   tiene lugar en la web todavía).
 - La vía es un tubo único; trocha real, durmientes y estructura quedan para más adelante.
@@ -133,8 +135,8 @@ porque los parámetros editables lo necesitan.
 
 # Fase 0 (2026-09-19): base visual y estructural
 
-Consigna en `web/consignas/fase-0-base.md`. Sin funcionalidad nueva salvo el arreglo de los números;
-todo lo demás es la base sobre la que se apoyan las fases siguientes (modelo, control, lectura, pulido).
+Sin funcionalidad nueva salvo el arreglo de los números; todo lo demás es la base sobre la que se
+apoyan las fases siguientes (modelo, control, lectura, pulido).
 
 ## Qué cambió y por qué
 
@@ -178,3 +180,86 @@ exactamente a MATLAB cuando ninguna instancia trae ajustes: `golden-port.test.ts
 tocan y tienen que seguir en verde, y un cambio en JS que los rompa está mal por definición. MATLAB
 sigue siendo la referencia normativa y la memoria de cálculo para el caso de parámetros globales. Está
 escrito también en `CONTRATO_VISUALIZADOR.md` §8.
+
+## El modelo: instancias con ajustes propios
+
+El problema era de modelo de datos, no de interfaz: `EntradaDeDiseno.secuencia` era una lista de
+nombres de tipo y el cálculo le pasaba **los mismos** `Parametros` a todos los constructores, así que dos
+`Helice` compartían radio, vueltas, avance y peralte, y el formulario, agrupado por tipo, no podía hacer
+otra cosa que editar las dos a la vez.
+
+```ts
+interface InstanciaDeElemento { id: string; tipo: NombreDeElemento; ajustes: Partial<Parametros> }
+interface EntradaDeDiseno { parametros: Parametros; posicion; tangente; arriba; velocidad; secuencia: InstanciaDeElemento[] }
+```
+
+- `ajustes` es **solo lo que la instancia pisa** sobre los globales. `calcularLayout` construye cada
+  instancia con `AjustarParametros(globales, ajustes, tipo)`, el port de `AjustarParametros.m`, como
+  haría un script de MATLAB elemento por elemento; no se reimplementó nada. Los `Inertes` que devuelve
+  (ajustes que ni el modo ni el tipo consumen) antes se descartaban; ahora viajan al layout exportado y
+  a la ficha de la instancia. `SeparacionDePatas`, que es derivado en `ParametrosPorDefecto()` pero
+  parámetro declarado del loop, no recibe trato especial: gana el ajuste si viene, si no el derivado.
+- `id` (`e1`, `e2`, …) es estable dentro del diseño: identifica la instancia elegida en el panel y va
+  a servir para deshacer/rehacer. No viaja en la serialización (es estado de sesión, como el hash de
+  la interfaz del contrato §9): al crear un diseño desde un layout o al deserializar se asignan
+  secuenciales, y agregar o duplicar toma el siguiente número libre sin reutilizar uno quitado.
+- Los `Parametros` del núcleo, `Layout` y `RegistroDeLayout` no cambian: los ajustes e inertes entran al
+  exportador por opciones (`exportarLayout(Layout, { instancias })`), que es la única pieza que no es un
+  espejo de MATLAB.
+
+## El contrato: `1.1.0`, cambio MINOR
+
+Cada elemento del layout puede traer dos campos **opcionales**: `ajustes` (lo que la instancia pisó, en
+SI y camelCase) e `inertes` (claves de `ajustes` sin efecto). Como su ausencia significa "sin ajustes",
+`cargar.ts` sigue rechazando solo MAJOR ≠ 1, los golden de `1.0.0` cargan igual y **MATLAB no emite los
+campos, lo cual es válido** (`CONTRATO_VISUALIZADOR.md` §3 y §6). El exportador JS emite `1.1.0` y solo
+agrega los campos cuando hay ajustes: con ajustes vacíos el objeto es byte a byte el de antes. El
+validador chequea que las claves de `ajustes` existan en `defaults` y que `inertes ⊆ ajustes`.
+`parametrosDesdeContrato` toma el default exacto cuando el valor del JSON coincide con él a 6 cifras
+(la inversa del redondeo del export), así "diseñar a partir de este caso" reproduce el golden y no deja
+treinta globales a 1e-6 del default.
+
+## `serializar.ts`: un módulo, no tres
+
+El guardado a archivo, la importación, el hash de la URL y el deshacer/rehacer (fase 2) necesitan lo
+mismo: una representación **completa y mínima** del diseño. Si cada uno tuviera la suya, habría tres
+listas de "qué es un parámetro válido", tres comparaciones con el default y tres formas de fallar en
+silencio. `nucleo/serializar.ts` es la única:
+
+- `serializarDiseno` guarda **solo lo que difiere de `ParametrosPorDefecto()`** con comparación profunda
+  (vectores, caja 3×2, anulables `null`), el estado inicial y las instancias como `{t, a}`. El circuito
+  de demo serializa a 247 bytes de JSON (`p = {RadioDelLoop: 0.3}`), contra 2,2 MB del layout.
+- `deserializarDiseno` completa con los defaults y **rechaza con mensaje de campo + esperado**: versión
+  distinta de 1, nombre inexistente en `ParametrosPorDefecto()`, tipo fuera de `CATALOGO_DE_ELEMENTOS`,
+  valor de forma equivocada (la forma sale del default: número, lógico, opción, vector3, caja 3×2; `null`
+  solo en los anulables).
+- `aTextoCompacto` / `desdeTextoCompacto`: deflate crudo con **fflate** en base64url sin relleno, apto
+  para el hash de la URL. fflate y no `CompressionStream` porque la API es sincrónica (sirve en un
+  `hashchange`, en el deshacer y en los tests), `deflate-raw` nativo recién existe en Chrome 103 /
+  Safari 16.4 / Node 21, y cuesta ~8 kB. La justificación completa está en la cabecera del módulo.
+- Los nombres son los del núcleo (PascalCase): es un formato interno de la web, no el contrato.
+- `test/serializar.test.ts` hace la ida y vuelta exacta para los once golden, por objeto y por texto.
+
+## El panel: la secuencia es la navegación
+
+- Cada fila de la secuencia tiene número, tipo, subir / bajar / **duplicar** / quitar y el contador
+  "N ajustes"; elegir una abre su **ficha** con `DECLARACIONES_DE_ELEMENTOS[tipo]`. Cada campo dice si
+  es *heredado* del global o *pisado* por la instancia, con ↺ para volver al global; editar uno lo pisa
+  en el lugar, sin redibujar la ficha (así no se pierde el foco: la propiedad de `cambioPropio` de la
+  iteración 2 se mantiene, y el estado del cálculo, que llega mientras se tipea, también se actualiza
+  en el lugar). Duplicar copia los ajustes con id nuevo. Los inertes se muestran con el texto concreto
+  ("ajustaste RadioDeLaHelice pero el elemento LoopVertical no lo consume") y un botón para quitarlos.
+- Los grupos de parámetros **por tipo** desaparecen: los geométricos se editan por instancia; modo de
+  curvatura, criterios de aceptación y generales siguen como globales. "Resetear a default" vuelve los
+  globales y conserva los ajustes.
+- Las cuatro listas salen del núcleo y no del esquema del layout, por lo que al cambiar de modo sus
+  parámetros aparecen al instante (pendiente conocido de la iteración 2, resuelto). La propiedad "si el
+  port declara un parámetro nuevo, aparece solo" se conserva: el núcleo es quien declara.
+- `disenoDesdeLayout` es un módulo puro en `contrato/` y lee `elementos[].ajustes` si el layout los trae.
+
+## Verificado
+
+`npm test` (143 tests, ~12 s: la reducción a MATLAB reconstruye los once casos otra vez) y
+`npm run build` en verde con `golden-port.test.ts` y `golden/` intactos; en el
+navegador, dos hélices con radios 0,7 y 0,4 en la misma secuencia se ven distintas en el 3D, y al
+tipear un valor y pasar con Tab el foco queda en el campo siguiente durante y después del recálculo.

@@ -38,11 +38,11 @@ de la vía, se vuelve a capturar.
 | `index.html`, `src/portada.css` | la portada: solo tokens y tipografía, sin Three.js ni uPlot |
 | `visualizador.html`, `src/main.ts`, `src/visualizador.ts` | la app: `montarVisualizador(raiz)` arma el DOM, conecta todo y devuelve `destruir()` |
 | `src/tokens.css`, `src/fuentes.css`, `src/estilos.css`, `src/tema.ts` | tokens de diseño (única fuente de color), `@font-face`, estilos del visualizador, y el puente para que JavaScript lea los tokens |
-| `src/contrato/` | `tipos.ts` (generado desde el esquema, no editar), `cargar.ts` (fetch + rechazo de MAJOR ≠ 1), `magnitudes.ts` (qué columnas se pueden colorear) |
+| `src/contrato/` | `tipos.ts` (generado desde el esquema, no editar), `cargar.ts` (fetch + rechazo de MAJOR ≠ 1), `magnitudes.ts` (qué columnas se pueden colorear), `parametrosDesdeContrato.ts` y `disenoDesdeLayout.ts` (del JSON a un diseño editable) |
 | `src/escena/` | `geometriaDeVia.ts` (tubo, heartline, uniones y colores como arrays planos, sin Three.js), `colores.ts` (escalas), `escena.ts` y `via.ts` (Three.js) |
 | `src/paneles/` | DOM plano: selector de caso y de magnitud, leyenda, resumen, elementos, criterios, errores |
 | `src/graficos/` | gráficos 2D con uPlot: `series.ts` (puro, qué series lleva cada figura), `figura.ts` (wrapper), `panelDeGraficos.ts` |
-| `src/nucleo/` | el port de la física a TypeScript (ver `DISENO.md`, iteración 2), `worker.ts` y `cliente.ts` para calcular fuera del hilo de la interfaz, `exportar.ts` (el equivalente de `LayoutAJson.m`) |
+| `src/nucleo/` | el port de la física a TypeScript (ver `DISENO.md`, iteración 2), `calcular.ts` (un diseño: globales + instancias con ajustes), `worker.ts` y `cliente.ts` para calcular fuera del hilo de la interfaz, `exportar.ts` (el equivalente de `LayoutAJson.m`), `serializar.ts` (el diseño como texto: solo lo que difiere del default, comprimido para la URL) |
 | `src/estado.ts` | estado mínimo con suscripción |
 | `plugins/golden.ts` | sirve y emite `golden/` e `indice.json` |
 | `test/` | vitest |
@@ -65,6 +65,12 @@ Vía 3D coloreada por magnitud, gráficos 2D (G con bandas normativas, jerk, cin
 pestaña Diseño con parámetros editables que recalculan la vía en el navegador (Web Worker sobre el port
 de la física), carro recorriendo la vía con play/pausa, y descarga del JSON del contrato.
 
+Desde la fase 1 (`DISENO.md`), cada instancia de elemento de la secuencia puede pisar sus parámetros
+geométricos sobre los globales (dos hélices con radios distintos): la secuencia es la navegación, la
+ficha de cada instancia muestra qué hereda y qué pisa, y el layout exportado lleva `ajustes` e
+`inertes` por elemento (contrato 1.1.0, campos opcionales que MATLAB no emite). Con ajustes vacíos el
+resultado es idéntico al de MATLAB.
+
 `npm test` incluye `test/golden-port.test.ts`: el port reconstruye los once golden y tienen que coincidir
 dentro de 6e-6 relativo. Si cambia la física en MATLAB, se regeneran los golden y ese test dice qué hay
 que portear.
@@ -72,4 +78,5 @@ que portear.
 ## Pendiente
 
 Contenido de la portada (presentación, video, contacto: fase 4), tema claro, compartir un diseño por
-URL, trocha real y estructura en la vía, comparación de métodos A/B en la web.
+URL y guardarlo a archivo (fase 2, sobre `nucleo/serializar.ts`), trocha real y estructura en la vía,
+comparación de métodos A/B en la web.
