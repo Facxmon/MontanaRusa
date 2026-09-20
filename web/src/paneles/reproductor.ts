@@ -12,7 +12,8 @@ import { numeroDeMagnitud, SIN_DATO } from './formato';
 
 const VELOCIDADES = [0.1, 0.25, 0.5, 1, 2];
 
-export function montarReproductor(contenedor: HTMLElement, estado: Estado, escena: Escena, carro: Carro): void {
+/** Devuelve la funcion que suelta el listener de teclado de document y el callback por cuadro. */
+export function montarReproductor(contenedor: HTMLElement, estado: Estado, escena: Escena, carro: Carro): () => void {
   let reproduciendo = false;
   let tiempo = 0;
   let factor = 0.5;
@@ -110,13 +111,16 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
     if (seguir) escena.centrarEn(donde.posicion);
   }
 
-  escena.enCadaCuadro((dt) => actualizar(dt));
+  const sacarDelCuadro = escena.enCadaCuadro((dt) => actualizar(dt));
 
-  document.addEventListener('keydown', (evento) => {
+  // La barra espaciadora se escucha en document (el foco puede estar en
+  // cualquier lado); se guarda la referencia para poder sacarlo al destruir.
+  const alTeclear = (evento: KeyboardEvent) => {
     if (evento.code !== 'Space' || evento.target instanceof HTMLInputElement || evento.target instanceof HTMLSelectElement) return;
     evento.preventDefault();
     alternar();
-  });
+  };
+  document.addEventListener('keydown', alTeclear);
 
   const reiniciar = () => {
     const { layout } = estado.get();
@@ -133,7 +137,12 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
     actualizar(0, true);
   };
   reiniciar();
-  estado.suscribir((nuevo, anterior) => {
+  const cancelar = estado.suscribir((nuevo, anterior) => {
     if (nuevo.layout !== anterior.layout) reiniciar();
   });
+  return () => {
+    document.removeEventListener('keydown', alTeclear);
+    sacarDelCuadro();
+    cancelar();
+  };
 }

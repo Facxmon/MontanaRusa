@@ -7,7 +7,8 @@ import { el, vaciar } from '../paneles/dom';
 import { Figura } from './figura';
 import { ETIQUETA_DE_EJE, PESTANAS, extraerColumnas, figurasDePestana, type EjeX, type Pestana } from './series';
 
-export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado): void {
+/** Devuelve la funcion que destruye las figuras (uPlot y sus ResizeObserver). */
+export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado): () => void {
   const barra = el('div', { class: 'graficos-barra' });
   const cuerpo = el('div', { class: 'graficos-cuerpo' });
   contenedor.append(barra, cuerpo);
@@ -35,7 +36,7 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado): 
     );
     const selector = el(
       'select',
-      { id: 'ejeX', onChange: (evento: Event) => estado.set({ ejeX: (evento.target as HTMLSelectElement).value as EjeX }) },
+      { onChange: (evento: Event) => estado.set({ ejeX: (evento.target as HTMLSelectElement).value as EjeX }) },
       (Object.keys(ETIQUETA_DE_EJE) as EjeX[]).map((clave) => {
         const opcion = el('option', { value: clave }, ETIQUETA_DE_EJE[clave]);
         if (clave === ejeX) opcion.selected = true;
@@ -47,7 +48,7 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado): 
 
   const dibujarFiguras = () => {
     const { layout, elemento, pestana, ejeX, vista } = estado.get();
-    for (const f of figuras) f.destruir();
+    for (const f of figuras) f.destruirDelTodo();
     figuras = [];
     vaciar(cuerpo);
     if (vista !== 'graficos' || !layout) return;
@@ -73,7 +74,7 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado): 
 
   dibujarBarra();
   dibujarFiguras();
-  estado.suscribir((nuevo, anterior) => {
+  const cancelar = estado.suscribir((nuevo, anterior) => {
     if (nuevo.pestana !== anterior.pestana || nuevo.ejeX !== anterior.ejeX) dibujarBarra();
     if (
       nuevo.layout !== anterior.layout ||
@@ -85,4 +86,9 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado): 
       dibujarFiguras();
     }
   });
+  return () => {
+    cancelar();
+    for (const f of figuras) f.destruirDelTodo();
+    figuras = [];
+  };
 }

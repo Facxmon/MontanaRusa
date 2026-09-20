@@ -80,11 +80,13 @@ export class Figura {
   private readonly contenedor: HTMLElement;
   private franjas: Franja[] = [];
   private readonly claveDeSincronizacion: string;
+  private readonly observador: ResizeObserver;
 
   constructor(contenedor: HTMLElement, claveDeSincronizacion: string) {
     this.contenedor = contenedor;
     this.claveDeSincronizacion = claveDeSincronizacion;
-    new ResizeObserver(() => this.ajustarTamano()).observe(contenedor);
+    this.observador = new ResizeObserver(() => this.ajustarTamano());
+    this.observador.observe(contenedor);
   }
 
   private tamano(): { width: number; height: number } {
@@ -184,9 +186,16 @@ export class Figura {
     ctx.restore();
   }
 
+  /** Destruye el uPlot y vacia el contenedor; el ResizeObserver sigue hasta destruirDelTodo. */
   destruir(): void {
     this.grafico?.destroy();
     this.grafico = null;
     this.contenedor.replaceChildren();
+  }
+
+  /** destruir() mas soltar el ResizeObserver: la figura no se vuelve a usar. */
+  destruirDelTodo(): void {
+    this.destruir();
+    this.observador.disconnect();
   }
 }

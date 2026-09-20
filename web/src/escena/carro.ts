@@ -48,6 +48,12 @@ export class Carro {
     this.grupo.visible = false;
   }
 
+  /** Libera las geometrias y saca el grupo de la escena. */
+  destruir(): void {
+    this.vaciar();
+    this.grupo.removeFromParent();
+  }
+
   get duracion(): number {
     return this.tabla ? this.tabla.tiempo[this.tabla.cantidad - 1]! : 0;
   }

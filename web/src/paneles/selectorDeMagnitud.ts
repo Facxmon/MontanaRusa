@@ -9,7 +9,6 @@ export function montarSelectorDeMagnitud(contenedor: HTMLElement, estado: Estado
     const { magnitud } = estado.get();
     vaciar(contenedor);
     const selector = el('select', {
-      id: 'magnitud',
       onChange: (evento: Event) => estado.set({ magnitud: (evento.target as HTMLSelectElement).value as ClaveDeMagnitud }),
     });
     for (const m of MAGNITUDES) {
@@ -17,7 +16,7 @@ export function montarSelectorDeMagnitud(contenedor: HTMLElement, estado: Estado
       if (m.clave === magnitud) opcion.selected = true;
       selector.append(opcion);
     }
-    contenedor.append(el('label', { for: 'magnitud', class: 'etiqueta' }, 'Colorear la vía por'), selector);
+    contenedor.append(el('label', {}, el('span', { class: 'etiqueta' }, 'Colorear la vía por'), selector));
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {

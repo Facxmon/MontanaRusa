@@ -20,6 +20,7 @@ export class Escena {
   private readonly grilla: THREE.GridHelper;
   private readonly reloj = new THREE.Clock();
   private readonly porCuadro: ((dt: number) => void)[] = [];
+  private readonly observador: ResizeObserver;
 
   constructor(contenedor: HTMLElement) {
     this.contenedor = contenedor;
@@ -53,8 +54,20 @@ export class Escena {
     this.scene.add(new THREE.AxesHelper(0.25));
 
     this.ajustarTamano();
-    new ResizeObserver(() => this.ajustarTamano()).observe(contenedor);
+    this.observador = new ResizeObserver(() => this.ajustarTamano());
+    this.observador.observe(contenedor);
     this.activar(true);
+  }
+
+  /** Para el loop, suelta el contexto WebGL y saca el canvas: no queda nada vivo. */
+  destruir(): void {
+    this.activar(false);
+    this.porCuadro.length = 0;
+    this.observador.disconnect();
+    this.controles.dispose();
+    this.renderer.dispose();
+    this.renderer.forceContextLoss();
+    this.renderer.domElement.remove();
   }
 
   /** Arranca o pausa el loop de render (pausado mientras la vista 3D esta oculta). */
@@ -72,9 +85,13 @@ export class Escena {
     }
   }
 
-  /** Registra algo que se actualiza en cada cuadro (dt en segundos). */
-  enCadaCuadro(fn: (dt: number) => void): void {
+  /** Registra algo que se actualiza en cada cuadro (dt en segundos); devuelve como sacarlo. */
+  enCadaCuadro(fn: (dt: number) => void): () => void {
     this.porCuadro.push(fn);
+    return () => {
+      const i = this.porCuadro.indexOf(fn);
+      if (i >= 0) this.porCuadro.splice(i, 1);
+    };
   }
 
   /** Mueve el centro de la orbita a un punto conservando la posicion relativa de la camara. */

@@ -33,6 +33,13 @@ export class ClienteDeCalculo {
     };
   }
 
+  /** Termina el worker; un pedido en curso se rechaza como superado. */
+  terminar(): void {
+    if (this.pendiente) this.pendiente.rechazar(new PedidoSuperado());
+    this.pendiente = null;
+    this.worker.terminate();
+  }
+
   /** Calcula; si habia un pedido en curso, su promesa se rechaza como superada. */
   calcular(entrada: EntradaDeDiseno): Promise<ResultadoDeCalculo> {
     if (this.pendiente) this.pendiente.rechazar(new PedidoSuperado());

@@ -8,7 +8,6 @@ export function montarSelectorDeCaso(contenedor: HTMLElement, estado: Estado): v
     const { casos, caso, cargando } = estado.get();
     vaciar(contenedor);
     const selector = el('select', {
-      id: 'caso',
       disabled: cargando,
       onChange: (evento: Event) => estado.set({ caso: (evento.target as HTMLSelectElement).value, elemento: null, fuente: 'golden' }),
     });
@@ -24,8 +23,7 @@ export function montarSelectorDeCaso(contenedor: HTMLElement, estado: Estado): v
       selector.append(opcion);
     }
     contenedor.append(
-      el('label', { for: 'caso', class: 'etiqueta' }, 'Caso'),
-      selector,
+      el('label', {}, el('span', { class: 'etiqueta' }, 'Caso'), selector),
       el('p', { class: 'ayuda' }, cargando ? 'Cargando…' : 'Golden files generados por MATLAB (GenerarGoldenFiles.m).'),
     );
   };

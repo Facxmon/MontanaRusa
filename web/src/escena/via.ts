@@ -37,6 +37,12 @@ export class Via {
     scene.add(this.grupo);
   }
 
+  /** Libera las geometrias y saca el grupo de la escena. */
+  destruir(): void {
+    this.vaciar();
+    this.grupo.removeFromParent();
+  }
+
   /** Reemplaza la via por la del layout dado y la pinta con la magnitud. */
   construir(layout: Layout, magnitud: ClaveDeMagnitud, elementoResaltado: number | null): void {
     this.vaciar();
