@@ -1,0 +1,197 @@
+/*
+ * Tokens de diseno: la unica fuente de color, espaciado, radio, tipografia y
+ * movimiento de la web. Ningun otro archivo (CSS o TS) puede tener un
+ * literal de color: todo se lee de aca, el CSS con var() y el JS con tema.ts.
+ *
+ * Dos capas:
+ *  1. Paleta cruda: valores concretos sin semantica (--gris-950, --azul-400).
+ *  2. Tokens semanticos por tema: que color cumple cada rol (--superficie-1,
+ *     --texto-2, --acento). Estan dentro de :root[data-tema="..."] para que
+ *     cambiar de tema sea cambiar un atributo en <html>.
+ *
+ * Los tokens que lee JavaScript (escena 3D, canvas de los graficos) se
+ * resuelven a hex o a rgba(r, g, b, a) con comas: THREE.Color y el canvas no
+ * entienden color-mix() ni rgb(r g b / a). Por eso la paleta tiene los
+ * tripletes --xxx-rgb para componer transparencias.
+ */
+
+:root {
+  /* ---------- paleta cruda ---------- */
+  --gris-950: #0f1115;
+  --gris-900: #171a21;
+  --gris-850: #1a1d24;
+  --gris-800: #232833;
+  --gris-700: #2a2f3a;
+  --gris-600: #3a4150;
+  --gris-500: #8a94a6;
+  --gris-400: #9aa3b2;
+  --gris-200: #dfe6f2;
+  --gris-100: #e6e8ee;
+  --gris-050: #f5f6f8;
+  --blanco: #ffffff;
+
+  --azul-400: #6cb6ff;
+  --azul-500: #3987e5;
+  --azul-gris-500: #8aa4c8;
+
+  --verde-500: #3ddc84;
+  --verde-600: #199e70;
+  --verde-norma-600: #0ca30c;
+
+  --rojo-100: #ffd7d7;
+  --rojo-500: #ff5c5c;
+  --rojo-600: #d03b3b;
+  --rojo-800: #551111;
+  --rojo-900: #3a1214;
+
+  --naranja-500: #d95926;
+  --ambar-500: #ffb454;
+
+  /* Tripletes para transparencias: rgba(var(--gris-400-rgb), 0.14). */
+  --gris-950-rgb: 15, 17, 21;
+  --gris-400-rgb: 154, 163, 178;
+  --blanco-rgb: 255, 255, 255;
+  --azul-400-rgb: 108, 182, 255;
+  --verde-norma-600-rgb: 12, 163, 12;
+
+  /* ---------- espaciado ---------- */
+  --esp-1: 4px;
+  --esp-2: 8px;
+  --esp-3: 12px;
+  --esp-4: 16px;
+  --esp-5: 24px;
+  --esp-6: 32px;
+  --esp-7: 48px;
+  --esp-8: 64px;
+
+  /* ---------- radios ---------- */
+  --radio-chico: 4px;
+  --radio: 6px;
+  --radio-grande: 10px;
+
+  /* ---------- tipografia ---------- */
+  --fuente: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --texto-xs: 11px;
+  --texto-sm: 12.5px;
+  --texto-base: 14px;
+  --texto-lg: 18px;
+  --texto-xl: 24px;
+
+  /* ---------- movimiento ---------- */
+  --dur-rapida: 120ms;
+  --dur-media: 200ms;
+  --dur-lenta: 400ms;
+  --curva: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ---------- dimensiones de la interfaz ---------- */
+  --ancho-panel: 420px;
+  --ancho-campo: 96px;
+  --ancho-campo-chico: 62px;
+  --alto-figura: 240px;
+}
+
+/* ---------- tema oscuro (el unico por ahora) ---------- */
+:root[data-tema="oscuro"] {
+  color-scheme: dark;
+
+  --superficie-0: var(--gris-950);
+  --superficie-1: var(--gris-900);
+  --superficie-2: var(--gris-800);
+  --superficie-3: var(--gris-700);
+  /* Barras que flotan sobre la vista 3D. */
+  --superficie-flotante: rgba(var(--gris-950-rgb), 0.85);
+
+  --texto-1: var(--gris-100);
+  --texto-2: var(--gris-400);
+  --texto-3: var(--gris-500);
+
+  --borde-sutil: var(--gris-700);
+  --borde-fuerte: var(--gris-400);
+
+  --acento: var(--azul-400);
+  --acento-suave: rgba(var(--azul-400-rgb), 0.15);
+  --exito: var(--verde-500);
+  --alerta: var(--ambar-500);
+  --falla: var(--rojo-500);
+  --falla-fondo: var(--rojo-900);
+  --falla-texto: var(--rojo-100);
+  --informativo: var(--gris-400);
+
+  /* Graficos (uPlot y el canvas de las franjas). */
+  --grafico-texto: var(--gris-400);
+  --grafico-grilla: rgba(var(--gris-400-rgb), 0.14);
+  --grafico-franja-a: rgba(var(--blanco-rgb), 0.025);
+  --grafico-franja-b: rgba(var(--blanco-rgb), 0.06);
+  --serie-1: var(--azul-500);
+  --serie-2: var(--naranja-500);
+  --serie-3: var(--verde-600);
+  --serie-limite: var(--rojo-600);
+  --serie-admisible-trazo: rgba(var(--verde-norma-600-rgb), 0.55);
+  --serie-admisible-relleno: rgba(var(--verde-norma-600-rgb), 0.10);
+  --serie-cero: rgba(var(--gris-400-rgb), 0.6);
+
+  /* Escena 3D (Three.js lee estos en hex). */
+  --escena-fondo: var(--gris-950);
+  --escena-cielo: var(--gris-200);
+  --escena-suelo: var(--gris-850);
+  --escena-sol: var(--blanco);
+  --escena-contraluz: var(--azul-gris-500);
+  --escena-grilla-fuerte: var(--gris-600);
+  --escena-grilla: var(--gris-800);
+  --escena-uniones: var(--gris-500);
+  --escena-carro: var(--ambar-500);
+  --escena-pasajero: var(--rojo-500);
+  --escena-pasajero-brillo: var(--rojo-800);
+}
+
+/* ---------- tema claro: estructura lista, valores provisorios (fase 4) ---------- */
+:root[data-tema="claro"] {
+  color-scheme: light;
+
+  --superficie-0: var(--gris-050);
+  --superficie-1: var(--blanco);
+  --superficie-2: var(--gris-100);
+  --superficie-3: var(--gris-200);
+  --superficie-flotante: rgba(var(--blanco-rgb), 0.85);
+
+  --texto-1: var(--gris-950);
+  --texto-2: var(--gris-600);
+  --texto-3: var(--gris-500);
+
+  --borde-sutil: var(--gris-200);
+  --borde-fuerte: var(--gris-500);
+
+  --acento: var(--azul-500);
+  --acento-suave: rgba(var(--azul-400-rgb), 0.2);
+  --exito: var(--verde-600);
+  --alerta: var(--ambar-500);
+  --falla: var(--rojo-600);
+  --falla-fondo: var(--rojo-100);
+  --falla-texto: var(--rojo-900);
+  --informativo: var(--gris-500);
+
+  --grafico-texto: var(--gris-600);
+  --grafico-grilla: rgba(var(--gris-400-rgb), 0.3);
+  --grafico-franja-a: rgba(var(--gris-950-rgb), 0.02);
+  --grafico-franja-b: rgba(var(--gris-950-rgb), 0.05);
+  --serie-1: var(--azul-500);
+  --serie-2: var(--naranja-500);
+  --serie-3: var(--verde-600);
+  --serie-limite: var(--rojo-600);
+  --serie-admisible-trazo: rgba(var(--verde-norma-600-rgb), 0.55);
+  --serie-admisible-relleno: rgba(var(--verde-norma-600-rgb), 0.10);
+  --serie-cero: rgba(var(--gris-400-rgb), 0.8);
+
+  --escena-fondo: var(--gris-050);
+  --escena-cielo: var(--blanco);
+  --escena-suelo: var(--gris-200);
+  --escena-sol: var(--blanco);
+  --escena-contraluz: var(--azul-gris-500);
+  --escena-grilla-fuerte: var(--gris-400);
+  --escena-grilla: var(--gris-200);
+  --escena-uniones: var(--gris-600);
+  --escena-carro: var(--ambar-500);
+  --escena-pasajero: var(--rojo-600);
+  --escena-pasajero-brillo: var(--rojo-800);
+}
