@@ -1,19 +1,45 @@
-// Formulario de parametros generado desde parametros.esquema del layout
-// (CONTRATO_VISUALIZADOR.md, 1.9): los grupos, las etiquetas, las unidades
-// y los tooltips salen del JSON, nunca de una lista escrita aca. Edita
-// estado.diseno.parametros (los Parametros del nucleo, en PascalCase).
+// Formulario de parametros. Arriba, la ficha de la instancia de elemento
+// elegida en la secuencia (diseno.ts): sus parametros geometricos, cada uno
+// heredado del global o pisado por la instancia, con boton para volver al
+// global, y las advertencias de los ajustes inertes. Abajo, los grupos
+// globales: modo de curvatura, criterios de aceptacion y generales.
+//
+// Las cuatro listas (que consume el modo, que declara cada elemento,
+// aceptacion, generales) salen del nucleo, que es el mismo port que las
+// declara para el contrato y que parametros.test.ts verifica identicas al
+// esquema de los golden: por eso al cambiar de modo los parametros del modo
+// nuevo aparecen al instante, sin esperar el recalculo. Las etiquetas, las
+// unidades y los tooltips siguen siendo las ternas de MATLAB.
+//
+// Edita estado.diseno (los Parametros del nucleo, en PascalCase, y los
+// ajustes de cada instancia).
 
-import type { DeclaracionDeParametro, Layout } from '../contrato/tipos';
+import type { DeclaracionDeParametro } from '../contrato/tipos';
 import type { Estado } from '../estado';
-import { instanciasDesdeTipos, type EntradaDeDiseno } from '../nucleo/calcular';
-import { OPCIONES_DE_PARAMETRO, PARAMETROS_ANULABLES, ParametrosPorDefecto } from '../nucleo/parametros';
-import type { NombreDeParametro, Parametros } from '../nucleo/tipos';
+import type { EntradaDeDiseno, InstanciaDeElemento } from '../nucleo/calcular';
+import {
+  AjustarParametros,
+  DECLARACIONES_DE_ELEMENTOS,
+  MODOS_DE_CURVATURA,
+  OPCIONES_DE_PARAMETRO,
+  PARAMETROS_ANULABLES,
+  ParametrosDeAceptacion,
+  ParametrosDelModo,
+  ParametrosGenerales,
+  ParametrosPorDefecto,
+} from '../nucleo/parametros';
+import type { Declaracion, ModoCurvatura, NombreDeParametro, Parametros } from '../nucleo/tipos';
 import { el } from './dom';
 
 const RAD_A_GRADOS = 180 / Math.PI;
 
 function pascal(clave: string): NombreDeParametro {
   return (clave[0]!.toUpperCase() + clave.slice(1)) as NombreDeParametro;
+}
+
+/** Las ternas del nucleo con la clave en camelCase, como las escribe el contrato. */
+function declaraciones(lista: Declaracion[]): DeclaracionDeParametro[] {
+  return lista.map((d) => ({ clave: d.Nombre[0]!.toLowerCase() + d.Nombre.slice(1), unidad: d.Unidad, descripcion: d.Descripcion }));
 }
 
 type Actualizar = (nombre: NombreDeParametro, valor: unknown) => void;
@@ -117,58 +143,156 @@ function grupo(titulo: string, lista: DeclaracionDeParametro[], parametros: Para
   );
 }
 
+/** Texto de la advertencia de un ajuste inerte: que lo pisaron y quien no lo consume (el modo o el elemento). */
+export function textoDeInerte(nombre: NombreDeParametro, modo: ModoCurvatura, tipo: InstanciaDeElemento['tipo']): string {
+  const esDelModo = MODOS_DE_CURVATURA.some((m) => ParametrosDelModo(m).Lista.some((d) => d.Nombre === nombre));
+  return esDelModo
+    ? `ajustaste ${nombre} pero el modo ${modo} no lo consume`
+    : `ajustaste ${nombre} pero el elemento ${tipo} no lo consume`;
+}
+
+/** Cambio de los ajustes de una instancia: recibe los vigentes (no los del dibujo, que pueden estar viejos) y devuelve los nuevos. */
+type Ajustar = (transformar: (ajustes: Partial<Parametros>) => Partial<Parametros>, enElLugar: boolean) => void;
+
+function sinAjuste(ajustes: Partial<Parametros>, nombre: NombreDeParametro): Partial<Parametros> {
+  const { [nombre]: _quitado, ...resto } = ajustes;
+  return resto;
+}
+
+/** La ficha de la instancia elegida: sus parametros geometricos, heredados o pisados, y los inertes. */
+function ficha(inst: InstanciaDeElemento, orden: number, diseno: EntradaDeDiseno, ajustar: Ajustar): HTMLElement {
+  const globales = diseno.parametros;
+  const estados = new Map<NombreDeParametro, { fila: HTMLElement; origen: HTMLElement; volver: HTMLButtonElement }>();
+
+  const marcar = (nombre: NombreDeParametro, pisado: boolean) => {
+    const e = estados.get(nombre);
+    if (!e) return;
+    e.fila.classList.toggle('pisado', pisado);
+    e.fila.classList.toggle('heredado', !pisado);
+    e.origen.textContent = pisado ? 'pisado' : 'heredado';
+    e.origen.title = pisado ? 'Valor propio de esta instancia' : 'Valor de los parámetros globales';
+    e.volver.hidden = !pisado;
+  };
+
+  // Editar un campo lo convierte en pisado sin redibujar la ficha (no se pierde el foco).
+  const actualizar: Actualizar = (nombre, valor) => {
+    ajustar((ajustes) => ({ ...ajustes, [nombre]: valor }), true);
+    marcar(nombre, true);
+  };
+
+  const campos = DECLARACIONES_DE_ELEMENTOS[inst.tipo].map((d) => {
+    const nombre = d.Nombre;
+    const pisado = nombre in inst.ajustes;
+    const valor = pisado ? inst.ajustes[nombre] : globales[nombre];
+    const [declaracion] = declaraciones([d]);
+    const fila = campo(declaracion!, valor, actualizar);
+    const origen = el('span', { class: 'campo-origen' });
+    const volver = el('button', {
+      type: 'button', class: 'boton chico', title: 'Volver al valor global',
+      onClick: () => ajustar((ajustes) => sinAjuste(ajustes, nombre), false),
+    }, '↺');
+    fila.append(el('span', { class: 'campo-estado' }, origen, volver));
+    estados.set(nombre, { fila, origen, volver });
+    marcar(nombre, pisado);
+    return fila;
+  });
+
+  const { Inertes } = AjustarParametros(globales, inst.ajustes, inst.tipo);
+  const advertencias = Inertes.map((nombre) =>
+    el('p', { class: 'advertencia' },
+      textoDeInerte(nombre, globales.ModoCurvatura, inst.tipo),
+      ' ',
+      el('button', {
+        type: 'button', class: 'boton chico', title: `Quitar el ajuste de ${nombre}`,
+        onClick: () => ajustar((ajustes) => sinAjuste(ajustes, nombre), false),
+      }, 'quitar'),
+    ),
+  );
+
+  const cantidad = Object.keys(inst.ajustes).length;
+  return el('section', { class: 'ficha' },
+    el('div', { class: 'parametros-cabecera' },
+      el('h2', {}, `${orden}. ${inst.tipo}`),
+      cantidad > 0
+        ? el('button', { type: 'button', class: 'boton chico', title: 'Quitar todos los ajustes de esta instancia', onClick: () => ajustar(() => ({}), false) }, 'Todo al global')
+        : null,
+    ),
+    el('p', { class: 'ayuda' }, cantidad === 0 ? 'Hereda todos sus parámetros de los globales; editar uno lo pisa solo para esta instancia.' : `${cantidad} parámetro${cantidad === 1 ? '' : 's'} pisado${cantidad === 1 ? '' : 's'}; ↺ vuelve al global.`),
+    el('div', { class: 'campos' }, campos),
+    advertencias,
+  );
+}
+
 export function montarParametros(contenedor: HTMLElement, estado: Estado): void {
+  // Los cambios que salen de este formulario no lo redibujan (se perderia el
+  // foco), salvo el modo de curvatura, que cambia que parametros se muestran,
+  // y los que quitan ajustes (vuelven un campo al global y cambian su valor).
+  let cambioPropio = false;
+
   const dibujar = () => {
-    const { layout, diseno } = estado.get();
+    const { diseno, instancia } = estado.get();
     contenedor.replaceChildren();
-    if (!layout || !diseno) return;
-    const esquema = layout.parametros.esquema;
+    if (!diseno) return;
     const parametros = diseno.parametros;
 
-    const actualizar: Actualizar = (nombre, valor) => {
+    const actualizarGlobal: Actualizar = (nombre, valor) => {
       const actual = estado.get().diseno;
       if (!actual) return;
-      // Los cambios que salen de este formulario no lo redibujan (se perderia el foco),
-      // salvo el modo de curvatura, que cambia que parametros se muestran.
       cambioPropio = nombre !== 'ModoCurvatura';
       estado.set({ diseno: { ...actual, parametros: { ...actual.parametros, [nombre]: valor } } });
       cambioPropio = false;
     };
 
+    // --- ficha de la instancia elegida ---
+    const indice = diseno.secuencia.findIndex((i) => i.id === instancia);
+    const inst = indice >= 0 ? diseno.secuencia[indice]! : null;
+    if (inst) {
+      const ajustar: Ajustar = (transformar, enElLugar) => {
+        const actual = estado.get().diseno;
+        if (!actual) return;
+        const secuencia = actual.secuencia.map((i) => (i.id === inst.id ? { ...i, ajustes: transformar(i.ajustes) } : i));
+        cambioPropio = enElLugar;
+        estado.set({ diseno: { ...actual, secuencia } });
+        cambioPropio = false;
+      };
+      contenedor.append(ficha(inst, indice + 1, diseno, ajustar));
+    } else {
+      contenedor.append(el('section', { class: 'ficha' }, el('p', { class: 'ayuda' }, 'Elegí un elemento de la secuencia para editar sus parámetros.')));
+    }
+
+    // --- globales ---
     const selectorDeModo = el('select', {
-      onChange: (e: Event) => actualizar('ModoCurvatura', (e.target as HTMLSelectElement).value),
+      onChange: (e: Event) => actualizarGlobal('ModoCurvatura', (e.target as HTMLSelectElement).value),
     });
-    for (const opcion of esquema.modo.opciones) {
+    for (const opcion of MODOS_DE_CURVATURA) {
       const o = el('option', { value: opcion }, opcion);
       if (opcion === parametros.ModoCurvatura) o.selected = true;
       selectorDeModo.append(o);
     }
+    const modo = ParametrosDelModo(parametros.ModoCurvatura);
 
-    const enSecuencia = new Set(diseno.secuencia.map((inst) => inst.tipo));
     contenedor.append(
       el('div', { class: 'parametros-cabecera' },
-        el('h2', {}, 'Parámetros'),
-        el('button', { type: 'button', class: 'boton', onClick: () => restablecer(estado) }, 'Resetear a default'),
+        el('h2', {}, 'Parámetros globales'),
+        el('button', { type: 'button', class: 'boton', title: 'Los globales vuelven a ParametrosPorDefecto(); los ajustes de las instancias se conservan', onClick: () => restablecer(estado) }, 'Resetear a default'),
       ),
       el('details', { open: true },
         el('summary', {}, 'Modo de curvatura'),
         el('div', { class: 'campos' },
           el('label', { class: 'campo' }, el('span', { class: 'campo-etiqueta' }, 'modoCurvatura'), selectorDeModo),
-          esquema.modo.nota ? el('p', { class: 'ayuda' }, esquema.modo.nota) : null,
-          esquema.modo.parametros.map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizar)),
+          modo.Nota ? el('p', { class: 'ayuda' }, modo.Nota) : null,
+          declaraciones(modo.Lista).map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizarGlobal)),
         ),
       ),
-      ...Object.entries(esquema.elementos).map(([tipo, lista]) => grupo(tipo, lista, parametros, actualizar, enSecuencia.has(tipo as never))),
-      grupo('Criterios de aceptación', esquema.aceptacion, parametros, actualizar, false),
-      grupo('Generales', esquema.generales, parametros, actualizar, false),
+      grupo('Criterios de aceptación', declaraciones(ParametrosDeAceptacion()), parametros, actualizarGlobal, false),
+      grupo('Generales', declaraciones(ParametrosGenerales()), parametros, actualizarGlobal, false),
     );
   };
-  let cambioPropio = false;
   dibujar();
   estado.suscribir((nuevo, anterior) => {
     if (cambioPropio) return;
-    // Se redibuja cuando cambia el diseno por fuera del formulario (reset, otro caso, secuencia) o el esquema.
-    if (nuevo.diseno !== anterior.diseno || nuevo.layout?.parametros.esquema !== anterior.layout?.parametros.esquema) dibujar();
+    // Se redibuja cuando cambia el diseno por fuera del formulario (reset, otro caso, secuencia) o la instancia elegida.
+    if (nuevo.diseno !== anterior.diseno || nuevo.instancia !== anterior.instancia) dibujar();
   });
 }
 
@@ -176,17 +300,4 @@ function restablecer(estado: Estado): void {
   const actual = estado.get().diseno;
   if (!actual) return;
   estado.set({ diseno: { ...actual, parametros: ParametrosPorDefecto() } });
-}
-
-/** Un diseno inicial a partir del layout cargado: sus parametros, su estado inicial y su secuencia. */
-export function disenoDesdeLayout(layout: Layout, parametros: Parametros): EntradaDeDiseno {
-  const e = layout.estadoInicial;
-  return {
-    parametros,
-    posicion: [...e.posicion],
-    tangente: [...e.versorTangente],
-    arriba: [...e.versorArribaCarro],
-    velocidad: e.velocidad,
-    secuencia: instanciasDesdeTipos(layout.elementos.map((el) => el.tipo)),
-  };
 }

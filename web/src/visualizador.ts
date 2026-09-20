@@ -7,7 +7,7 @@
 // de cualquier pagina (la portada, una demo) o dos veces seguidas.
 
 import { cargarIndice, cargarLayout } from './contrato/cargar';
-import { parametrosDesdeContrato } from './contrato/parametrosDesdeContrato';
+import { disenoDesdeLayout } from './contrato/disenoDesdeLayout';
 import { MAGNITUD_INICIAL } from './contrato/magnitudes';
 import { Carro } from './escena/carro';
 import { Escena } from './escena/escena';
@@ -22,7 +22,7 @@ import { montarElementos } from './paneles/elementos';
 import { montarErrores } from './paneles/errores';
 import { montarLeyenda } from './paneles/leyenda';
 import { montarReproductor } from './paneles/reproductor';
-import { disenoDesdeLayout, montarParametros } from './paneles/parametros';
+import { montarParametros } from './paneles/parametros';
 import { montarResumenElemento, montarResumenLayout } from './paneles/resumen';
 import { montarSelectorDeCaso } from './paneles/selectorDeCaso';
 import { montarSelectorDeMagnitud } from './paneles/selectorDeMagnitud';
@@ -153,8 +153,8 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   function abrirDiseno(): void {
     const { layout } = estado.get();
     if (!layout) return;
-    const diseno = disenoDesdeLayout(layout, parametrosDesdeContrato(layout.parametros.valores as Record<string, unknown>));
-    estado.set({ diseno, fuente: 'diseno', caso: null, panel: 'diseno' });
+    const diseno = disenoDesdeLayout(layout);
+    estado.set({ diseno, instancia: diseno.secuencia[0]?.id ?? null, fuente: 'diseno', caso: null, panel: 'diseno' });
   }
 
   let temporizador: ReturnType<typeof setTimeout> | null = null;
