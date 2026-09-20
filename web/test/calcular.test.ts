@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { analizarLayout } from '../src/contrato/cargar';
 import { parametrosDesdeContrato } from '../src/contrato/parametrosDesdeContrato';
-import { calcularLayout } from '../src/nucleo/calcular';
+import { calcularLayout, instanciasDesdeTipos, nuevoIdDeInstancia } from '../src/nucleo/calcular';
 import { textoDelLayout } from '../src/nucleo/descargar';
 import { ParametrosPorDefecto } from '../src/nucleo/parametros';
 
@@ -28,7 +28,7 @@ describe('calcularLayout', () => {
     parametros.PasoGeneracion = 0.01;
     parametros.PasoSimulacion = 0.01;
     const layout = calcularLayout(
-      { parametros, posicion: [0, 0, 1], tangente: [1, 0, 0], arriba: [0, 0, 1], velocidad: 5, secuencia: ['LoopVertical', 'OverBankedTurn'] },
+      { parametros, posicion: [0, 0, 1], tangente: [1, 0, 0], arriba: [0, 0, 1], velocidad: 5, secuencia: instanciasDesdeTipos(['LoopVertical', 'OverBankedTurn']) },
       'test',
     );
     expect(layout.meta.generadoPor).toBe('js');
@@ -39,6 +39,13 @@ describe('calcularLayout', () => {
     const texto = textoDelLayout(layout);
     expect(JSON.parse(texto).elementos[0].nodos.numeroDeNodos).toBe(layout.elementos[0]!.nodos.numeroDeNodos);
     expect(texto).not.toContain('NaN');
+  });
+
+  it('nuevoIdDeInstancia no reutiliza ids aunque se haya quitado uno del medio', () => {
+    const secuencia = instanciasDesdeTipos(['LoopVertical', 'Helice', 'DiveLoop']);
+    expect(secuencia.map((i) => i.id)).toEqual(['e1', 'e2', 'e3']);
+    expect(nuevoIdDeInstancia(secuencia.filter((i) => i.id !== 'e2'))).toBe('e4');
+    expect(nuevoIdDeInstancia([])).toBe('e1');
   });
 
   it('una secuencia vacia es un error claro', () => {

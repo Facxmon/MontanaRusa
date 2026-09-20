@@ -4,7 +4,7 @@
 // (parametros.ts). Editar cualquier cosa dispara el recalculo en el worker.
 
 import type { Estado } from '../estado';
-import type { EntradaDeDiseno } from '../nucleo/calcular';
+import { nuevoIdDeInstancia, type EntradaDeDiseno } from '../nucleo/calcular';
 import { textoDelLayout } from '../nucleo/descargar';
 import { CATALOGO_DE_ELEMENTOS } from '../nucleo/parametros';
 import type { NombreDeElemento } from '../nucleo/tipos';
@@ -68,17 +68,17 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
     );
 
     // --- secuencia ---
-    const filas = diseno.secuencia.map((tipo, i) => {
+    const filas = diseno.secuencia.map((inst, i) => {
       const selector = el('select', {
         onChange: (e: Event) => {
           const nueva = [...diseno.secuencia];
-          nueva[i] = (e.target as HTMLSelectElement).value as NombreDeElemento;
+          nueva[i] = { ...inst, tipo: (e.target as HTMLSelectElement).value as NombreDeElemento };
           actualizar({ secuencia: nueva });
         },
       });
       for (const nombre of CATALOGO_DE_ELEMENTOS) {
         const o = el('option', { value: nombre }, nombre);
-        if (nombre === tipo) o.selected = true;
+        if (nombre === inst.tipo) o.selected = true;
         selector.append(o);
       }
       const mover = (desde: number, hasta: number) => {
@@ -99,7 +99,7 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
       el('section', {},
         el('h2', {}, 'Secuencia de elementos'),
         el('div', { class: 'secuencia' }, filas),
-        el('button', { type: 'button', class: 'boton', onClick: () => actualizar({ secuencia: [...diseno.secuencia, 'LoopVertical'] }) }, '+ Agregar elemento'),
+        el('button', { type: 'button', class: 'boton', onClick: () => actualizar({ secuencia: [...diseno.secuencia, { id: nuevoIdDeInstancia(diseno.secuencia), tipo: 'LoopVertical', ajustes: {} }] }) }, '+ Agregar elemento'),
       ),
     );
   };

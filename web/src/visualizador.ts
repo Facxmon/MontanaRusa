@@ -113,6 +113,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     ejeX: 'arco',
     fuente: 'golden',
     diseno: null,
+    instancia: null,
     calculando: false,
     ultimoCalculoMs: null,
     panel: 'resultados',

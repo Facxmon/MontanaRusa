@@ -7,13 +7,24 @@
 import type * as Contrato from '../contrato/tipos';
 import type { Vec3 } from './matematica';
 import { CATALOGO_DE_ELEMENTOS, DECLARACIONES_DE_ELEMENTOS, ParametrosDeAceptacion, ParametrosDelModo, ParametrosGenerales, ParametrosPorDefecto } from './parametros';
-import type { Criterio, Declaracion, Estado, Layout, Parametros, RegistroDeLayout } from './tipos';
+import type { Criterio, Declaracion, Estado, Layout, NombreDeParametro, Parametros, RegistroDeLayout } from './tipos';
+
+/** Lo que una instancia de elemento piso sobre los globales y que de eso no consumio (AjustarParametros). */
+export interface InstanciaExportada {
+  ajustes: Partial<Parametros>;
+  inertes: NombreDeParametro[];
+}
 
 export interface OpcionesDeExportacion {
   /** Texto para meta.versionGenerador (hash del build, p. ej.). */
   versionGenerador?: string;
   /** Redondear a 6 cifras significativas como el exportador de MATLAB. */
   redondear?: boolean;
+  /**
+   * Ajustes e inertes de cada instancia, en el orden de Layout.Elementos.
+   * Solo JS los conoce: MATLAB construye con parametros globales y no los emite.
+   */
+  instancias?: InstanciaExportada[];
 }
 
 const VERSION_DEL_CONTRATO = '1.0.0';

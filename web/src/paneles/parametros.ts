@@ -5,7 +5,7 @@
 
 import type { DeclaracionDeParametro, Layout } from '../contrato/tipos';
 import type { Estado } from '../estado';
-import type { EntradaDeDiseno } from '../nucleo/calcular';
+import { instanciasDesdeTipos, type EntradaDeDiseno } from '../nucleo/calcular';
 import { ParametrosPorDefecto } from '../nucleo/parametros';
 import type { NombreDeParametro, Parametros } from '../nucleo/tipos';
 import { el } from './dom';
@@ -154,7 +154,7 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
       selectorDeModo.append(o);
     }
 
-    const enSecuencia = new Set(diseno.secuencia);
+    const enSecuencia = new Set(diseno.secuencia.map((inst) => inst.tipo));
     contenedor.append(
       el('div', { class: 'parametros-cabecera' },
         el('h2', {}, 'Parámetros'),
@@ -197,6 +197,6 @@ export function disenoDesdeLayout(layout: Layout, parametros: Parametros): Entra
     tangente: [...e.versorTangente],
     arriba: [...e.versorArribaCarro],
     velocidad: e.velocidad,
-    secuencia: layout.elementos.map((el) => el.tipo),
+    secuencia: instanciasDesdeTipos(layout.elementos.map((el) => el.tipo)),
   };
 }

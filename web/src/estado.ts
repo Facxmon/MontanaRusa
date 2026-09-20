@@ -35,6 +35,8 @@ export interface DatosDeEstado {
   fuente: Fuente;
   /** El diseno editable (parametros, estado inicial, secuencia), o null si nunca se abrio uno. */
   diseno: EntradaDeDiseno | null;
+  /** Id de la instancia de elemento elegida en el panel de diseno, o null si ninguna. */
+  instancia: string | null;
   /** true mientras el worker calcula. */
   calculando: boolean;
   /** Duracion del ultimo calculo, en ms, o null. */
