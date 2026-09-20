@@ -128,3 +128,39 @@ porque los parámetros editables lo necesitan.
   tiene lugar en la web todavía).
 - La vía es un tubo único; trocha real, durmientes y estructura quedan para más adelante.
 - Compartir un diseño por URL (parámetros en el hash, contrato §9) no está hecho; hoy se descarga el JSON.
+
+---
+
+# Fase 0 (2026-09-19): base visual y estructural
+
+Consigna en `web/consignas/fase-0-base.md`. Sin funcionalidad nueva salvo el arreglo de los números;
+todo lo demás es la base sobre la que se apoyan las fases siguientes (modelo, control, lectura, pulido).
+
+## Qué cambió y por qué
+
+| Pieza | Qué se hizo | Por qué |
+|---|---|---|
+| Tokens (`src/tokens.css`) | Paleta cruda (`--gris-950…050`, `--azul-400`, `--verde-500`, `--rojo-500`, `--ambar-500`, más tripletes rgb para transparencias) y tokens semánticos (`--superficie-0/1/2/3`, `--texto-1/2/3`, bordes, `--acento`, estados, gráficos, escena) definidos por tema en `:root[data-tema="oscuro"]` y `:root[data-tema="claro"]`; escalas de espaciado, radios, tipografía y movimiento. `estilos.css` no tiene ni un literal. | Sin una sola fuente de color no hay tema claro posible, y los diez `--nombre` ad hoc más los hex sueltos en JS eran dos fuentes que ya divergían. El tema claro tiene la estructura lista con valores provisorios: la fase 4 los calibra, no los inventa. |
+| `src/tema.ts` | JavaScript lee los tokens con `getComputedStyle` (cacheado, con `alCambiarTema` sobre `data-tema`). `series.ts` describe colores simbólicos (`'serie1'`, `'limite'`…) y `figura.ts` los resuelve al dibujar; Three.js recibe `new THREE.Color(tema().escenaFondo)`. | `series.ts` y `colores.ts` se testean en Node y no pueden tocar el DOM; el color se resuelve en la capa que sí lo toca. Los tokens que lee JS resuelven a hex o `rgba(r, g, b, a)` porque `THREE.Color` no parsea `color-mix()`. |
+| `colores.ts` | Las escalas de la vía (interpolación lineal en RGB entre paradas: viridis aproximado y azul-gris-rojo) quedan documentadas y las paradas son un parámetro nombrado (`ESCALAS_OSCURO`). | Son el único color que no sale de `tokens.css`: van a un atributo de la GPU, no al CSS. La fase 4 pasa otras paradas para el tema claro sin tocar la fórmula. |
+| Tipografía | IBM Plex Sans (400/500/600) y Mono (400/500) self-hosteadas en `public/fuentes/`, subseteadas con `scripts/subsetear-fuentes.mjs` (harfbuzz en wasm, sin Python). | Offline, sin terceros, y Plex Mono tiene cifras tabulares de verdad. Plex no trae `✕ ▶ ❚ ✗`: esos caen al fallback del sistema. |
+| Números | `formato.ts` pasa de 4 cifras significativas a decimales fijos declarados por magnitud (`MAGNITUDES[].decimales`, `notacion`) o por unidad (tabla para resúmenes y criterios); `tabular-nums` en todo lo que muestra números; el HUD es un `inline-grid` con un `span` por campo y columnas de ancho fijo; la leyenda de uPlot reserva `7ch` por valor y usa los decimales de la magnitud de cada figura. | `toPrecision(4)` borraba los ceros a la derecha y `1 G` convivía con `0.0002815 G`; con un solo string, cada cambio de ancho movía todo lo de la derecha. Verificado en `circuito-demolayout`: ningún span del HUD ni fila de la leyenda cambia de posición entre cuadros. |
+| `montarVisualizador(raiz)` | `src/visualizador.ts` arma el DOM con `el()`, monta todo sobre un estado propio y devuelve `destruir()`. `main.ts` son dos líneas. Nada busca ids en el documento. | Lo que DISENO.md prometía ("un componente al que se le pone una portada adelante") no era cierto: `main.ts` era efectos de módulo sobre ids globales. Ahora se puede montar dentro de cualquier página y dos veces seguidas. |
+| Multipágina | `index.html` es la portada (esqueleto) con `portada.css`; `visualizador.html` es la app; `vite.config.ts` con dos entradas. Meta tags OG y `public/og.png`. | La portada no tiene que pagar los ~600 kB de Three.js + uPlot. Medido: la portada carga 1.5 kB de HTML y 5.8 kB de CSS, ningún chunk JS. Un router de cliente habría arrastrado todo. |
+
+## Invariantes nuevos
+
+- **`tokens.css` es la única fuente de color, espaciado, radio y tipografía.** Ningún otro archivo
+  (CSS o TS) tiene un literal: `grep -rE "#[0-9a-fA-F]{6}|0x[0-9a-fA-F]{6}" web/src/` no devuelve nada
+  fuera de `tokens.css`. JavaScript los lee por `tema.ts`. La excepción documentada son las paradas de
+  las escalas de la vía en `colores.ts`, que van a la GPU y son un parámetro nombrado.
+- **`montarVisualizador(raiz)` es el único punto de entrada de la app**, y `destruir()` suelta todo lo
+  global (worker, contexto WebGL, uPlot y ResizeObservers, loop de render, listener de teclado en
+  `document`). `grep -r "document.getElementById" web/src/` solo encuentra `main.ts`.
+- **Sitio multipágina**: la portada nunca importa nada de `src/` salvo `portada.css` (tokens y fuentes).
+  Si algún día la portada necesita el visualizador, lo monta con `montarVisualizador` en un
+  `import()` dinámico, no en su entrada.
+- **Los números van con decimales fijos declarados**, nunca con cifras significativas, y cada
+  contenedor que muestra un número que cambia le reserva el ancho (`ch`) y usa `tabular-nums`.
+- **El tema se elige con `data-tema` en `<html>`**, y `color-scheme` lo sigue. Hoy está fijo en
+  `oscuro`; el claro llega en la fase 4.
