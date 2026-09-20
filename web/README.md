@@ -1,6 +1,7 @@
 # Visualizador web
 
-Página estática que lee un layout en el formato de [`CONTRATO_VISUALIZADOR.md`](../CONTRATO_VISUALIZADOR.md)
+Sitio estático de dos páginas: la **portada** del portfolio (`index.html`, por ahora un esqueleto sin
+JavaScript) y el **visualizador** (`visualizador.html`), que lee un layout en el formato de [`CONTRATO_VISUALIZADOR.md`](../CONTRATO_VISUALIZADOR.md)
 y lo dibuja en 3D: riel (tubo orientado con los versores del carro), heartline, uniones d·U, color por
 magnitud (Gz, Gy, velocidad, curvatura, jerk…), resumen del layout y de cada elemento, y criterios de
 aceptación con semáforo. No calcula nada: todo viene del JSON. Diseño en [`DISENO.md`](DISENO.md), plan de
@@ -11,12 +12,12 @@ la v1 en [`PLAN-v1.md`](PLAN-v1.md).
 ```bash
 cd web
 npm install
-npm run dev        # http://localhost:5173/MontanaRusa/
+npm run dev        # http://localhost:5173/MontanaRusa/ (portada) y /MontanaRusa/visualizador.html
 ```
 
 Los casos que aparecen en el menú son los `../golden/*.json` (los genera `GenerarGoldenFiles.m` en
 MATLAB); el plugin `plugins/golden.ts` los sirve en desarrollo y los copia en el build. Para abrir uno
-directo: `?caso=loop-normativa`.
+directo: `visualizador.html?caso=loop-normativa`.
 
 ```bash
 npm test           # vitest sobre los módulos puros, con los golden como fixtures
@@ -25,10 +26,18 @@ npm run preview    # sirve dist/ en http://localhost:4173/MontanaRusa/
 npm run tipos      # regenera src/contrato/tipos.ts desde ../esquema/layout-v1.schema.json
 ```
 
+Las fuentes (IBM Plex Sans y Mono, self-hosteadas en `public/fuentes/`) se regeneran con
+`scripts/subsetear-fuentes.mjs` (ver la cabecera del script). `public/og.png` (1200×630, la imagen de
+las meta tags `og:image`) es una captura de la vista 3D de `circuito-demolayout`; si cambia el aspecto
+de la vía, se vuelve a capturar.
+
 ## Estructura
 
 | Carpeta | Qué hay |
 |---|---|
+| `index.html`, `src/portada.css` | la portada: solo tokens y tipografía, sin Three.js ni uPlot |
+| `visualizador.html`, `src/main.ts`, `src/visualizador.ts` | la app: `montarVisualizador(raiz)` arma el DOM, conecta todo y devuelve `destruir()` |
+| `src/tokens.css`, `src/fuentes.css`, `src/estilos.css`, `src/tema.ts` | tokens de diseño (única fuente de color), `@font-face`, estilos del visualizador, y el puente para que JavaScript lea los tokens |
 | `src/contrato/` | `tipos.ts` (generado desde el esquema, no editar), `cargar.ts` (fetch + rechazo de MAJOR ≠ 1), `magnitudes.ts` (qué columnas se pueden colorear) |
 | `src/escena/` | `geometriaDeVia.ts` (tubo, heartline, uniones y colores como arrays planos, sin Three.js), `colores.ts` (escalas), `escena.ts` y `via.ts` (Three.js) |
 | `src/paneles/` | DOM plano: selector de caso y de magnitud, leyenda, resumen, elementos, criterios, errores |
@@ -62,5 +71,5 @@ que portear.
 
 ## Pendiente
 
-Portada de presentación y video, compartir un diseño por URL, trocha real y estructura en la vía,
-comparación de métodos A/B en la web.
+Contenido de la portada (presentación, video, contacto: fase 4), tema claro, compartir un diseño por
+URL, trocha real y estructura en la vía, comparación de métodos A/B en la web.
