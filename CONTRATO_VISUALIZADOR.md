@@ -174,6 +174,13 @@ respectivos parámetros"* y *"resetear a default con nuestros datos"* sin manten
 **Regla de compatibilidad:** el consumidor compara solo el MAJOR de `versionContrato`. Distinto MAJOR
 → se niega a cargar con un mensaje claro. Igual MAJOR, MINOR mayor → carga e ignora lo que no conoce.
 
+**Historial.** `1.0.0` es el contrato original que emite MATLAB (`LayoutAJson.m`). **`1.1.0`**
+(2026-09-20) agrega a cada elemento los campos **opcionales** `ajustes` e `inertes` (§6); como su
+ausencia significa "sin ajustes", es un cambio MINOR: `web/src/contrato/cargar.ts` sigue rechazando solo
+MAJOR ≠ 1 y los golden de `1.0.0`, que no los traen, cargan igual. Solo el núcleo en JS emite `1.1.0`;
+**MATLAB sigue emitiendo `1.0.0` sin esos campos y eso es válido**: MATLAB construye con parámetros
+globales y no tiene nada que poner ahí (§8, "MATLAB es la referencia normativa").
+
 ---
 
 ## 4. `parametros`
@@ -272,6 +279,8 @@ consumidor lo descarta al concatenar, igual que hace `LayoutAgregarElemento.m` c
   "indice": 0,
   "tipo":   "LoopVertical",           // Receta.Nombre
   "parametrosUsados": { "radioDelLoop": 0.30, "rollExtraDelLoop": 0, "separacionDePatas": 0.08 },
+  "ajustes":  { "radioDelLoop": 0.30 }, // opcional (1.1.0): lo que esta instancia pisó sobre parametros.valores, en SI
+  "inertes":  [],                       // opcional (1.1.0): claves de ajustes que ni el modo ni el tipo consumen
 
   "nodos":     { ... },   // §6.1
   "subtramos": [ ... ],   // §6.2
@@ -280,6 +289,16 @@ consumidor lo descarta al concatenar, igual que hace `LayoutAgregarElemento.m` c
   "estadoSalida": { ... } // misma forma que estadoInicial
 }
 ```
+
+**`ajustes` e `inertes` (opcionales, desde 1.1.0).** El núcleo en JS admite que cada instancia de
+elemento pise algunos parámetros sobre los globales de `parametros.valores` (dos hélices con radios
+distintos en la misma secuencia). `ajustes` trae exactamente esos pares clave/valor, en SI y camelCase,
+con las mismas claves que `parametros.defaults`; `parametrosUsados` sigue mostrando lo que el elemento
+efectivamente consumió (globales ya pisados). `inertes` lista las claves de `ajustes` que ni el modo de
+curvatura ni el tipo del elemento consumen (lo que `AjustarParametros.m` avisa con un warning): se
+aplicaron pero no tuvieron efecto. Un elemento sin `ajustes` se construyó con los globales tal cual.
+**MATLAB no emite ninguno de los dos y eso es válido** (§3, historial): el consumidor los trata como
+ausentes y no depende de ellos para dibujar.
 
 ### 6.1 `nodos` — arrays columnares de igual largo
 

@@ -119,6 +119,20 @@ function chequeosDeConsistencia(doc) {
       }
     }
 
+    // ajustes (opcional, 1.1.0): claves de defaults, sin repetir en parametrosUsados algo distinto; inertes dentro de ajustes
+    if (elemento.ajustes !== undefined) {
+      for (const clave of Object.keys(elemento.ajustes)) {
+        if (!(clave in defaults)) falla(`${ruta}.ajustes.${clave} no existe en parametros.defaults`);
+      }
+      if (elemento.inertes !== undefined) {
+        for (const clave of elemento.inertes) {
+          if (!(clave in elemento.ajustes)) falla(`${ruta}.inertes trae '${clave}' pero no esta en ${ruta}.ajustes`);
+        }
+      }
+    } else if (elemento.inertes !== undefined && elemento.inertes.length > 0) {
+      falla(`${ruta}.inertes sin ${ruta}.ajustes: un parametro inerte es siempre uno ajustado`);
+    }
+
     // nodos: todos los arrays del largo prometido
     const { nodos } = elemento;
     const n = nodos.numeroDeNodos;
