@@ -4,7 +4,7 @@ import { magnitudPorClave } from '../contrato/magnitudes';
 import { gradienteCss, paradasDeLeyenda, rangoDeMagnitud } from '../escena/colores';
 import type { Estado } from '../estado';
 import { el, vaciar } from './dom';
-import { formatear } from './formato';
+import { formatearMagnitud } from './formato';
 
 export function montarLeyenda(contenedor: HTMLElement, estado: Estado): void {
   const dibujar = () => {
@@ -19,7 +19,7 @@ export function montarLeyenda(contenedor: HTMLElement, estado: Estado): void {
       el(
         'div',
         { class: 'leyenda-paradas' },
-        paradas.map((p) => el('span', {}, formatear(p, m.unidad))),
+        paradas.map((p) => el('span', {}, formatearMagnitud(p, magnitud))),
       ),
       el('p', { class: 'ayuda' }, 'Gris: nodo sin dato (null en el JSON). El rango es el del layout entero.'),
     );

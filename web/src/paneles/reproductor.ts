@@ -8,7 +8,7 @@ import type { Carro } from '../escena/carro';
 import type { Escena } from '../escena/escena';
 import type { Estado } from '../estado';
 import { el } from './dom';
-import { formatear } from './formato';
+import { numeroDeMagnitud, SIN_DATO } from './formato';
 
 const VELOCIDADES = [0.1, 0.25, 0.5, 1, 2];
 
@@ -44,7 +44,29 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
     mostrarCarro = casillaCarro.checked;
     carro.mostrar(mostrarCarro);
   });
-  const hud = el('span', { class: 'reproductor-hud' });
+  // HUD: un span por campo dentro de una grilla de columnas fijas, para que un
+  // valor que cambia de ancho no mueva lo que tiene a la derecha. Los numeros
+  // van con decimales fijos (formato.ts) y cifras tabulares (CSS).
+  const hudTiempo = el('span', { class: 'hud-valor' }, SIN_DATO);
+  const hudElemento = el('span', { class: 'hud-elemento' });
+  const hudVelocidad = el('span', { class: 'hud-valor' }, SIN_DATO);
+  const hudGz = el('span', { class: 'hud-valor' }, SIN_DATO);
+  const hudGy = el('span', { class: 'hud-valor' }, SIN_DATO);
+  const hud = el(
+    'span',
+    { class: 'reproductor-hud' },
+    el('span', {}, 't ='),
+    hudTiempo,
+    el('span', {}, 's ·'),
+    hudElemento,
+    el('span', {}, '· v ='),
+    hudVelocidad,
+    el('span', {}, 'm/s · Gz ='),
+    hudGz,
+    el('span', {}, 'G · Gy ='),
+    hudGy,
+    el('span', {}, 'G'),
+  );
 
   contenedor.append(
     botonPlay,
@@ -78,9 +100,13 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
     if (!donde) return;
     const { layout } = estado.get();
     const tipo = layout?.elementos[donde.elemento]?.tipo ?? '';
-    hud.textContent =
-      `t = ${tiempo.toFixed(2)} s · ${donde.elemento + 1}. ${tipo} · v = ${formatear(donde.velocidad, 'm/s')} · ` +
-      `Gz = ${formatear(donde.gz, 'G')} · Gy = ${formatear(donde.gy, 'G')}`;
+    hudTiempo.textContent = numeroDeMagnitud(tiempo, 'tiempo');
+    const nombre = `${donde.elemento + 1}. ${tipo}`;
+    hudElemento.textContent = nombre;
+    hudElemento.title = nombre;
+    hudVelocidad.textContent = numeroDeMagnitud(donde.velocidad, 'velocidad');
+    hudGz.textContent = numeroDeMagnitud(donde.gz, 'gz');
+    hudGy.textContent = numeroDeMagnitud(donde.gy, 'gy');
     if (seguir) escena.centrarEn(donde.posicion);
   }
 

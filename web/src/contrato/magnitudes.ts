@@ -31,28 +31,32 @@ export interface Magnitud {
   etiqueta: string;
   unidad: string;
   escala: TipoDeEscala;
+  /** Decimales fijos con los que se muestra (en grados si la unidad es rad). */
+  decimales: number;
+  /** 'cientifica': exponente a partir de 1e4 (energia); por defecto, fija. */
+  notacion?: 'fija' | 'cientifica';
 }
 
 export const MAGNITUDES: readonly Magnitud[] = [
-  { clave: 'gz', etiqueta: 'Gz (vertical del carro)', unidad: 'G', escala: 'secuencial' },
-  { clave: 'gy', etiqueta: 'Gy (lateral)', unidad: 'G', escala: 'divergente' },
-  { clave: 'gx', etiqueta: 'Gx (longitudinal)', unidad: 'G', escala: 'divergente' },
-  { clave: 'gzCabeza', etiqueta: 'Gz en la cabeza', unidad: 'G', escala: 'secuencial' },
-  { clave: 'gyCabeza', etiqueta: 'Gy en la cabeza', unidad: 'G', escala: 'divergente' },
-  { clave: 'velocidad', etiqueta: 'Velocidad (centro de masa)', unidad: 'm/s', escala: 'secuencial' },
-  { clave: 'velocidadRiel', etiqueta: 'Velocidad (punto del riel)', unidad: 'm/s', escala: 'secuencial' },
-  { clave: 'aceleracionTangencial', etiqueta: 'Aceleración tangencial', unidad: 'm/s²', escala: 'divergente' },
-  { clave: 'jerkGz', etiqueta: 'Jerk Gz', unidad: 'G/s', escala: 'divergente' },
-  { clave: 'jerkGy', etiqueta: 'Jerk Gy', unidad: 'G/s', escala: 'divergente' },
-  { clave: 'jerkGx', etiqueta: 'Jerk Gx', unidad: 'G/s', escala: 'divergente' },
-  { clave: 'curvatura', etiqueta: 'Curvatura de la heartline', unidad: '1/m', escala: 'secuencial' },
-  { clave: 'curvaturaRiel', etiqueta: 'Curvatura del riel', unidad: '1/m', escala: 'secuencial' },
-  { clave: 'anguloRoll', etiqueta: 'Roll contra el transporte paralelo', unidad: 'rad', escala: 'divergente' },
-  { clave: 'anguloPeralte', etiqueta: 'Peralte contra la vertical', unidad: 'rad', escala: 'divergente' },
-  { clave: 'fuerzaNormal', etiqueta: 'Fuerza normal sobre la vía', unidad: 'N', escala: 'secuencial' },
-  { clave: 'energiaTotal', etiqueta: 'Energía mecánica total', unidad: 'J', escala: 'secuencial' },
-  { clave: 'arco', etiqueta: 'Arco recorrido', unidad: 'm', escala: 'secuencial' },
-  { clave: 'tiempo', etiqueta: 'Tiempo dentro del elemento', unidad: 's', escala: 'secuencial' },
+  { clave: 'gz', etiqueta: 'Gz (vertical del carro)', unidad: 'G', escala: 'secuencial', decimales: 2 },
+  { clave: 'gy', etiqueta: 'Gy (lateral)', unidad: 'G', escala: 'divergente', decimales: 2 },
+  { clave: 'gx', etiqueta: 'Gx (longitudinal)', unidad: 'G', escala: 'divergente', decimales: 2 },
+  { clave: 'gzCabeza', etiqueta: 'Gz en la cabeza', unidad: 'G', escala: 'secuencial', decimales: 2 },
+  { clave: 'gyCabeza', etiqueta: 'Gy en la cabeza', unidad: 'G', escala: 'divergente', decimales: 2 },
+  { clave: 'velocidad', etiqueta: 'Velocidad (centro de masa)', unidad: 'm/s', escala: 'secuencial', decimales: 2 },
+  { clave: 'velocidadRiel', etiqueta: 'Velocidad (punto del riel)', unidad: 'm/s', escala: 'secuencial', decimales: 2 },
+  { clave: 'aceleracionTangencial', etiqueta: 'Aceleración tangencial', unidad: 'm/s²', escala: 'divergente', decimales: 2 },
+  { clave: 'jerkGz', etiqueta: 'Jerk Gz', unidad: 'G/s', escala: 'divergente', decimales: 1 },
+  { clave: 'jerkGy', etiqueta: 'Jerk Gy', unidad: 'G/s', escala: 'divergente', decimales: 1 },
+  { clave: 'jerkGx', etiqueta: 'Jerk Gx', unidad: 'G/s', escala: 'divergente', decimales: 1 },
+  { clave: 'curvatura', etiqueta: 'Curvatura de la heartline', unidad: '1/m', escala: 'secuencial', decimales: 2 },
+  { clave: 'curvaturaRiel', etiqueta: 'Curvatura del riel', unidad: '1/m', escala: 'secuencial', decimales: 2 },
+  { clave: 'anguloRoll', etiqueta: 'Roll contra el transporte paralelo', unidad: 'rad', escala: 'divergente', decimales: 1 },
+  { clave: 'anguloPeralte', etiqueta: 'Peralte contra la vertical', unidad: 'rad', escala: 'divergente', decimales: 1 },
+  { clave: 'fuerzaNormal', etiqueta: 'Fuerza normal sobre la vía', unidad: 'N', escala: 'secuencial', decimales: 2 },
+  { clave: 'energiaTotal', etiqueta: 'Energía mecánica total', unidad: 'J', escala: 'secuencial', decimales: 3, notacion: 'cientifica' },
+  { clave: 'arco', etiqueta: 'Arco recorrido', unidad: 'm', escala: 'secuencial', decimales: 3 },
+  { clave: 'tiempo', etiqueta: 'Tiempo dentro del elemento', unidad: 's', escala: 'secuencial', decimales: 2 },
 ];
 
 export const MAGNITUD_INICIAL: ClaveDeMagnitud = 'gz';

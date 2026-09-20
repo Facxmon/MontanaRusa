@@ -5,7 +5,7 @@
 import type { Layout, ResumenElemento, ResumenLayout } from '../contrato/tipos';
 import type { Estado } from '../estado';
 import { el, fila, vaciar } from './dom';
-import { formatear, formatearNumero } from './formato';
+import { decimalesDeUnidad, formatear, formatearNumero } from './formato';
 
 function tablaDelLayout(resumen: ResumenLayout, layout: Layout): HTMLElement {
   const filas = [
@@ -59,7 +59,7 @@ function tablaDelElemento(resumen: ResumenElemento): HTMLElement {
 function formatearSalto(valor: number | null | undefined, unidad: string): string {
   if (valor === null || valor === undefined) return '—';
   if (valor === 0) return unidad === '-' ? '0' : `0 ${unidad}`;
-  const texto = Math.abs(valor) < 1e-4 ? valor.toExponential(2) : formatearNumero(valor);
+  const texto = Math.abs(valor) < 1e-4 ? valor.toExponential(2) : formatearNumero(valor, decimalesDeUnidad(unidad));
   if (unidad === 'rad') return `${texto} rad`;
   return unidad === '-' ? texto : `${texto} ${unidad}`;
 }

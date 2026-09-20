@@ -90,6 +90,8 @@ describe('figurasDePestana', () => {
       etiquetaX: '',
       etiquetaY: '',
       x: [0, 1, null as unknown as number, 3],
+      decimales: 2,
+      decimalesX: 3,
       series: [{ etiqueta: 'a', valores: [1, 2, 3, 4], color: 'serie1' }],
       franjas: [],
     });

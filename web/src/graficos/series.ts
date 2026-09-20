@@ -9,7 +9,7 @@
 // la norma. Las bandas de G se evaluan siempre con el tiempo del modelo,
 // que es lo que fija la duracion de los eventos.
 
-import type { ClaveDeMagnitud } from '../contrato/magnitudes';
+import { magnitudPorClave, type ClaveDeMagnitud } from '../contrato/magnitudes';
 import type { Elemento, Layout } from '../contrato/tipos';
 import { limiteNormativo, limitePorPunto, type CurvaNormativa } from '../nucleo/norma';
 import type { BandaEntreSeries, DatosDeFigura, Franja, SerieDeFigura } from './figura';
@@ -22,6 +22,19 @@ export const ETIQUETA_DE_EJE: Record<EjeX, string> = {
   tiempo: 'Tiempo del modelo [s]',
   tiempoPrototipo: 'Tiempo del prototipo [s]',
 };
+
+/** Decimales del valor de x en la leyenda: los de arco y tiempo del contrato. */
+export const DECIMALES_DE_EJE: Record<EjeX, number> = {
+  arco: magnitudPorClave('arco').decimales,
+  tiempo: magnitudPorClave('tiempo').decimales,
+  tiempoPrototipo: magnitudPorClave('tiempo').decimales,
+};
+
+/** Decimales y notacion de la leyenda, tomados de la magnitud que grafica la figura. */
+function formatoDe(clave: ClaveDeMagnitud): Pick<DatosDeFigura, 'decimales' | 'notacion'> {
+  const m = magnitudPorClave(clave);
+  return { decimales: m.decimales, notacion: m.notacion };
+}
 
 export const PESTANAS: { clave: Pestana; etiqueta: string }[] = [
   { clave: 'g', etiqueta: 'G' },
@@ -218,6 +231,8 @@ function figuraDeG(
     etiquetaX: ETIQUETA_DE_EJE[ejeX],
     etiquetaY: `${nombre} [G]`,
     x: columnas.x[ejeX] as number[],
+    decimalesX: DECIMALES_DE_EJE[ejeX],
+    ...formatoDe(clave),
     series,
     franjas: columnas.franjas[ejeX],
     bandas,
@@ -254,6 +269,8 @@ export function figurasDeJerk(columnas: Columnas, ejeX: EjeX): DatosDeFigura[] {
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: `d${nombre}/dt [G/s]`,
       x: columnas.x[ejeX] as number[],
+      decimalesX: DECIMALES_DE_EJE[ejeX],
+      ...formatoDe(clave),
       series: [
         { etiqueta: `Jerk de ${nombre}`, valores, color: SERIE[0], ancho: 1.6 },
         { etiqueta: 'Presupuesto de onset', valores: presupuesto, color: LIMITE, ancho: 1.2, trazos: [6, 4] },
@@ -272,6 +289,8 @@ export function figurasDeCinematica(columnas: Columnas, ejeX: EjeX): DatosDeFigu
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: 'v [m/s]',
       x,
+      decimalesX: DECIMALES_DE_EJE[ejeX],
+      ...formatoDe('velocidad'),
       series: [
         { etiqueta: 'Centro de masa (heartline)', valores: columna(columnas, 'velocidad'), color: SERIE[0], ancho: 1.8 },
         { etiqueta: 'Punto del riel', valores: columna(columnas, 'velocidadRiel'), color: SERIE[1], ancho: 1, trazos: [4, 3] },
@@ -283,6 +302,8 @@ export function figurasDeCinematica(columnas: Columnas, ejeX: EjeX): DatosDeFigu
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: 'a_t [m/s²]',
       x,
+      decimalesX: DECIMALES_DE_EJE[ejeX],
+      ...formatoDe('aceleracionTangencial'),
       series: [
         { etiqueta: 'Aceleración tangencial', valores: columna(columnas, 'aceleracionTangencial'), color: SERIE[0], ancho: 1.6 },
         { etiqueta: 'cero', valores: constante(0, columnas.cantidad), color: COLOR_CERO, ancho: 1, trazos: [2, 4], ocultarEnLeyenda: true },
@@ -294,6 +315,8 @@ export function figurasDeCinematica(columnas: Columnas, ejeX: EjeX): DatosDeFigu
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: 'E [J]',
       x,
+      decimalesX: DECIMALES_DE_EJE[ejeX],
+      ...formatoDe('energiaTotal'),
       series: [{ etiqueta: 'Energía total', valores: columna(columnas, 'energiaTotal'), color: SERIE[0], ancho: 1.6 }],
       franjas: columnas.franjas[ejeX],
     },
@@ -308,6 +331,8 @@ export function figurasDeRoll(columnas: Columnas, ejeX: EjeX): DatosDeFigura[] {
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: 'ángulo [°]',
       x: columnas.x[ejeX] as number[],
+      decimalesX: DECIMALES_DE_EJE[ejeX],
+      ...formatoDe('anguloRoll'),
       series: [
         { etiqueta: 'φ: roll contra el marco de transporte', valores: columna(columnas, 'anguloRoll', RAD_A_GRADOS), color: SERIE[0], ancho: 1.8 },
         {
@@ -330,6 +355,8 @@ export function figurasDeCurvatura(columnas: Columnas, ejeX: EjeX): DatosDeFigur
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: 'κ [1/m]',
       x: columnas.x[ejeX] as number[],
+      decimalesX: DECIMALES_DE_EJE[ejeX],
+      ...formatoDe('curvaturaRiel'),
       series: [
         { etiqueta: 'Riel (curvatura impuesta)', valores: columna(columnas, 'curvaturaRiel'), color: SERIE[0], ancho: 1.8 },
         { etiqueta: 'Heartline (derivada)', valores: columna(columnas, 'curvatura'), color: SERIE[1], ancho: 1.4 },

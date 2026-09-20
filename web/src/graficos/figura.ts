@@ -5,6 +5,7 @@
 
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
+import { formatearNumero, SIN_DATO, type Notacion } from '../paneles/formato';
 import { fuenteDeCanvas, tema } from '../tema';
 
 /**
@@ -44,6 +45,11 @@ export interface DatosDeFigura {
   etiquetaX: string;
   etiquetaY: string;
   x: number[];
+  /** Decimales fijos de la leyenda (los de la magnitud graficada), para que no salte. */
+  decimales: number;
+  notacion?: Notacion;
+  /** Decimales del valor de x en la leyenda. */
+  decimalesX: number;
   series: SerieDeFigura[];
   franjas: Franja[];
   bandas?: BandaEntreSeries[];
@@ -126,7 +132,7 @@ export class Figura {
         },
       ],
       series: [
-        { label: datos.etiquetaX },
+        { label: datos.etiquetaX, value: (_u: uPlot, v: number | null) => (v === null ? SIN_DATO : formatearNumero(v, datos.decimalesX)) },
         ...datos.series.map((s) => ({
           label: s.etiqueta,
           stroke: colorDeSerie(s.color),
@@ -134,7 +140,7 @@ export class Figura {
           dash: s.trazos,
           spanGaps: false,
           points: { show: false },
-          value: (_u: uPlot, v: number | null) => (v === null ? '—' : formatearValor(v)),
+          value: (_u: uPlot, v: number | null) => (v === null ? SIN_DATO : formatearNumero(v, datos.decimales, datos.notacion)),
         })),
       ],
       bands: (datos.bandas ?? []).map((b) => ({ series: [b.superior + 1, b.inferior + 1] as [number, number], fill: colorDeSerie(b.color) })),
@@ -183,10 +189,4 @@ export class Figura {
     this.grafico = null;
     this.contenedor.replaceChildren();
   }
-}
-
-function formatearValor(v: number): string {
-  const magnitud = Math.abs(v);
-  if (magnitud !== 0 && (magnitud < 1e-3 || magnitud >= 1e5)) return v.toExponential(2);
-  return String(Number(v.toPrecision(4)));
 }
