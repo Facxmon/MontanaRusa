@@ -1,7 +1,7 @@
 # Visualizador web
 
-Sitio estático de dos páginas: la **portada** del portfolio (`index.html`, por ahora un esqueleto sin
-JavaScript) y el **visualizador** (`visualizador.html`), que lee un layout en el formato de [`CONTRATO_VISUALIZADOR.md`](../CONTRATO_VISUALIZADOR.md)
+Sitio estático de dos páginas: la **portada** del portfolio (`index.html`, sin JavaScript de la app y con
+placeholders para los textos del autor) y el **visualizador** (`visualizador.html`), que lee un layout en el formato de [`CONTRATO_VISUALIZADOR.md`](../CONTRATO_VISUALIZADOR.md)
 y lo dibuja en 3D: riel (tubo orientado con los versores del carro), heartline, uniones d·U, color por
 magnitud (Gz, Gy, velocidad, curvatura, jerk…), resumen del layout y de cada elemento, y criterios de
 aceptación con semáforo, y un **veredicto** arriba de todo con las G extremas y dónde ocurren. El layout
@@ -11,7 +11,9 @@ uno, **Generar** los calcula en un Web Worker con progreso y **Detener** corta, 
 diseño se guarda a `.json`, a un paquete `.zip` (layout, parámetros, gráficos PNG, vista 3D, CSV y LEEME)
 o a un link, se importa por botón o arrastrando, y se restaura solo al recargar. Los gráficos tienen zoom,
 tooltip, estadística del rango y exportación propia, y el **cursor está ligado**: pasar el mouse por un
-pico ilumina ese punto de la vía en 3D y un clic lleva el carro ahí. Diseño en [`DISENO.md`](DISENO.md),
+pico ilumina ese punto de la vía en 3D y un clic lleva el carro ahí. Desde la fase 4 hay tema claro (interfaz y
+gráficos; el 3D queda oscuro), comparación A/B de dos diseños, una bienvenida con tres recorridos guiados,
+hoja de atajos con `?` y diseño responsive hasta teléfono. Diseño en [`DISENO.md`](DISENO.md),
 plan de la v1 en [`PLAN-v1.md`](PLAN-v1.md).
 
 ## Correr
@@ -42,11 +44,11 @@ de la vía, se vuelve a capturar.
 
 | Carpeta | Qué hay |
 |---|---|
-| `index.html`, `src/portada.css` | la portada: solo tokens y tipografía, sin Three.js ni uPlot |
+| `index.html`, `src/portada.css` | la portada: solo tokens y tipografía, sin Three.js ni uPlot; en el build el CSS va dentro del HTML (`plugins/cssEnLinea.ts`) |
 | `visualizador.html`, `src/main.ts`, `src/visualizador.ts` | la app: `montarVisualizador(raiz)` arma el DOM, conecta todo y devuelve `destruir()` |
-| `src/tokens.css`, `src/fuentes.css`, `src/estilos.css`, `src/tema.ts` | tokens de diseño (única fuente de color), `@font-face`, estilos del visualizador, y el puente para que JavaScript lea los tokens |
+| `src/tokens.css`, `src/fuentes.css`, `src/estilos.css`, `src/tema.ts`, `src/preferenciaDeTema.ts` | tokens de diseño (única fuente de color, temas oscuro y claro), `@font-face`, estilos del visualizador, el puente para que JavaScript lea los tokens y la preferencia auto / claro / oscuro |
 | `src/contrato/` | `tipos.ts` (generado desde el esquema, no editar), `cargar.ts` (fetch + rechazo de MAJOR ≠ 1), `magnitudes.ts` (qué columnas se pueden colorear), `parametrosDesdeContrato.ts` y `disenoDesdeLayout.ts` (del JSON a un diseño editable), `veredicto.ts` (puro: pasa/no pasa, extremos con su ubicación y criterio peor) |
-| `src/escena/` | `geometriaDeVia.ts` (tubo, heartline, uniones y colores como arrays planos, sin Three.js), `colores.ts` (escalas), `escena.ts` y `via.ts` (Three.js) |
+| `src/escena/` | `geometriaDeVia.ts` (tubo, heartline, uniones y colores como arrays planos, sin Three.js), `colores.ts` (escalas), `escena.ts` (renderer, cámara con vuelo, gizmo), `via.ts` y `entorno.ts` (piso con grilla rotulada, caja disponible, proyección) (Three.js) |
 | `src/paneles/` | DOM plano: barra de aplicación (`barra.ts`) con deshacer/rehacer, importar, guardar y Generar/Detener; `etiquetas.ts` (cómo se muestra cada parámetro: nombre humano, unidad de presentación, rango) y `ayuda.ts` (el `?` con `popover` nativo); `veredicto.ts` y `cursor.ts`; selector de caso y de magnitud, leyenda, resumen, elementos, criterios, errores, avisos y persistencia en `localStorage` |
 | `src/graficos/` | gráficos 2D con uPlot: `series.ts` (puro, qué series lleva cada figura, el índice de nodo global y la estadística de rango), `figura.ts` (wrapper con zoom, tooltip y alto configurable), `panelDeGraficos.ts` |
 | `src/nucleo/` | el port de la física a TypeScript (ver `DISENO.md`, iteración 2), `calcular.ts` (un diseño: globales + instancias con ajustes), `worker.ts` y `cliente.ts` para calcular fuera del hilo de la interfaz, `exportar.ts` (el equivalente de `LayoutAJson.m`), `serializar.ts` (el diseño como texto: solo lo que difiere del default, comprimido para la URL), `importar.ts` y `descargar.ts` (los textos que se guardan: contrato, parámetros, CSV y LEEME) |
@@ -84,6 +86,6 @@ que portear.
 
 ## Pendiente
 
-Contenido de la portada (presentación, video, contacto: fase 4), tema claro, compartir un diseño por
-URL y guardarlo a archivo (fase 2, sobre `nucleo/serializar.ts`), trocha real y estructura en la vía,
-comparación de métodos A/B en la web.
+Los textos, el video y el contacto de la portada (placeholders marcados en `index.html`), volver a
+capturar `public/og.png`, trocha real y estructura en la vía, y la comparación de métodos de acoplamiento
+(`MetodoDeAcoplamiento = 'Ambos'` de MATLAB) en la web. Ver "Pendiente" en la fase 4 de `DISENO.md`.

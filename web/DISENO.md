@@ -478,3 +478,90 @@ navegador, sobre `circuito-demolayout`:
 - el panel abre con "No pasa — 8 de 105 criterios" y el criterio peor (`Altura del riel sobre el suelo`,
   4. DiveLoop, margen −0,325 m); pisando `RadioDelLoop` en una instancia y cambiándola a `Helice`, el
   aviso de inerte aparece en el panel de resultados.
+
+---
+
+# Fase 4 (2026-09-22): pulido — jerarquía, movimiento, 3D, modo claro, portada
+
+Antes de escribir CSS se leyeron las skills de diseño `impeccable` (jerarquía, affordance, movimiento,
+accesibilidad) y `dataviz` (paleta, contraste, reglas de gráficos). La paleta de series del tema claro
+**no se eligió a ojo**: salió de correr `validate_palette.js` de la skill sobre las superficies reales.
+
+## El sistema visual final
+
+| Capa | Qué es |
+|---|---|
+| Tokens | `tokens.css` sigue siendo la única fuente de color, espaciado, radio, tipografía y movimiento (el grep de hex fuera de `tokens.css` sigue vacío). Tres bloques: `:root` (paleta cruda, escalas y **la escena 3D**, que no depende del tema), `:root[data-tema="oscuro"]` y `:root[data-tema="claro"]`. |
+| Jerarquía del panel | Cabecera fija con el nombre del caso (o "Diseño propio · a partir de X") y una **píldora de estado** (golden · MATLAB / diseño propio / cambios sin generar / calculando N/M), junto con las pestañas. Debajo, **tarjetas colapsables** (`tarjeta()` en `paneles/dom.ts`): un `<details>` con el `h2` en el `summary` y una línea de resumen que se ve con la tarjeta cerrada; qué tarjetas están abiertas se recuerda en la sesión, así un recálculo no reabre lo que se cerró. El veredicto queda arriba y sin colapsar: es el titular. |
+| Criterios que fallan | Regla roja a la izquierda, fondo teñido (`--falla-tenue`), el margen en negrita y rojo, y primeros en su lista. |
+| Botones | Fondo propio un escalón sobre la tarjeta (`--superficie-3`, `--borde-boton`, `--sombra-boton`), distinto de los inputs, que van sobre `--superficie-0`; el primario relleno con el acento. |
+| Movimiento | Todo con `--dur-*` y `--curva`. Acordeones de 200 ms (`::details-content` + `interpolate-size`, donde existe); subrayado de pestañas que se **desliza** (`paneles/pestanas.ts`, un único elemento con `transform`); **destello de 400 ms** en las celdas cuyo valor cambió después de un recálculo (tiñe el fondo, el número no se mueve); la cámara **vuela** al encuadrar (`escena.encuadrar` interpola posición y centro de la órbita con el cubic-bezier del token, que evalúa `tema.ts`); el progreso del cálculo, determinado, también como línea a lo ancho de la barra. Con `prefers-reduced-motion: reduce` no se anima nada: una regla global anula transiciones y animaciones, y la cámara salta. |
+| Vista 3D | `ACESFilmicToneMapping` + `SRGBColorSpace`, con los colores de vértice pasados a lineal (sin eso el tubo se veía más lavado que la barra de la leyenda con el mismo valor). Fondo con gradiente vertical (textura: sale igual en la captura PNG). Gizmo de ejes arriba a la izquierda. `escena/entorno.ts`: la **caja disponible** en wireframe, verde si la vía entra y roja con rótulo si se sale (coincide con el criterio "Dentro del bounding box disponible" de los golden, lo verifica `entorno.test.ts`), la **proyección del riel** sobre el piso y una grilla que cubre la vía y la caja, con líneas cada 10 cm, mayores cada 0,5 m y rótulos cada metro a tamaño fijo en pantalla. |
+| Comparar A/B | "Comparar" fija lo que está en pantalla como A (layout y diseño: nada se recalcula). Las figuras superponen las series de datos de A en tono más claro (`--serie-comparacion-*`), con "A ·" / "B ·" en la leyenda, una franja que dice qué es A con "Fijar B como A" y "Descartar A", y el veredicto muestra el valor de A y la diferencia. `superponerComparacion` (pura) une los ejes x y mantiene crecientes los nodos globales, así el cursor ligado sigue funcionando. |
+| Bienvenida | Tres líneas de "qué es esto", descartables y persistidas, y tres recorridos: el dive loop del circuito, el radio del loop × 1,5 (la Gz máxima baja de 7,23 a 5,69 G, con el original fijado como A) y el modo G constante. Pasan por el mismo estado que el resto de la app. |
+| Accesibilidad | Foco visible en todo control, enlaces para saltar, orden de tabulación barra → vista → panel, los tres `tablist` con el patrón tabs de WAI-ARIA (`aria-selected`, `aria-controls` hacia `role="tabpanel"`, tabindex rotativo, flechas / Inicio / Fin), hoja de atajos con `?` en un `<dialog>`, y la barra espaciadora ya no dispara play/pausa con el foco en un control. |
+| Responsive | Cuatro escalones: ≤ 1360 px la barra pasa a iconos; ≤ 1180 px panel de 360 px; ≤ 900 px una columna, barra en dos filas, 3D en 60vh y la página scrollea; ≤ 560 px barra en tres filas y formulario apilado. Verificado sin scroll horizontal de 1440 a 390 px. |
+
+## Modo claro: alcance acotado (decisión tomada)
+
+El tema claro aplica a la **interfaz y a los gráficos 2D**; el **viewport 3D queda oscuro en los dos
+temas**. Motivos: los visores 3D se leen mejor en oscuro (ver "Decisiones tomadas" de la v1), y las escalas
+perceptualmente uniformes con que se colorea la vía tienen un extremo de baja luminosidad que desaparece
+sobre blanco, así que un modo claro completo obligaría a rediseñar y revalidar toda la paleta de la vía. El
+valor concreto del modo claro es poder pegar las figuras en la memoria de cálculo impresa (el PNG de cada
+figura sale con el fondo del tema).
+
+- Tres estados auto / claro / oscuro (`preferenciaDeTema.ts`), persistidos; sin nada guardado, **oscuro**.
+  `auto` sigue a `prefers-color-scheme` en vivo. Un script en línea en el `<head>` de las dos páginas
+  aplica la preferencia antes del primer pintado (misma clave; lo chequea un test).
+- Los tokens `--escena-*` viven fuera de los bloques de tema; un test verifica que ninguno se cuele en
+  ellos. En el claro, el canvas 3D lleva marco y margen para que se lea como una ventana intencional.
+- uPlot congela los colores en sus opciones: las figuras se recrean al cambiar `data-tema`.
+- **Contraste, validado** (WCAG para los textos, `validate_palette.js` para las series):
+  - Textos de estado del claro por encima de 4,5:1 sobre las tres superficies (el ámbar, el verde y el
+    rojo del oscuro no llegaban a 2:1 sobre blanco): `--alerta #8a5300`, `--exito #0b7a55`,
+    `--falla #b3261e`, `--texto-3 #5c6576`, `--acento #256abf`.
+  - Series en **todos los pares** (el test más exigente, porque las líneas se cruzan): claro
+    `#256abf / #d95926 / #199e70`, contraste ≥ 3:1 sobre el fondo, CVD ≥ 9,4, visión normal ≥ 22,2;
+    oscuro `#3987e5 / #d95926 / #199e70`, sin cambios, igual de válido. Los pasos "claros" de referencia
+    de la skill (`#eb6834`, `#1baf7a`) quedaban por debajo de 3:1 sobre blanco: por eso naranja y aqua
+    usan el mismo paso en los dos temas y el azul baja un escalón.
+  - Límite y admisible son colores de **estado** (crítico `#d03b3b` y bueno `#0ca30c`), fijos en los dos
+    temas como pide la skill; lo que cambia es la opacidad: el admisible va opaco en claro (3,35:1; con
+    0,55 caía a 2:1) y sube de 0,55 a 0,70 en oscuro (a 0,55 daba 2,46:1, **no pasaba**). El eje cero pasa
+    a gris opaco en claro (3,1:1).
+
+## Portada
+
+`index.html` con presentación, video (contenedor 16:9 con el alto reservado y las dos variantes preparadas
+en un comentario: `<iframe loading="lazy">` o `<video preload="none">`), el proyecto, qué implementa el
+modelo, CTA grande al visualizador arriba y al final, repositorio y contacto. **Ningún texto inventado**:
+lo que escribe el autor está entre corchetes con la clase `.marcador` (borde punteado ámbar). Lo único que
+no es placeholder son hechos del repositorio: la descripción de las meta tags, los nombres de los elementos
+y modos que calcula el código, ASTM F2291 y el link al repo.
+
+Carga, medida en el preset "3G" de Chrome (562 ms de latencia por pedido): **primer pintado y LCP en
+0,73 s**, tres pedidos (el HTML y dos fuentes) y ningún JavaScript de la app, ni Three.js ni uPlot. Para
+llegar ahí, en el build el CSS de la portada va **dentro** del HTML (`plugins/cssEnLinea.ts`: con un CSS
+aparte eran dos viajes antes de pintar) y la portada usa solo Plex Sans 400 y 600, precargadas. El evento
+`load` llega a 1,4 s porque espera las dos fuentes (43 kB), que entran con `swap` sobre un texto ya pintado.
+
+## Invariantes nuevos
+
+- **La escena 3D no depende del tema**: sus tokens viven en `:root`, fuera de los bloques de tema
+  (`preferenciaDeTema.test.ts`).
+- **Toda animación se apaga con `prefers-reduced-motion`**, incluida la cámara (`movimientoReducido()`).
+- **Las barras de pestañas se montan con `montarPestanas`** y no se redibujan: el subrayado y el foco
+  dependen de que los botones sean siempre los mismos.
+
+## Pendiente
+
+- El error "Cannot read properties of undefined (reading '0')" asociado al onset máximo del modelo **no se
+  pudo reproducir**: el núcleo calcula bien con 11 casos y 20 combinaciones de onset, y la interfaz completa
+  no falla en 5 casos. Se arregló lo que sí apareció al buscarlo: destildar "vacío (derivar)" dejaba el
+  onset en 0, 0, 0 y el cálculo tardaba minutos; ahora arranca en el valor derivado.
+- `public/og.png` es la captura de la vía de antes de esta fase (sin la caja ni la grilla nueva): conviene
+  volver a capturarla.
+- La animación de los acordeones depende de `interpolate-size`, que hoy es solo de Chromium; en Firefox y
+  Safari abren sin animar.
+- Contenido de la portada (textos, video, contacto): lo escribe el autor.

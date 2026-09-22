@@ -21,7 +21,7 @@ export default defineConfig({
     },
     target: 'es2022',
     sourcemap: true,
-    // Three.js + uPlot + la app van en un solo chunk (~655 kB minificado, 187 kB gzip): es esperable.
-    chunkSizeWarningLimit: 700,
+    // Three.js + uPlot + la app van en un solo chunk (~716 kB minificado, 207 kB gzip desde la fase 4): es esperable.
+    chunkSizeWarningLimit: 750,
   },
 });
