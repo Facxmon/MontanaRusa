@@ -8,15 +8,23 @@ const inicial: DatosDeEstado = {
   magnitud: 'gz',
   elemento: null,
   error: null,
+  diagnostico: null,
   cargando: false,
   vista: 'via3d',
   pestana: 'g',
   ejeX: 'arco',
   fuente: 'golden',
   diseno: null,
+  instancia: null,
+  origen: null,
+  disenoCalculado: null,
   calculando: false,
+  progreso: null,
   ultimoCalculoMs: null,
+  autoGenerar: false,
   panel: 'resultados',
+  nodo: null,
+  comparacion: null,
 };
 
 describe('crearEstado', () => {

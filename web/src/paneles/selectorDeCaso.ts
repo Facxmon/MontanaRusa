@@ -8,9 +8,10 @@ export function montarSelectorDeCaso(contenedor: HTMLElement, estado: Estado): v
     const { casos, caso, cargando } = estado.get();
     vaciar(contenedor);
     const selector = el('select', {
-      id: 'caso',
       disabled: cargando,
-      onChange: (evento: Event) => estado.set({ caso: (evento.target as HTMLSelectElement).value, elemento: null, fuente: 'golden' }),
+      // Volver a un golden cierra el diseno propio (queda en localStorage hasta que se edite otro).
+      onChange: (evento: Event) =>
+        estado.set({ caso: (evento.target as HTMLSelectElement).value, elemento: null, fuente: 'golden', diseno: null, disenoCalculado: null, instancia: null }),
     });
     if (caso === null) {
       const propio = el('option', { value: '' }, 'Diseño propio');
@@ -24,8 +25,7 @@ export function montarSelectorDeCaso(contenedor: HTMLElement, estado: Estado): v
       selector.append(opcion);
     }
     contenedor.append(
-      el('label', { for: 'caso', class: 'etiqueta' }, 'Caso'),
-      selector,
+      el('label', {}, el('span', { class: 'etiqueta' }, 'Caso'), selector),
       el('p', { class: 'ayuda' }, cargando ? 'Cargando…' : 'Golden files generados por MATLAB (GenerarGoldenFiles.m).'),
     );
   };

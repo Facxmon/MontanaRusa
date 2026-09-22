@@ -2,11 +2,13 @@
 // suscribe y se vuelve a dibujar cuando cambia lo que le importa.
 
 import type { ClaveDeMagnitud } from './contrato/magnitudes';
+import type { Diagnostico } from './diagnostico';
 import type { Layout } from './contrato/tipos';
 import type { EjeX, Pestana } from './graficos/series';
 import type { EntradaDeDiseno } from './nucleo/calcular';
 
-export type Vista = 'via3d' | 'graficos';
+/** 'ambos' parte el area principal: sin eso, el cursor ligado grafico <-> 3D no se puede ver. */
+export type Vista = 'via3d' | 'graficos' | 'ambos';
 export type Fuente = 'golden' | 'diseno';
 export type PanelLateral = 'resultados' | 'diseno';
 
@@ -23,6 +25,8 @@ export interface DatosDeEstado {
   elemento: number | null;
   /** Mensaje de error a mostrar, o null. */
   error: string | null;
+  /** Detalle del ultimo error del calculo: que campos nombra y en que instancia fallo, para resaltarlos en el formulario. */
+  diagnostico: Diagnostico | null;
   /** true mientras se carga un caso. */
   cargando: boolean;
   /** Que ocupa el area principal: la via en 3D o los graficos. */
@@ -35,12 +39,44 @@ export interface DatosDeEstado {
   fuente: Fuente;
   /** El diseno editable (parametros, estado inicial, secuencia), o null si nunca se abrio uno. */
   diseno: EntradaDeDiseno | null;
+  /** Id de la instancia de elemento elegida en el panel de diseno, o null si ninguna. */
+  instancia: string | null;
+  /** De donde salio el diseno (nombre del golden, del archivo importado, "link"), para el LEEME y los nombres de archivo; null si no hay diseno. */
+  origen: string | null;
+  /**
+   * El diseno al que corresponde el layout en pantalla, o null si el layout
+   * no salio de un diseno. Generar esta habilitado cuando diseno !== disenoCalculado.
+   */
+  disenoCalculado: EntradaDeDiseno | null;
   /** true mientras el worker calcula. */
   calculando: boolean;
+  /** Avance del calculo en curso (elementos hechos / total), o null. */
+  progreso: { hecho: number; total: number; tipo: string } | null;
   /** Duracion del ultimo calculo, en ms, o null. */
   ultimoCalculoMs: number | null;
+  /** Recalcular solo con cada edicion (debounce), como antes de la fase 2. Apagado por defecto. */
+  autoGenerar: boolean;
   /** Pestana del panel lateral. */
   panel: PanelLateral;
+  /**
+   * Nodo bajo el cursor, como INDICE DE NODO GLOBAL sobre todo el layout
+   * (el mismo que usa la via 3D). Es el estado que comparten los graficos,
+   * el marcador de la via y el reproductor; null cuando no hay cursor.
+   */
+  nodo: number | null;
+  /**
+   * Diseno fijado como A para comparar (fase 4.8), o null. Se guarda el
+   * LAYOUT (las curvas) ademas del diseno: recalcular A cada vez costaria
+   * segundos, y un golden no tiene diseno hasta que se lo abre.
+   */
+  comparacion: Comparacion | null;
+}
+
+export interface Comparacion {
+  layout: Layout;
+  diseno: EntradaDeDiseno | null;
+  /** Como se lo nombra en la leyenda y en la franja: el caso, o "diseño propio". */
+  etiqueta: string;
 }
 
 export type Suscriptor = (estado: DatosDeEstado, anterior: DatosDeEstado) => void;
@@ -68,4 +104,13 @@ export function crearEstado(inicial: DatosDeEstado): Estado {
       };
     },
   };
+}
+
+/**
+ * true si el cambio de layout es un RECALCULO del diseno propio (y no abrir
+ * otro caso o el primer layout): es cuando los paneles destellan los
+ * valores que cambiaron (fase 4.3).
+ */
+export function esRecalculo(nuevo: DatosDeEstado, anterior: DatosDeEstado): boolean {
+  return nuevo.layout !== anterior.layout && nuevo.layout !== null && anterior.layout !== null && nuevo.fuente === 'diseno' && anterior.fuente === 'diseno';
 }

@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import type { ClaveDeMagnitud } from '../contrato/magnitudes';
 import { magnitudPorClave } from '../contrato/magnitudes';
 import type { Layout } from '../contrato/tipos';
-import { rangoDeMagnitud } from './colores';
+import { tema } from '../tema';
+import { bufferALineal, rangoDeMagnitud } from './colores';
 import {
   aplanarNodos,
   coloresPorVertice,
@@ -20,6 +21,8 @@ import {
 
 /** Radio del tubo que representa el riel, en m. Chico frente a d = 0.03 m para que se vea el offset. */
 const RADIO_DEL_RIEL = 0.008;
+/** El marcador del nodo bajo el cursor: una esfera algo mas gorda que el riel. */
+const RADIO_DEL_MARCADOR = RADIO_DEL_RIEL * 2.2;
 const LADOS_DEL_TUBO = 10;
 const UNION_CADA_N_NODOS = 25;
 
@@ -31,9 +34,19 @@ export class Via {
   private tuboMesh: THREE.Mesh | null = null;
   private heartline: THREE.Line | null = null;
   private unionesLineas: THREE.LineSegments | null = null;
+  private marcador: THREE.Mesh | null = null;
+  /** Nodo global pedido y nodo global ya dibujado (ver marcarNodo). */
+  private nodoPedido: number | null = null;
+  private nodoDibujado: number | null = null;
 
   constructor(scene: THREE.Scene) {
     scene.add(this.grupo);
+  }
+
+  /** Libera las geometrias y saca el grupo de la escena. */
+  destruir(): void {
+    this.vaciar();
+    this.grupo.removeFromParent();
   }
 
   /** Reemplaza la via por la del layout dado y la pinta con la magnitud. */
@@ -73,11 +86,51 @@ export class Via {
     geometriaUniones.setAttribute('position', new THREE.BufferAttribute(uniones(this.nodos, UNION_CADA_N_NODOS), 3));
     this.unionesLineas = new THREE.LineSegments(
       geometriaUniones,
-      new THREE.LineBasicMaterial({ color: 0x8a94a6, transparent: true, opacity: 0.6 }),
+      new THREE.LineBasicMaterial({ color: new THREE.Color(tema().escenaUniones), transparent: true, opacity: 0.6 }),
     );
     this.grupo.add(this.unionesLineas);
 
+    // Marcador del nodo bajo el cursor: no recolorea la via, se mueve sobre ella.
+    const marcador = new THREE.Mesh(
+      new THREE.SphereGeometry(RADIO_DEL_MARCADOR, 16, 12),
+      new THREE.MeshStandardMaterial({
+        color: new THREE.Color(tema().escenaMarcador),
+        emissive: new THREE.Color(tema().escenaMarcador),
+        emissiveIntensity: 0.6,
+        roughness: 0.3,
+      }),
+    );
+    marcador.visible = false;
+    this.marcador = marcador;
+    this.grupo.add(marcador);
+    this.nodoDibujado = null;
+
     this.recolorear(magnitud, elementoResaltado);
+  }
+
+  /**
+   * Pide mover el marcador al nodo global dado. NO toca Three.js: solo
+   * guarda el pedido, y lo aplica actualizarMarcador() en el
+   * requestAnimationFrame de la escena. El cursor de los graficos se mueve en
+   * cada evento de mouse y el carro en cada cuadro: tocar la escena ahi seria
+   * trabajo tirado entre dos cuadros.
+   */
+  marcarNodo(nodo: number | null): void {
+    this.nodoPedido = nodo;
+  }
+
+  /** Aplica el ultimo marcarNodo(); se llama desde escena.enCadaCuadro. */
+  actualizarMarcador(): void {
+    if (this.nodoPedido === this.nodoDibujado) return;
+    this.nodoDibujado = this.nodoPedido;
+    if (!this.marcador || !this.nodos) return;
+    const nodo = this.nodoPedido;
+    if (nodo === null || nodo < 0 || nodo >= this.nodos.cantidad) {
+      this.marcador.visible = false;
+      return;
+    }
+    this.marcador.position.set(this.nodos.riel[3 * nodo]!, this.nodos.riel[3 * nodo + 1]!, this.nodos.riel[3 * nodo + 2]!);
+    this.marcador.visible = true;
   }
 
   /** Solo reescribe los atributos de color; la geometria no se toca. */
@@ -90,14 +143,14 @@ export class Via {
     const atenuar =
       elementoResaltado === null ? undefined : (nodo: number) => nodos.elemento[nodo] !== elementoResaltado;
 
-    const coloresTubo = coloresPorVertice(valores, this.geometriaDelTubo.nodoDeVertice, rango, escala, atenuar);
+    const coloresTubo = bufferALineal(coloresPorVertice(valores, this.geometriaDelTubo.nodoDeVertice, rango, escala, atenuar));
     const atributoTubo = this.tuboMesh.geometry.getAttribute('color') as THREE.BufferAttribute;
     (atributoTubo.array as Float32Array).set(coloresTubo);
     atributoTubo.needsUpdate = true;
 
     const identidad = new Uint32Array(nodos.cantidad);
     for (let k = 0; k < nodos.cantidad; k++) identidad[k] = k;
-    const coloresHeartline = coloresPorVertice(valores, identidad, rango, escala, atenuar);
+    const coloresHeartline = bufferALineal(coloresPorVertice(valores, identidad, rango, escala, atenuar));
     const atributoHeartline = this.heartline.geometry.getAttribute('color') as THREE.BufferAttribute;
     (atributoHeartline.array as Float32Array).set(coloresHeartline);
     atributoHeartline.needsUpdate = true;
@@ -127,7 +180,7 @@ export class Via {
   }
 
   private vaciar(): void {
-    for (const objeto of [this.tuboMesh, this.heartline, this.unionesLineas]) {
+    for (const objeto of [this.tuboMesh, this.heartline, this.unionesLineas, this.marcador]) {
       if (!objeto) continue;
       this.grupo.remove(objeto);
       objeto.geometry.dispose();
@@ -136,6 +189,8 @@ export class Via {
     this.tuboMesh = null;
     this.heartline = null;
     this.unionesLineas = null;
+    this.marcador = null;
+    this.nodoDibujado = null;
     this.layout = null;
     this.nodos = null;
     this.geometriaDelTubo = null;

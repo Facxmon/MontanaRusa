@@ -1,56 +1,185 @@
-// Formulario de parametros generado desde parametros.esquema del layout
-// (CONTRATO_VISUALIZADOR.md, 1.9): los grupos, las etiquetas, las unidades
-// y los tooltips salen del JSON, nunca de una lista escrita aca. Edita
-// estado.diseno.parametros (los Parametros del nucleo, en PascalCase).
+// Formulario de parametros. Arriba, la ficha de la instancia de elemento
+// elegida en la secuencia (diseno.ts): sus parametros geometricos, cada uno
+// heredado del global o pisado por la instancia, con boton para volver al
+// global, y las advertencias de los ajustes inertes. Abajo, los grupos
+// globales: modo de curvatura, criterios de aceptacion y generales.
+//
+// Las cuatro listas (que consume el modo, que declara cada elemento,
+// aceptacion, generales) salen del nucleo, que es el mismo port que las
+// declara para el contrato y que parametros.test.ts verifica identicas al
+// esquema de los golden: por eso al cambiar de modo los parametros del modo
+// nuevo aparecen al instante, sin esperar el recalculo. Las etiquetas, las
+// unidades y los tooltips siguen siendo las ternas de MATLAB.
+//
+// Edita estado.diseno (los Parametros del nucleo, en PascalCase, y los
+// ajustes de cada instancia).
+//
+// Lo que se VE no es el nombre del nucleo: cada campo se dibuja con el
+// nombre humano y la unidad de presentacion de etiquetas.ts, y con un "?"
+// que abre el popover de ayuda.ts. El valor que se guarda sigue siendo el
+// del nucleo, en SI y radianes.
 
-import type { DeclaracionDeParametro, Layout } from '../contrato/tipos';
+import type { DeclaracionDeParametro } from '../contrato/tipos';
+import type { Diagnostico } from '../diagnostico';
 import type { Estado } from '../estado';
-import type { EntradaDeDiseno } from '../nucleo/calcular';
-import { ParametrosPorDefecto } from '../nucleo/parametros';
-import type { NombreDeParametro, Parametros } from '../nucleo/tipos';
-import { el } from './dom';
-
-const RAD_A_GRADOS = 180 / Math.PI;
-
-/** Enumeraciones que el esquema no distingue de un texto libre. */
-const OPCIONES: Partial<Record<NombreDeParametro, string[]>> = {
-  SentidoDelGiro: ['Derecha', 'Izquierda'],
-  PuntoDeVerificacionNormativa: ['Heartline', 'Cabeza'],
-  MetodoDeAcoplamiento: ['A', 'B', 'Ambos'],
-};
-
-/** Los que en MATLAB admiten [] (vacio = derivar). */
-const ANULABLES: NombreDeParametro[] = ['OnsetMaximoModelo', 'InclinacionHelicoidalImpuesta'];
+import type { EntradaDeDiseno, InstanciaDeElemento } from '../nucleo/calcular';
+import {
+  AjustarParametros,
+  DECLARACIONES_DE_ELEMENTOS,
+  MODOS_DE_CURVATURA,
+  OPCIONES_DE_PARAMETRO,
+  PARAMETROS_ANULABLES,
+  ParametrosDeAceptacion,
+  ParametrosDelModo,
+  ParametrosGenerales,
+  ParametrosPorDefecto,
+} from '../nucleo/parametros';
+import type { Declaracion, ModoCurvatura, NombreDeParametro, Parametros } from '../nucleo/tipos';
+import { modoEfectivo } from '../contrato/modo';
+import { EscalasDeFroude } from '../nucleo/basicos';
+import { ayudaDeCampo } from './ayuda';
+import { el, tarjeta } from './dom';
+import {
+  aSI,
+  digitosDeEntrada,
+  elementosQueLoConsumen,
+  etiquetaDe,
+  fueraDelRango,
+  modosQueLoConsumen,
+  textoConUnidad,
+  textoDeEntrada,
+  type Etiqueta,
+} from './etiquetas';
 
 function pascal(clave: string): NombreDeParametro {
   return (clave[0]!.toUpperCase() + clave.slice(1)) as NombreDeParametro;
 }
 
+/** Las ternas del nucleo con la clave en camelCase, como las escribe el contrato. */
+function declaraciones(lista: Declaracion[]): DeclaracionDeParametro[] {
+  return lista.map((d) => ({ clave: d.Nombre[0]!.toLowerCase() + d.Nombre.slice(1), unidad: d.Unidad, descripcion: d.Descripcion }));
+}
+
 type Actualizar = (nombre: NombreDeParametro, valor: unknown) => void;
 
-function entradaNumerica(valor: number, unidad: string, alCambiar: (v: number) => void): HTMLInputElement {
-  const enGrados = unidad === 'rad';
+/**
+ * Input de un numero en UNIDAD DE PRESENTACION. Lo que entra y lo que sale
+ * de aca es SI: `etiquetas.ts` hace las dos conversiones y decide los
+ * decimales y el `step`. El `step` es el de la unidad (0,5 cm, 0,1 mm, 1°)
+ * y no `any`, que dejaba las flechitas del teclado sin ningun efecto util.
+ *
+ * Salirse del rango sugerido es un AVISO, nunca un bloqueo: si el valor
+ * rompe algo, el que se tiene que quejar es el criterio de aceptacion.
+ *
+ * EL VALOR EXACTO VIVE EN LA CLOSURE, NO EN EL INPUT. `exportar.ts`
+ * redondea todo a 6 cifras al escribir el JSON (deliberado, y cubierto por
+ * los tests de paridad con MATLAB), asi que deg2rad(55) vuelve del JSON como
+ * 0,959931 y en grados da 54,99999493. Mostrando con los decimales de la
+ * unidad se lee "55.0", y como al estado se escribe SOLO si el texto cambio,
+ * un campo que el usuario no toca conserva su valor original exacto y no
+ * suma un error de ida y vuelta por cada dibujo del formulario.
+ */
+function entradaNumerica(valorSI: number, etiqueta: Etiqueta, alCambiar: (v: number) => void): HTMLInputElement {
+  const unidad = etiqueta.unidadDePresentacion;
+  let mostrado = textoDeEntrada(valorSI, unidad);
   const entrada = el('input', {
     type: 'number',
-    step: 'any',
-    value: String(enGrados ? Number((valor * RAD_A_GRADOS).toPrecision(10)) : Number(valor.toPrecision(10))),
+    step: unidad ? String(unidad.paso) : 'any',
+    value: mostrado,
     onChange: (evento: Event) => {
-      const texto = (evento.target as HTMLInputElement).value;
+      const campo = evento.target as HTMLInputElement;
+      const texto = campo.value;
       const numero = Number(texto);
       if (texto.trim() === '' || !Number.isFinite(numero)) return;
-      alCambiar(enGrados ? numero / RAD_A_GRADOS : numero);
+      // Confirmado: defaultValue marca lo que ya esta en el diseno (atajos.ts decide con eso a quien va Ctrl+Z).
+      campo.defaultValue = texto;
+      // Foco y blur sin tocar nada, o volver a tipear lo mismo, no es una
+      // edicion: escribir aca convertiria "55.0" en deg2rad(55) y cambiaria
+      // el diseno sin que nadie lo haya pedido.
+      if (texto === mostrado) return;
+      mostrado = texto;
+      avisarDelRango(campo, numero, etiqueta);
+      alCambiar(aSI(numero, unidad));
     },
   });
+  entrada.style.setProperty('--digitos', String(digitosDeEntrada(etiqueta)));
+  avisarDelRango(entrada, Number(mostrado), etiqueta);
   return entrada;
 }
 
-function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: Actualizar): HTMLElement {
+/** Marca (no bloquea) el input cuyo valor se fue del rango sugerido. */
+function avisarDelRango(entrada: HTMLInputElement, valorMostrado: number, etiqueta: Etiqueta): void {
+  const fuera = fueraDelRango(valorMostrado, etiqueta);
+  entrada.classList.toggle('fuera-de-rango', fuera);
+  const rango = etiqueta.rangoSugerido;
+  entrada.title = fuera && rango ? `Fuera del rango sugerido (${rango[0]} a ${rango[1]}): se calcula igual, lo van a decir los criterios de aceptación.` : '';
+}
+
+/** Los defaults se leen una vez: el popover de cada campo muestra el suyo. */
+const DEFECTOS = ParametrosPorDefecto();
+
+/** El valor por defecto de un parametro, ya en unidad de presentacion, para el popover. */
+function textoDelDefecto(nombre: NombreDeParametro, etiqueta: Etiqueta): string {
+  const valor = (DEFECTOS as unknown as Record<string, unknown>)[nombre];
+  const unidad = etiqueta.unidadDePresentacion;
+  if (valor === null || valor === undefined) return 'vacío (derivar)';
+  if (typeof valor === 'boolean') return valor ? 'sí' : 'no';
+  if (typeof valor === 'number') return textoConUnidad(valor, unidad);
+  if (Array.isArray(valor)) {
+    const uno = (v: unknown): string => (Array.isArray(v) ? `[${v.map(uno).join(', ')}]` : typeof v === 'number' ? textoDeEntrada(v, unidad) : String(v));
+    const lista = valor.map(uno).join(', ');
+    return unidad && unidad.simbolo !== '-' ? `${lista} ${unidad.simbolo}` : lista;
+  }
+  return String(valor);
+}
+
+function textoDelRango(etiqueta: Etiqueta): string | undefined {
+  const rango = etiqueta.rangoSugerido;
+  if (!rango) return undefined;
+  const simbolo = etiqueta.unidadDePresentacion?.simbolo;
+  const sufijo = !simbolo || simbolo === '-' ? '' : simbolo === '°' ? '°' : ` ${simbolo}`;
+  return `${rango[0]} a ${rango[1]}${sufijo}`;
+}
+
+/**
+ * La etiqueta visible de un campo: nombre humano, unidad de presentacion
+ * entre corchetes y el "?" que abre el popover. Nunca el camelCase del
+ * nucleo, que ahora solo aparece dentro del popover ("En el JSON").
+ */
+function etiquetaVisible(nombre: NombreDeParametro, descripcion: string, clave: string) {
+  const etiqueta = etiquetaDe(nombre);
+  const simbolo = etiqueta.unidadDePresentacion?.simbolo ?? '-';
+  const ayuda = ayudaDeCampo({
+    titulo: etiqueta.nombre,
+    // Gana la descripcion del contexto (la del elemento concreto, que para
+    // SentidoDelGiro no dice lo mismo en el dive loop que en la helice).
+    ayuda: descripcion || etiqueta.ayuda,
+    unidad: simbolo,
+    porDefecto: textoDelDefecto(nombre, etiqueta),
+    rango: textoDelRango(etiqueta),
+    modos: modosQueLoConsumen(nombre),
+    elementos: elementosQueLoConsumen(nombre),
+    clave,
+  });
+  const texto = el(
+    'span',
+    { class: 'campo-etiqueta' },
+    etiqueta.nombre,
+    simbolo !== '-' ? el('small', {}, ` [${simbolo}]`) : null,
+    ayuda.boton,
+  );
+  return { texto, ayuda, etiqueta };
+}
+
+/** Valor con que arranca un parametro anulable al destildar "vacio (derivar)": el que se venia derivando. */
+type Derivar = (nombre: NombreDeParametro) => number[] | null;
+
+function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: Actualizar, diagnostico?: Diagnostico | null, derivar?: Derivar): HTMLElement {
   const nombre = pascal(declaracion.clave);
-  const unidad = declaracion.unidad === 'rad' ? '°' : declaracion.unidad;
-  const etiqueta = el('span', { class: 'campo-etiqueta', title: declaracion.descripcion }, declaracion.clave, unidad !== '-' ? el('small', {}, ` [${unidad}]`) : null);
+  const { texto: etiqueta, ayuda } = etiquetaVisible(nombre, declaracion.descripcion, declaracion.clave);
   let control: HTMLElement;
 
-  const opciones = OPCIONES[nombre];
+  const opciones = nombre === 'ModoCurvatura' ? undefined : OPCIONES_DE_PARAMETRO[nombre];
   if (opciones) {
     const selector = el('select', { onChange: (e: Event) => actualizar(nombre, (e.target as HTMLSelectElement).value) });
     for (const opcion of opciones) {
@@ -63,14 +192,14 @@ function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: 
     const casilla = el('input', { type: 'checkbox', onChange: (e: Event) => actualizar(nombre, (e.target as HTMLInputElement).checked) });
     casilla.checked = valor;
     control = casilla;
-  } else if (ANULABLES.includes(nombre)) {
-    control = campoAnulable(nombre, declaracion, valor, actualizar);
+  } else if (PARAMETROS_ANULABLES.includes(nombre)) {
+    control = campoAnulable(nombre, valor, actualizar, derivar);
   } else if (typeof valor === 'number') {
-    control = entradaNumerica(valor, declaracion.unidad, (v) => actualizar(nombre, v));
+    control = entradaNumerica(valor, etiquetaDe(nombre), (v) => actualizar(nombre, v));
   } else if (Array.isArray(valor) && valor.length === 3 && valor.every((v) => typeof v === 'number')) {
     const vector = [...(valor as number[])];
     control = el('span', { class: 'campo-vector' }, vector.map((v, i) =>
-      entradaNumerica(v, declaracion.unidad, (nuevo) => {
+      entradaNumerica(v, etiquetaDe(nombre), (nuevo) => {
         vector[i] = nuevo;
         actualizar(nombre, [...vector]);
       }),
@@ -79,21 +208,48 @@ function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: 
     const caja = (valor as number[][]).map((fila) => [...fila]);
     control = el('span', { class: 'campo-caja' }, ['x', 'y', 'z'].map((eje, i) =>
       el('span', { class: 'campo-fila' }, `${eje}: `, ...caja[i]!.map((v, j) =>
-        entradaNumerica(v, declaracion.unidad, (nuevo) => {
+        entradaNumerica(v, etiquetaDe(nombre), (nuevo) => {
           caja[i]![j] = nuevo;
           actualizar(nombre, caja.map((f) => [...f]));
         }),
       )),
     ));
   } else if (typeof valor === 'string') {
-    control = el('input', { type: 'text', value: valor, onChange: (e: Event) => actualizar(nombre, (e.target as HTMLInputElement).value) });
+    control = el('input', {
+      type: 'text', value: valor,
+      onChange: (e: Event) => {
+        const campo = e.target as HTMLInputElement;
+        campo.defaultValue = campo.value;
+        actualizar(nombre, campo.value);
+      },
+    });
   } else {
     control = el('span', { class: 'ayuda' }, String(valor));
   }
-  return el('label', { class: 'campo' }, etiqueta, control);
+  describir(control, ayuda.id);
+  return marcarSiTieneError(el('label', { class: 'campo' }, etiqueta, control, ayuda.popover), nombre, diagnostico);
 }
 
-function campoAnulable(nombre: NombreDeParametro, declaracion: DeclaracionDeParametro, valor: unknown, actualizar: Actualizar): HTMLElement {
+/** aria-describedby del popover sobre el control (o sobre cada input, si son varios). */
+function describir(control: HTMLElement, id: string): void {
+  const controles = control.matches('input, select') ? [control] : Array.from(control.querySelectorAll('input, select'));
+  for (const c of controles) c.setAttribute('aria-describedby', id);
+}
+
+/**
+ * Si el ultimo error del nucleo nombra este parametro, se resalta el campo y
+ * el mensaje va debajo, ademas del banner: que se vea que campo hay que
+ * tocar y no solo que algo fallo.
+ */
+function marcarSiTieneError(fila: HTMLElement, nombre: NombreDeParametro, diagnostico?: Diagnostico | null): HTMLElement {
+  if (diagnostico && diagnostico.parametros.includes(nombre)) {
+    fila.classList.add('con-error');
+    fila.append(el('span', { class: 'campo-error', role: 'alert' }, diagnostico.mensaje));
+  }
+  return fila;
+}
+
+function campoAnulable(nombre: NombreDeParametro, valor: unknown, actualizar: Actualizar, derivar?: Derivar): HTMLElement {
   const vacio = valor === null || valor === undefined || (Array.isArray(valor) && valor.length === 0);
   const esVector = nombre === 'OnsetMaximoModelo';
   const contenedor = el('span', { class: 'campo-anulable' });
@@ -103,7 +259,7 @@ function campoAnulable(nombre: NombreDeParametro, declaracion: DeclaracionDePara
   const valores: number[] = vacio ? (esVector ? [0, 0, 0] : [0]) : esVector ? [...(valor as number[])] : [valor as number];
   const emitir = () => actualizar(nombre, casilla.checked ? null : esVector ? [...valores] : valores[0]);
   valores.forEach((v, i) => {
-    const entrada = entradaNumerica(v, declaracion.unidad, (nuevo) => {
+    const entrada = entradaNumerica(v, etiquetaDe(nombre), (nuevo) => {
       valores[i] = nuevo;
       emitir();
     });
@@ -111,6 +267,17 @@ function campoAnulable(nombre: NombreDeParametro, declaracion: DeclaracionDePara
     entradas.append(entrada);
   });
   casilla.addEventListener('change', () => {
+    // Al pasar de "derivar" a un valor propio se arranca del valor que se
+    // venia derivando (para el onset, sqrt(lambda) x onset normativo) y no de
+    // cero: un presupuesto de onset nulo deja al calculo minutos iterando.
+    const derivado = !casilla.checked && vacio ? derivar?.(nombre) : null;
+    if (derivado && derivado.length === valores.length) {
+      const inputs = Array.from(entradas.querySelectorAll('input'));
+      derivado.forEach((v, i) => {
+        valores[i] = v;
+        inputs[i]!.value = textoDeEntrada(v, etiquetaDe(nombre).unidadDePresentacion);
+      });
+    }
     entradas.querySelectorAll('input').forEach((i) => (i.disabled = casilla.checked));
     emitir();
   });
@@ -118,67 +285,241 @@ function campoAnulable(nombre: NombreDeParametro, declaracion: DeclaracionDePara
   return contenedor;
 }
 
-function grupo(titulo: string, lista: DeclaracionDeParametro[], parametros: Parametros, actualizar: Actualizar, abierto: boolean): HTMLElement {
+/**
+ * Las tolerancias, los topes de iteracion y los pasos de dibujo no son
+ * decisiones de diseno sino del solver, y mezclarlos con los radios es parte
+ * de por que el panel abrumaba: van a un desplegable propio, cerrado.
+ */
+function esDelSolver(declaracion: DeclaracionDeParametro): boolean {
+  return etiquetaDe(pascal(declaracion.clave)).grupo === 'solver';
+}
+const deDiseno = (lista: DeclaracionDeParametro[]) => lista.filter((d) => !esDelSolver(d));
+const deSolver = (lista: DeclaracionDeParametro[]) => lista.filter(esDelSolver);
+
+function grupo(titulo: string, lista: DeclaracionDeParametro[], parametros: Parametros, actualizar: Actualizar, abierto: boolean, diagnostico: Diagnostico | null, derivar?: Derivar): HTMLElement {
+  const conError = lista.some((d) => diagnostico?.parametros.includes(pascal(d.clave)));
   return el(
     'details',
-    { open: abierto },
-    el('summary', {}, `${titulo} (${lista.length})`),
-    el('div', { class: 'campos' }, lista.map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizar))),
+    // Un grupo cerrado que esconde el campo con error se abre solo.
+    { open: abierto || conError },
+    el('summary', {}, `${titulo} (${lista.length})`, conError ? el('span', { class: 'summary-error', title: 'Hay un campo con error en este grupo' }, ' ⚠') : null),
+    el('div', { class: 'campos' }, lista.map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizar, diagnostico, derivar))),
   );
 }
 
+/** Texto de la advertencia de un ajuste inerte: que lo pisaron y quien no lo consume (el modo o el elemento). */
+export function textoDeInerte(nombre: NombreDeParametro, modo: ModoCurvatura, tipo: InstanciaDeElemento['tipo']): string {
+  const esDelModo = MODOS_DE_CURVATURA.some((m) => ParametrosDelModo(m).Lista.some((d) => d.Nombre === nombre));
+  return esDelModo
+    ? `ajustaste ${nombre} pero el modo ${modo} no lo consume`
+    : `ajustaste ${nombre} pero el elemento ${tipo} no lo consume`;
+}
+
+/** Cambio de los ajustes de una instancia: recibe los vigentes (no los del dibujo, que pueden estar viejos) y devuelve los nuevos. */
+type Ajustar = (transformar: (ajustes: Partial<Parametros>) => Partial<Parametros>, enElLugar: boolean) => void;
+
+function sinAjuste(ajustes: Partial<Parametros>, nombre: NombreDeParametro): Partial<Parametros> {
+  const { [nombre]: _quitado, ...resto } = ajustes;
+  return resto;
+}
+
+/**
+ * La ficha de la instancia elegida: su modo de curvatura y los parametros
+ * de ese modo, y sus parametros geometricos, cada uno heredado del global o
+ * pisado por la instancia, y los inertes.
+ *
+ * El modo es por instancia desde la fase 4 (despues de la 4.10): un loop en
+ * clotoide y una helice en G normativa en el mismo circuito. El nucleo ya lo
+ * admitia (AjustarParametros aplica cualquier ajuste y calcula los inertes
+ * contra el modo YA pisado, igual que AjustarParametros.m); lo que faltaba
+ * era la interfaz. Cambiar el modo de la instancia redibuja la ficha,
+ * porque cambia que parametros consume.
+ */
+function ficha(inst: InstanciaDeElemento, orden: number, diseno: EntradaDeDiseno, ajustar: Ajustar, diagnostico: Diagnostico | null): HTMLElement {
+  // El diagnostico se aplica a la ficha solo si el calculo fallo en ESTA instancia (o no se sabe en cual).
+  const propio = diagnostico && (diagnostico.instancia === null || diagnostico.instancia === inst.id) ? diagnostico : null;
+  const globales = diseno.parametros;
+  const estados = new Map<NombreDeParametro, { fila: HTMLElement; origen: HTMLElement; volver: HTMLButtonElement }>();
+
+  const marcar = (nombre: NombreDeParametro, pisado: boolean) => {
+    const e = estados.get(nombre);
+    if (!e) return;
+    e.fila.classList.toggle('pisado', pisado);
+    e.fila.classList.toggle('heredado', !pisado);
+    e.origen.textContent = pisado ? 'pisado' : 'heredado';
+    e.origen.title = pisado ? 'Valor propio de esta instancia' : 'Valor de los parámetros globales';
+    e.volver.hidden = !pisado;
+  };
+
+  // Editar un campo lo convierte en pisado sin redibujar la ficha (no se pierde el foco).
+  const actualizar: Actualizar = (nombre, valor) => {
+    ajustar((ajustes) => ({ ...ajustes, [nombre]: valor }), true);
+    marcar(nombre, true);
+  };
+
+  const modo = modoEfectivo(globales, inst.ajustes);
+  const filaDe = (d: Declaracion) => {
+    const nombre = d.Nombre;
+    const pisado = nombre in inst.ajustes;
+    const valor = pisado ? inst.ajustes[nombre] : globales[nombre];
+    const [declaracion] = declaraciones([d]);
+    const fila = campo(declaracion!, valor, actualizar, propio);
+    const origen = el('span', { class: 'campo-origen' });
+    const volver = el('button', {
+      type: 'button', class: 'boton chico', title: 'Volver al valor global',
+      onClick: () => ajustar((ajustes) => sinAjuste(ajustes, nombre), false),
+    }, '↺');
+    fila.append(el('span', { class: 'campo-estado' }, origen, volver));
+    estados.set(nombre, { fila, origen, volver });
+    marcar(nombre, pisado);
+    return fila;
+  };
+  const campos = DECLARACIONES_DE_ELEMENTOS[inst.tipo].map(filaDe);
+
+  // --- modo de curvatura de la instancia ---
+  const modoPisado = 'ModoCurvatura' in inst.ajustes;
+  const selectorDeModo = el('select', {
+    // Cambia que parametros consume la instancia: se redibuja la ficha.
+    onChange: (e: Event) => ajustar((ajustes) => ({ ...ajustes, ModoCurvatura: (e.target as HTMLSelectElement).value as ModoCurvatura }), false),
+  });
+  for (const opcion of MODOS_DE_CURVATURA) {
+    const o = el('option', { value: opcion }, opcion === globales.ModoCurvatura ? `${opcion} (global)` : opcion);
+    if (opcion === modo) o.selected = true;
+    selectorDeModo.append(o);
+  }
+  const filaDelModo = campoDelModo(selectorDeModo, propio);
+  const origenDelModo = el('span', { class: 'campo-origen' }, modoPisado ? 'pisado' : 'heredado');
+  origenDelModo.title = modoPisado ? 'Modo propio de esta instancia' : 'Modo de los parámetros globales';
+  const volverDelModo = el('button', {
+    type: 'button', class: 'boton chico', title: 'Volver al modo global', hidden: !modoPisado,
+    onClick: () => ajustar((ajustes) => sinAjuste(ajustes, 'ModoCurvatura'), false),
+  }, '↺');
+  filaDelModo.classList.add(modoPisado ? 'pisado' : 'heredado');
+  filaDelModo.append(el('span', { class: 'campo-estado' }, origenDelModo, volverDelModo));
+  const delModo = ParametrosDelModo(modo);
+  const camposDelModo = delModo.Lista.map(filaDe);
+
+  const { Inertes } = AjustarParametros(globales, inst.ajustes, inst.tipo);
+  const advertencias = Inertes.map((nombre) =>
+    el('p', { class: 'advertencia' },
+      textoDeInerte(nombre, modo, inst.tipo),
+      ' ',
+      el('button', {
+        type: 'button', class: 'boton chico', title: `Quitar el ajuste de ${nombre}`,
+        onClick: () => ajustar((ajustes) => sinAjuste(ajustes, nombre), false),
+      }, 'quitar'),
+    ),
+  );
+
+  const cantidad = Object.keys(inst.ajustes).length;
+  return tarjeta(
+    {
+      clave: 'ficha',
+      titulo: `${orden}. ${inst.tipo}`,
+      resumen: `${modo}${modoPisado ? ' (propio)' : ''} · ${cantidad === 0 ? 'todo heredado' : `${cantidad} ajuste${cantidad === 1 ? '' : 's'}`}`,
+      clase: 'ficha',
+      accion: cantidad > 0
+        ? el('button', { type: 'button', class: 'boton chico', title: 'Quitar todos los ajustes de esta instancia', onClick: () => ajustar(() => ({}), false) }, 'Todo al global')
+        : null,
+    },
+    el('p', { class: 'ayuda' }, cantidad === 0 ? 'Hereda todos sus parámetros de los globales; editar uno lo pisa solo para esta instancia.' : `${cantidad} parámetro${cantidad === 1 ? '' : 's'} pisado${cantidad === 1 ? '' : 's'}; ↺ vuelve al global.`),
+    el('h3', { class: 'ficha-subtitulo' }, 'Modo de curvatura'),
+    el('div', { class: 'campos' }, filaDelModo, delModo.Nota ? el('p', { class: 'ayuda' }, delModo.Nota) : null, camposDelModo),
+    el('h3', { class: 'ficha-subtitulo' }, 'Geometría'),
+    el('div', { class: 'campos' }, campos),
+    advertencias,
+  );
+}
+
+/** El selector de modo, con la misma etiqueta humana y el mismo "?" que los demas campos. */
+function campoDelModo(selector: HTMLElement, diagnostico: Diagnostico | null): HTMLElement {
+  const { texto, ayuda } = etiquetaVisible('ModoCurvatura', '', 'modoCurvatura');
+  describir(selector, ayuda.id);
+  return marcarSiTieneError(el('label', { class: 'campo' }, texto, selector, ayuda.popover), 'ModoCurvatura', diagnostico);
+}
+
 export function montarParametros(contenedor: HTMLElement, estado: Estado): void {
+  // Los cambios que salen de este formulario no lo redibujan (se perderia el
+  // foco), salvo el modo de curvatura, que cambia que parametros se muestran,
+  // y los que quitan ajustes (vuelven un campo al global y cambian su valor).
+  let cambioPropio = false;
+
   const dibujar = () => {
-    const { layout, diseno } = estado.get();
+    const { diseno, instancia, diagnostico } = estado.get();
     contenedor.replaceChildren();
-    if (!layout || !diseno) return;
-    const esquema = layout.parametros.esquema;
+    if (!diseno) return;
     const parametros = diseno.parametros;
 
-    const actualizar: Actualizar = (nombre, valor) => {
+    const actualizarGlobal: Actualizar = (nombre, valor) => {
       const actual = estado.get().diseno;
       if (!actual) return;
-      // Los cambios que salen de este formulario no lo redibujan (se perderia el foco),
-      // salvo el modo de curvatura, que cambia que parametros se muestran.
       cambioPropio = nombre !== 'ModoCurvatura';
       estado.set({ diseno: { ...actual, parametros: { ...actual.parametros, [nombre]: valor } } });
       cambioPropio = false;
     };
 
+    // --- ficha de la instancia elegida ---
+    const indice = diseno.secuencia.findIndex((i) => i.id === instancia);
+    const inst = indice >= 0 ? diseno.secuencia[indice]! : null;
+    if (inst) {
+      const ajustar: Ajustar = (transformar, enElLugar) => {
+        const actual = estado.get().diseno;
+        if (!actual) return;
+        const secuencia = actual.secuencia.map((i) => (i.id === inst.id ? { ...i, ajustes: transformar(i.ajustes) } : i));
+        cambioPropio = enElLugar;
+        estado.set({ diseno: { ...actual, secuencia } });
+        cambioPropio = false;
+      };
+      contenedor.append(ficha(inst, indice + 1, diseno, ajustar, diagnostico));
+    } else {
+      contenedor.append(el('section', { class: 'tarjeta ficha vacia' }, el('p', { class: 'ayuda' }, 'Elegí un elemento de la secuencia para editar sus parámetros.')));
+    }
+
+    // --- globales ---
     const selectorDeModo = el('select', {
-      onChange: (e: Event) => actualizar('ModoCurvatura', (e.target as HTMLSelectElement).value),
+      onChange: (e: Event) => actualizarGlobal('ModoCurvatura', (e.target as HTMLSelectElement).value),
     });
-    for (const opcion of esquema.modo.opciones) {
+    for (const opcion of MODOS_DE_CURVATURA) {
       const o = el('option', { value: opcion }, opcion);
       if (opcion === parametros.ModoCurvatura) o.selected = true;
       selectorDeModo.append(o);
     }
+    const modo = ParametrosDelModo(parametros.ModoCurvatura);
+    // Lo que el nucleo deriva cuando un anulable esta vacio, con los globales VIGENTES (no los del dibujo).
+    const derivar: Derivar = (nombre) => {
+      const vigentes = estado.get().diseno?.parametros;
+      if (!vigentes || nombre !== 'OnsetMaximoModelo') return null;
+      return [...EscalasDeFroude({ ...vigentes, OnsetMaximoModelo: null }).OnsetMaximo];
+    };
+    const aceptacion = declaraciones(ParametrosDeAceptacion());
+    const generales = declaraciones(ParametrosGenerales());
 
-    const enSecuencia = new Set(diseno.secuencia);
-    contenedor.append(
-      el('div', { class: 'parametros-cabecera' },
-        el('h2', {}, 'Parámetros'),
-        el('button', { type: 'button', class: 'boton', onClick: () => restablecer(estado) }, 'Resetear a default'),
-      ),
+    contenedor.append(tarjeta(
+      {
+        clave: 'globales',
+        titulo: 'Parámetros globales',
+        resumen: `modo ${parametros.ModoCurvatura}${(() => { const propios = diseno.secuencia.filter((i) => modoEfectivo(parametros, i.ajustes) !== parametros.ModoCurvatura).length; return propios ? ` · ${propios} con modo propio` : ''; })()}`,
+        accion: el('button', { type: 'button', class: 'boton chico', title: 'Los globales vuelven a ParametrosPorDefecto(); los ajustes de las instancias se conservan', onClick: () => restablecer(estado) }, 'Resetear a default'),
+      },
       el('details', { open: true },
         el('summary', {}, 'Modo de curvatura'),
         el('div', { class: 'campos' },
-          el('label', { class: 'campo' }, el('span', { class: 'campo-etiqueta' }, 'modoCurvatura'), selectorDeModo),
-          esquema.modo.nota ? el('p', { class: 'ayuda' }, esquema.modo.nota) : null,
-          esquema.modo.parametros.map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizar)),
+          campoDelModo(selectorDeModo, diagnostico),
+          el('p', { class: 'ayuda' }, 'Es el modo de todas las instancias que no lo pisan; cada una puede elegir el suyo en su ficha.'),
+          modo.Nota ? el('p', { class: 'ayuda' }, modo.Nota) : null,
+          declaraciones(modo.Lista).map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizarGlobal, diagnostico)),
         ),
       ),
-      ...Object.entries(esquema.elementos).map(([tipo, lista]) => grupo(tipo, lista, parametros, actualizar, enSecuencia.has(tipo as never))),
-      grupo('Criterios de aceptación', esquema.aceptacion, parametros, actualizar, false),
-      grupo('Generales', esquema.generales, parametros, actualizar, false),
-    );
+      grupo('Criterios de aceptación', deDiseno(aceptacion), parametros, actualizarGlobal, false, diagnostico, derivar),
+      grupo('Generales', deDiseno(generales), parametros, actualizarGlobal, false, diagnostico, derivar),
+      grupo('Avanzado — numérico', [...deSolver(aceptacion), ...deSolver(generales)], parametros, actualizarGlobal, false, diagnostico),
+    ));
   };
-  let cambioPropio = false;
   dibujar();
   estado.suscribir((nuevo, anterior) => {
     if (cambioPropio) return;
-    // Se redibuja cuando cambia el diseno por fuera del formulario (reset, otro caso, secuencia) o el esquema.
-    if (nuevo.diseno !== anterior.diseno || nuevo.layout?.parametros.esquema !== anterior.layout?.parametros.esquema) dibujar();
+    // Se redibuja cuando cambia el diseno por fuera del formulario (reset, otro caso, secuencia), la instancia elegida o el diagnostico.
+    if (nuevo.diseno !== anterior.diseno || nuevo.instancia !== anterior.instancia || nuevo.diagnostico !== anterior.diagnostico) dibujar();
   });
 }
 
@@ -186,17 +527,4 @@ function restablecer(estado: Estado): void {
   const actual = estado.get().diseno;
   if (!actual) return;
   estado.set({ diseno: { ...actual, parametros: ParametrosPorDefecto() } });
-}
-
-/** Un diseno inicial a partir del layout cargado: sus parametros, su estado inicial y su secuencia. */
-export function disenoDesdeLayout(layout: Layout, parametros: Parametros): EntradaDeDiseno {
-  const e = layout.estadoInicial;
-  return {
-    parametros,
-    posicion: [...e.posicion],
-    tangente: [...e.versorTangente],
-    arriba: [...e.versorArribaCarro],
-    velocidad: e.velocidad,
-    secuencia: layout.elementos.map((el) => el.tipo),
-  };
 }

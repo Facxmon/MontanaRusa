@@ -235,9 +235,30 @@ export const DECLARACIONES_DE_ELEMENTOS: Record<NombreDeElemento, Declaracion[]>
 export const CATALOGO_DE_ELEMENTOS: NombreDeElemento[] = ['LoopVertical', 'DiveLoop', 'Helice', 'OverBankedTurn'];
 
 /**
+ * Enumeraciones que la declaracion (unidad '-') no distingue de un texto
+ * libre: las validan la serializacion y el formulario. ModoCurvatura es
+ * MODOS_DE_CURVATURA.
+ */
+export const OPCIONES_DE_PARAMETRO: Partial<Record<NombreDeParametro, readonly string[]>> = {
+  ModoCurvatura: MODOS_DE_CURVATURA,
+  SentidoDelGiro: ['Derecha', 'Izquierda'],
+  PuntoDeVerificacionNormativa: ['Heartline', 'Cabeza'],
+  MetodoDeAcoplamiento: ['A', 'B', 'Ambos'],
+};
+
+/** Los que en MATLAB admiten [] (vacio = derivar): aca valen null, y el contrato los escribe como []. */
+export const PARAMETROS_ANULABLES: readonly NombreDeParametro[] = ['OnsetMaximoModelo', 'InclinacionHelicoidalImpuesta'];
+
+/**
  * AjustarParametros.m: sobrescribe y devuelve los nombres inertes (los que
  * ni el modo ni el elemento elegidos consumen) para avisar. Un campo que no
  * existe es un error.
+ *
+ * SeparacionDePatas es un caso a tener presente: ParametrosPorDefecto() lo
+ * deriva de la envolvente del carro, pero ElementoLoopVertical lo declara
+ * como parametro propio. Aca no recibe trato especial y eso es lo correcto:
+ * si viene en Ajustes gana el ajuste (se sobrescribe como cualquier campo);
+ * si no viene, queda el derivado que traen los Parametros de entrada.
  */
 export function AjustarParametros(
   Parametros: Parametros,

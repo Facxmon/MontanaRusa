@@ -168,6 +168,16 @@
           "type": "object",
           "additionalProperties": true
         },
+        "ajustes": {
+          "description": "Opcional (desde 1.1.0). Los parámetros que esta instancia pisó sobre parametros.valores, en SI y camelCase, con las mismas claves que parametros.defaults. Ausente = sin ajustes. MATLAB construye con parámetros globales y no lo emite; eso es válido.",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "inertes": {
+          "description": "Opcional (desde 1.1.0). Claves de `ajustes` que ni el modo de curvatura ni el tipo de este elemento consumen (AjustarParametros.m): se aplicaron pero no tuvieron efecto. Ausente = ninguno.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "nodos": { "$ref": "#/$defs/nodos" },
         "subtramos": { "type": "array", "items": { "$ref": "#/$defs/subtramo" } },
         "resumen": { "$ref": "#/$defs/resumenElemento" },

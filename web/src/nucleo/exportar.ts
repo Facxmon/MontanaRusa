@@ -7,16 +7,28 @@
 import type * as Contrato from '../contrato/tipos';
 import type { Vec3 } from './matematica';
 import { CATALOGO_DE_ELEMENTOS, DECLARACIONES_DE_ELEMENTOS, ParametrosDeAceptacion, ParametrosDelModo, ParametrosGenerales, ParametrosPorDefecto } from './parametros';
-import type { Criterio, Declaracion, Estado, Layout, Parametros, RegistroDeLayout } from './tipos';
+import type { Criterio, Declaracion, Estado, Layout, NombreDeParametro, Parametros, RegistroDeLayout } from './tipos';
+
+/** Lo que una instancia de elemento piso sobre los globales y que de eso no consumio (AjustarParametros). */
+export interface InstanciaExportada {
+  ajustes: Partial<Parametros>;
+  inertes: NombreDeParametro[];
+}
 
 export interface OpcionesDeExportacion {
   /** Texto para meta.versionGenerador (hash del build, p. ej.). */
   versionGenerador?: string;
   /** Redondear a 6 cifras significativas como el exportador de MATLAB. */
   redondear?: boolean;
+  /**
+   * Ajustes e inertes de cada instancia, en el orden de Layout.Elementos.
+   * Solo JS los conoce: MATLAB construye con parametros globales y no los emite.
+   */
+  instancias?: InstanciaExportada[];
 }
 
-const VERSION_DEL_CONTRATO = '1.0.0';
+// 1.1.0: elementos[].ajustes e inertes, opcionales (solo los emite JS; MATLAB sigue en 1.0.0).
+const VERSION_DEL_CONTRATO = '1.1.0';
 
 function camel(Nombre: string): string {
   return Nombre[0]!.toLowerCase() + Nombre.slice(1);
@@ -60,7 +72,7 @@ function tripletes(valores: Vec3[]): Contrato.ArrayDeVectores3 {
   return valores.map((v) => [v[0], v[1], v[2]] as Contrato.Vector3);
 }
 
-function elementoAJson(R: RegistroDeLayout, indice: number): Contrato.Elemento {
+function elementoAJson(R: RegistroDeLayout, indice: number, instancia?: InstanciaExportada): Contrato.Elemento {
   const E = R.Elemento;
   const T = E.Track;
   const S = E.Sim;
@@ -112,10 +124,18 @@ function elementoAJson(R: RegistroDeLayout, indice: number): Contrato.Elemento {
       detalle: c.Detalle,
     }));
 
+  // Solo cuando la instancia piso algo: sin ajustes, el objeto es el mismo que emite MATLAB.
+  const ajustes: Partial<Contrato.Elemento> = {};
+  if (instancia && Object.keys(instancia.ajustes).length > 0) {
+    ajustes.ajustes = aCamelCase(instancia.ajustes) as Record<string, unknown>;
+    if (instancia.inertes.length > 0) ajustes.inertes = instancia.inertes.map(camel);
+  }
+
   return {
     indice,
     tipo: E.Receta.Nombre,
     parametrosUsados,
+    ...ajustes,
     nodos,
     subtramos: T.SubTramos.map((s) => ({ nombre: s.Nombre, indiceInicio: s.IndiceInicio, indiceFin: s.IndiceFin })),
     resumen: aCamelCase(R.Reporte.Resumen) as Contrato.ResumenElemento,
@@ -200,7 +220,7 @@ export function exportarLayout(L: Layout, opciones: OpcionesDeExportacion = {}):
       defaults: aCamelCase(ParametrosPorDefecto()) as Record<string, unknown>,
     },
     estadoInicial: estadoAJson(L.EstadoInicial),
-    elementos: L.Elementos.map(elementoAJson) as Contrato.Layout['elementos'],
+    elementos: L.Elementos.map((R, i) => elementoAJson(R, i, opciones.instancias?.[i])) as Contrato.Layout['elementos'],
     resumenLayout: resumenLayoutAJson(L),
   };
   return opciones.redondear ? (redondearTodo(documento) as Contrato.Layout) : documento;

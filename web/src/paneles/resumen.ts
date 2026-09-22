@@ -3,9 +3,12 @@
 // contrato; formatear() pasa los radianes a grados.
 
 import type { Layout, ResumenElemento, ResumenLayout } from '../contrato/tipos';
-import type { Estado } from '../estado';
-import { el, fila, vaciar } from './dom';
-import { formatear, formatearNumero } from './formato';
+import { esRecalculo, type Estado } from '../estado';
+import { destellarCambios, el, fila, tarjeta, vaciar, valoresPorClave } from './dom';
+import { decimalesDeUnidad, formatear, formatearNumero } from './formato';
+import { textoDeInerte } from './parametros';
+import { elementosConModoPropio, modoDelElemento } from '../contrato/modo';
+import type { NombreDeParametro } from '../nucleo/tipos';
 
 function tablaDelLayout(resumen: ResumenLayout, layout: Layout): HTMLElement {
   const filas = [
@@ -26,8 +29,9 @@ function tablaDelLayout(resumen: ResumenLayout, layout: Layout): HTMLElement {
   return el('table', { class: 'tabla' }, el('tbody', {}, filas));
 }
 
-function tablaDelElemento(resumen: ResumenElemento): HTMLElement {
+function tablaDelElemento(resumen: ResumenElemento, modo: string): HTMLElement {
   const filas = [
+    fila('Modo de curvatura', modo),
     fila('Método', resumen.metodo ?? '—'),
     fila('Longitud recorrida', formatear(resumen.longitudRecorrida, 'm')),
     fila('Altura sobre la entrada', formatear(resumen.alturaMaxima, 'm')),
@@ -59,51 +63,73 @@ function tablaDelElemento(resumen: ResumenElemento): HTMLElement {
 function formatearSalto(valor: number | null | undefined, unidad: string): string {
   if (valor === null || valor === undefined) return '—';
   if (valor === 0) return unidad === '-' ? '0' : `0 ${unidad}`;
-  const texto = Math.abs(valor) < 1e-4 ? valor.toExponential(2) : formatearNumero(valor);
+  const texto = Math.abs(valor) < 1e-4 ? valor.toExponential(2) : formatearNumero(valor, decimalesDeUnidad(unidad));
   if (unidad === 'rad') return `${texto} rad`;
   return unidad === '-' ? texto : `${texto} ${unidad}`;
 }
 
 export function montarResumenLayout(contenedor: HTMLElement, estado: Estado): void {
-  const dibujar = () => {
+  const dibujar = (destellar = false) => {
+    const antes = destellar ? valoresPorClave(contenedor) : null;
     const { layout, caso } = estado.get();
     vaciar(contenedor);
     if (!layout) return;
-    contenedor.append(
-      el('h2', {}, 'Layout'),
+    const r = layout.resumenLayout;
+    contenedor.append(tarjeta(
+      {
+        clave: 'layout',
+        titulo: 'Layout',
+        resumen: `${r.numeroDeElementos} elementos · ${formatear(r.longitudTotal, 'm')} · ${formatear(r.tiempoTotal, 's')}`,
+      },
       el(
         'p',
         { class: 'ayuda' },
-        `${caso ?? ''} · modo ${layout.parametros.valores.modoCurvatura} · método ${layout.parametros.valores.metodoDeAcoplamiento} · generado ${layout.meta.generadoEn ?? '?'} (${layout.meta.versionGenerador ?? '?'})`,
+        `${caso ?? ''} · modo ${layout.parametros.valores.modoCurvatura}${elementosConModoPropio(layout) ? ` (global; ${elementosConModoPropio(layout)} con modo propio)` : ''} · método ${layout.parametros.valores.metodoDeAcoplamiento} · generado ${layout.meta.generadoEn ?? '?'} (${layout.meta.versionGenerador ?? '?'})`,
       ),
-      tablaDelLayout(layout.resumenLayout, layout),
-    );
+      tablaDelLayout(r, layout),
+    ));
+    if (antes) destellarCambios(contenedor, antes);
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {
-    if (nuevo.layout !== anterior.layout) dibujar();
+    if (nuevo.layout !== anterior.layout) dibujar(esRecalculo(nuevo, anterior));
   });
 }
 
 export function montarResumenElemento(contenedor: HTMLElement, estado: Estado): void {
-  const dibujar = () => {
+  const dibujar = (destellar = false) => {
+    const antes = destellar ? valoresPorClave(contenedor) : null;
     const { layout, elemento } = estado.get();
     vaciar(contenedor);
     if (!layout || elemento === null) return;
     const e = layout.elementos[elemento];
     if (!e) return;
-    contenedor.append(
-      el('h2', {}, `Elemento ${elemento + 1}: ${e.tipo}`),
+    contenedor.append(tarjeta(
+      {
+        clave: 'elemento',
+        titulo: `Elemento ${elemento + 1}: ${e.tipo}`,
+        resumen: `Gz ${formatear(e.resumen.gzMaxima, 'G')} / ${formatear(e.resumen.gzMinima, 'G')} · |Gy| ${formatear(e.resumen.gyMaximaAbsoluta, 'G')}`,
+      },
       el(
         'p',
         { class: 'ayuda' },
         `${e.nodos.numeroDeNodos} nodos · ${e.subtramos.map((s) => `${s.nombre} ${s.indiceInicio}–${s.indiceFin}`).join(' · ')}`,
       ),
-      tablaDelElemento(e.resumen),
-    );
+      tablaDelElemento(e.resumen, modoDelElemento(layout, elemento)),
+      // Los inertes viajan en el layout desde la fase 1: ajustes que se
+      // aplicaron y que ni el modo ni el tipo de este elemento consumen.
+      ...(e.inertes ?? []).map((nombre) =>
+        el(
+          'p',
+          { class: 'advertencia' },
+          textoDeInerte((nombre[0]!.toUpperCase() + nombre.slice(1)) as NombreDeParametro, modoDelElemento(layout, elemento), e.tipo as never),
+        ),
+      ),
+    ));
+    if (antes) destellarCambios(contenedor, antes);
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {
-    if (nuevo.layout !== anterior.layout || nuevo.elemento !== anterior.elemento) dibujar();
+    if (nuevo.layout !== anterior.layout || nuevo.elemento !== anterior.elemento) dibujar(nuevo.elemento === anterior.elemento && esRecalculo(nuevo, anterior));
   });
 }

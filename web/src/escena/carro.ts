@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import type { Layout } from '../contrato/tipos';
+import { tema } from '../tema';
 
 export interface PosicionDelCarro {
   /** Tiempo global (acumulado sobre los elementos), s. */
@@ -47,6 +48,12 @@ export class Carro {
     this.grupo.visible = false;
   }
 
+  /** Libera las geometrias y saca el grupo de la escena. */
+  destruir(): void {
+    this.vaciar();
+    this.grupo.removeFromParent();
+  }
+
   get duracion(): number {
     return this.tabla ? this.tabla.tiempo[this.tabla.cantidad - 1]! : 0;
   }
@@ -62,10 +69,18 @@ export class Carro {
     // La caja se apoya sobre el riel: su centro queda alto/2 por encima, sobre U.
     const geometria = new THREE.BoxGeometry(largo, ancho, alto);
     geometria.translate(0, 0, alto / 2);
-    this.caja = new THREE.Mesh(geometria, new THREE.MeshStandardMaterial({ color: 0xffb454, roughness: 0.5, metalness: 0.1 }));
+    const t = tema();
+    this.caja = new THREE.Mesh(
+      geometria,
+      new THREE.MeshStandardMaterial({ color: new THREE.Color(t.escenaCarro), roughness: 0.5, metalness: 0.1 }),
+    );
     this.pasajero = new THREE.Mesh(
       new THREE.SphereGeometry(Math.max(d * 0.35, 0.006), 16, 12),
-      new THREE.MeshStandardMaterial({ color: 0xff5c5c, emissive: 0x551111, roughness: 0.4 }),
+      new THREE.MeshStandardMaterial({
+        color: new THREE.Color(t.escenaPasajero),
+        emissive: new THREE.Color(t.escenaPasajeroBrillo),
+        roughness: 0.4,
+      }),
     );
     this.pasajero.position.set(0, 0, d);
     this.caja.add(this.pasajero);
@@ -111,6 +126,20 @@ export class Carro {
       gy: valor(tabla.gy),
       posicion,
     };
+  }
+
+  /**
+   * Instante en el que el carro pasa por un nodo (elemento + nodo local), o
+   * null si ese nodo no esta en la tabla (despues de un punto de parada). Es
+   * lo que convierte un clic en un grafico en una posicion del reproductor.
+   */
+  tiempoDelNodo(elemento: number, nodoLocal: number): number | null {
+    const tabla = this.tabla;
+    if (!tabla) return null;
+    for (let k = 0; k < tabla.cantidad; k++) {
+      if (tabla.elemento[k] === elemento && tabla.nodoLocal[k] === nodoLocal) return tabla.tiempo[k]!;
+    }
+    return null;
   }
 
   mostrar(visible: boolean): void {

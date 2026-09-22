@@ -338,6 +338,8 @@ exportador calcula, y son estas:
 | `elementos[].tipo` | `Receta.Nombre` | texto | `'LoopVertical'`, `'Helice'`, `'OverBankedTurn'`, `'DiveLoop'` |
 | `elementos[].indice` | posición en `Layout.Elementos` | índice base 0 | — |
 | `elementos[].parametrosUsados` | `Elemento.Parametros.(Nombre)` para cada `Nombre` que declara `ElementoXxx()` | según parámetro | solo los geométricos del elemento |
+| `elementos[].ajustes` | `Ajustes` de `AjustarParametros(Parametros, Ajustes, Elegido)` (solo JS, contrato 1.1.0) | según parámetro | opcional; lo que esa instancia pisó sobre `parametros.valores`; MATLAB no lo emite |
+| `elementos[].inertes` | los nombres que `AjustarParametros` avisa como `ParametroInerte` (solo JS, contrato 1.1.0) | — | opcional; claves de `ajustes` que ni el modo ni el elemento consumen |
 | `parametros.esquema.*[].clave` | `Nombre` de `ParametrosDelModo`, `ElementoXxx()`, `ParametrosDeAceptacion`, `ParametrosGenerales` | — | en camelCase, apunta a `parametros.valores` |
 | `criterios.todosPasan` | `all([Previos.Pasa]) && all([Posteriores.Pasa])` | lógico | lo calcula el exportador |
 | `resumenLayout.alturaMaxima/alturaMinima` | `max/min(Layout.PuntosRiel(:,3))` | m | z del riel, absoluto |

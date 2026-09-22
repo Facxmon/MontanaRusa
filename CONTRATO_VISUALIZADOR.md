@@ -174,6 +174,13 @@ respectivos parámetros"* y *"resetear a default con nuestros datos"* sin manten
 **Regla de compatibilidad:** el consumidor compara solo el MAJOR de `versionContrato`. Distinto MAJOR
 → se niega a cargar con un mensaje claro. Igual MAJOR, MINOR mayor → carga e ignora lo que no conoce.
 
+**Historial.** `1.0.0` es el contrato original que emite MATLAB (`LayoutAJson.m`). **`1.1.0`**
+(2026-09-20) agrega a cada elemento los campos **opcionales** `ajustes` e `inertes` (§6); como su
+ausencia significa "sin ajustes", es un cambio MINOR: `web/src/contrato/cargar.ts` sigue rechazando solo
+MAJOR ≠ 1 y los golden de `1.0.0`, que no los traen, cargan igual. Solo el núcleo en JS emite `1.1.0`;
+**MATLAB sigue emitiendo `1.0.0` sin esos campos y eso es válido**: MATLAB construye con parámetros
+globales y no tiene nada que poner ahí (§8, "MATLAB es la referencia normativa").
+
 ---
 
 ## 4. `parametros`
@@ -272,6 +279,8 @@ consumidor lo descarta al concatenar, igual que hace `LayoutAgregarElemento.m` c
   "indice": 0,
   "tipo":   "LoopVertical",           // Receta.Nombre
   "parametrosUsados": { "radioDelLoop": 0.30, "rollExtraDelLoop": 0, "separacionDePatas": 0.08 },
+  "ajustes":  { "radioDelLoop": 0.30 }, // opcional (1.1.0): lo que esta instancia pisó sobre parametros.valores, en SI
+  "inertes":  [],                       // opcional (1.1.0): claves de ajustes que ni el modo ni el tipo consumen
 
   "nodos":     { ... },   // §6.1
   "subtramos": [ ... ],   // §6.2
@@ -280,6 +289,28 @@ consumidor lo descarta al concatenar, igual que hace `LayoutAgregarElemento.m` c
   "estadoSalida": { ... } // misma forma que estadoInicial
 }
 ```
+
+**`ajustes` e `inertes` (opcionales, desde 1.1.0).** El núcleo en JS admite que cada instancia de
+elemento pise algunos parámetros sobre los globales de `parametros.valores` (dos hélices con radios
+distintos en la misma secuencia). `ajustes` trae exactamente esos pares clave/valor, en SI y camelCase,
+con las mismas claves que `parametros.defaults`; `parametrosUsados` sigue mostrando lo que el elemento
+efectivamente consumió (globales ya pisados). `inertes` lista las claves de `ajustes` que ni el modo de
+curvatura ni el tipo del elemento consumen (lo que `AjustarParametros.m` avisa con un warning): se
+aplicaron pero no tuvieron efecto. Un elemento sin `ajustes` se construyó con los globales tal cual.
+**MATLAB no emite ninguno de los dos y eso es válido** (§3, historial): el consumidor los trata como
+ausentes y no depende de ellos para dibujar.
+
+**El modo de curvatura de cada elemento.** `modoCurvatura` es una clave de `parametros.defaults` como
+cualquier otra, así que una instancia puede pisarlo en sus `ajustes` (la web lo permite desde su fase 4).
+El modo con que se construyó un elemento es entonces
+
+    ajustes.modoCurvatura ?? parametros.valores.modoCurvatura
+
+`parametros.valores.modoCurvatura` y `esquema.modo` describen el modo **global**, que es el de todos los
+elementos que no lo pisan; un consumidor que muestre el modo de un elemento tiene que aplicar esa regla.
+No hace falta un campo nuevo (ni un cambio de versión): el dato ya viaja en `ajustes`, que es opcional
+desde 1.1.0, y los `inertes` de esa instancia se evalúan contra el modo ya pisado, igual que en
+`AjustarParametros.m`.
 
 ### 6.1 `nodos` — arrays columnares de igual largo
 
@@ -468,6 +499,14 @@ referencia de lo que se esperaba; lo que efectivamente se usa es 6e-6 relativo +
 los golden tienen 6 cifras y no se puede exigir más que eso. Las "trampas conocidas" de más abajo se
 confirmaron todas menos una: `fzero` no aparece en el repo (la bisección de `VelocidadInicialMinima`
 es a mano), así que no hubo que portear un Brent.
+
+**MATLAB es la referencia normativa; JS es un superconjunto (decidido 2026-09-20).** El núcleo en
+TypeScript admite ajustes de parámetros **por instancia** de elemento (dos hélices con radios distintos
+en la misma secuencia; §6, campos `ajustes` e `inertes`), cosa que MATLAB, con sus `Parametros`
+globales, no hace. La regla es que con `ajustes` vacíos en todas las instancias el resultado tiene que
+ser **idéntico** al de MATLAB: los golden se siguen generando con MATLAB, `golden-port.test.ts` no se
+toca, y un cambio en JS que los rompa está mal por definición. MATLAB no cambia y sigue siendo la
+memoria de cálculo para el caso de parámetros globales, que es al que JS se reduce exactamente.
 
 **Tolerancias por campo, no global.** El orden de acumulación en punto flotante difiere entre MATLAB
 y JS, así que un `assert` de igualdad exacta va a fallar por razones que no son físicas. Punto de

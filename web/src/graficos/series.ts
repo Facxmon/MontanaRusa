@@ -9,7 +9,7 @@
 // la norma. Las bandas de G se evaluan siempre con el tiempo del modelo,
 // que es lo que fija la duracion de los eventos.
 
-import type { ClaveDeMagnitud } from '../contrato/magnitudes';
+import { magnitudPorClave, type ClaveDeMagnitud } from '../contrato/magnitudes';
 import type { Elemento, Layout } from '../contrato/tipos';
 import { limiteNormativo, limitePorPunto, type CurvaNormativa } from '../nucleo/norma';
 import type { BandaEntreSeries, DatosDeFigura, Franja, SerieDeFigura } from './figura';
@@ -23,6 +23,19 @@ export const ETIQUETA_DE_EJE: Record<EjeX, string> = {
   tiempoPrototipo: 'Tiempo del prototipo [s]',
 };
 
+/** Decimales del valor de x en la leyenda: los de arco y tiempo del contrato. */
+export const DECIMALES_DE_EJE: Record<EjeX, number> = {
+  arco: magnitudPorClave('arco').decimales,
+  tiempo: magnitudPorClave('tiempo').decimales,
+  tiempoPrototipo: magnitudPorClave('tiempo').decimales,
+};
+
+/** Decimales y notacion de la leyenda, tomados de la magnitud que grafica la figura. */
+function formatoDe(clave: ClaveDeMagnitud): Pick<DatosDeFigura, 'decimales' | 'notacion'> {
+  const m = magnitudPorClave(clave);
+  return { decimales: m.decimales, notacion: m.notacion };
+}
+
 export const PESTANAS: { clave: Pestana; etiqueta: string }[] = [
   { clave: 'g', etiqueta: 'G' },
   { clave: 'jerk', etiqueta: 'Jerk' },
@@ -31,11 +44,12 @@ export const PESTANAS: { clave: Pestana; etiqueta: string }[] = [
   { clave: 'curvatura', etiqueta: 'Curvatura' },
 ];
 
-// Paleta validada (dataviz, modo oscuro): series 1-3 y colores de estado.
-const SERIE = ['#3987e5', '#d95926', '#199e70'] as const;
-const LIMITE = '#d03b3b';
-const ADMISIBLE_TRAZO = 'rgba(12, 163, 12, 0.55)';
-const ADMISIBLE_RELLENO = 'rgba(12, 163, 12, 0.10)';
+// Colores simbolicos (figura.ts los resuelve con el tema): series 1-3 y estados.
+const SERIE = ['serie1', 'serie2', 'serie3'] as const;
+const LIMITE = 'limite';
+const ADMISIBLE_TRAZO = 'admisibleTrazo';
+const ADMISIBLE_RELLENO = 'admisibleRelleno';
+const COLOR_CERO = 'cero';
 const NIVELES_PARA_GRAFICAR = 400;
 const RAD_A_GRADOS = 180 / Math.PI;
 
@@ -60,6 +74,60 @@ export interface Columnas {
   franjas: Record<EjeX, Franja[]>;
   onsetNormativo: [number, number, number];
   radioMinimoFabricable: number | null;
+  /**
+   * Indice de nodo GLOBAL de cada columna: el mismo que usa la via 3D
+   * (geometriaDeVia.aplanarNodos), o sea todo el layout sin los nodos
+   * repetidos de los empalmes. Es el estado que comparten los graficos, el
+   * 3D y el reproductor.
+   */
+  nodos: Int32Array;
+}
+
+/** Primer nodo global de cada elemento; espejo de aplanarNodos (contrato, seccion 6). */
+export function iniciosDeElemento(layout: Layout): number[] {
+  const inicios: number[] = [];
+  let acumulado = 0;
+  layout.elementos.forEach((elemento, i) => {
+    inicios.push(acumulado);
+    acumulado += elemento.nodos.numeroDeNodos - (i > 0 ? 1 : 0);
+  });
+  return inicios;
+}
+
+/** Nodo global de un nodo local. El nodo 0 de un elemento es el ultimo del anterior. */
+export function nodoGlobalDe(layout: Layout, elemento: number, nodoLocal: number): number {
+  return iniciosDeElemento(layout)[elemento]! + nodoLocal - (elemento > 0 ? 1 : 0);
+}
+
+/** A que elemento, nodo local y subtramo corresponde un nodo global. */
+export function ubicacionDeNodo(layout: Layout, nodoGlobal: number): { elemento: number; nodoLocal: number; subtramo: string | null } | null {
+  const inicios = iniciosDeElemento(layout);
+  for (let i = layout.elementos.length - 1; i >= 0; i--) {
+    if (nodoGlobal < inicios[i]!) continue;
+    const nodoLocal = nodoGlobal - inicios[i]! + (i > 0 ? 1 : 0);
+    const elemento = layout.elementos[i]!;
+    if (nodoLocal >= elemento.nodos.numeroDeNodos) return null;
+    const sub = elemento.subtramos.find((t) => nodoLocal >= t.indiceInicio && nodoLocal <= t.indiceFin);
+    return { elemento: i, nodoLocal, subtramo: sub?.nombre ?? null };
+  }
+  return null;
+}
+
+/**
+ * Indice dentro de una lista CRECIENTE de nodos globales (columnas.nodos, o
+ * el `nodos` ya filtrado de una figura), o null si ese nodo no esta. Binaria
+ * porque se llama en cada movimiento del cursor y por figura.
+ */
+export function indiceDeNodo(nodos: ArrayLike<number>, nodoGlobal: number): number | null {
+  let bajo = 0;
+  let alto = nodos.length - 1;
+  while (bajo <= alto) {
+    const medio = (bajo + alto) >> 1;
+    if (nodos[medio]! === nodoGlobal) return medio;
+    if (nodos[medio]! < nodoGlobal) bajo = medio + 1;
+    else alto = medio - 1;
+  }
+  return null;
 }
 
 function numero(v: number | null | undefined): number | null {
@@ -100,16 +168,20 @@ export function extraerColumnas(layout: Layout, elementoElegido: number | null):
   const arco: (number | null)[] = [];
   const tiempo: (number | null)[] = [];
   const tiempoPrototipo: (number | null)[] = [];
+  const nodos: number[] = [];
+  const inicios = iniciosDeElemento(layout);
   const franjas: Record<EjeX, Franja[]> = { arco: [], tiempo: [], tiempoPrototipo: [] };
 
   for (const tramo of tramos) {
     const n = tramo.elemento.nodos;
     const inicioGlobal = arco.length;
+    const desplazamiento = inicios[tramo.indice]! - (tramo.indice > 0 ? 1 : 0);
     for (let i = tramo.desde; i < n.numeroDeNodos; i++) {
       const t = numero(n.tiempo[i]);
       arco.push(numero(n.arco[i]));
       tiempo.push(t === null ? null : t + tramo.desfaseTiempo);
       tiempoPrototipo.push(t === null ? null : t * tramo.factorTiempo + tramo.desfaseTiempoPrototipo);
+      nodos.push(desplazamiento + i);
     }
     const finGlobal = arco.length - 1;
     const enX = (eje: EjeX, local: number): number | null => {
@@ -139,6 +211,7 @@ export function extraerColumnas(layout: Layout, elementoElegido: number | null):
     franjas,
     onsetNormativo: tripleta(layout.parametros.valores.onsetNormativoPorEje, [NaN, NaN, NaN]),
     radioMinimoFabricable: numero(layout.parametros.valores.radioMinimoFabricable as number | undefined),
+    nodos: Int32Array.from(nodos),
   };
 }
 
@@ -213,10 +286,13 @@ function figuraDeG(
   );
   const bandas: BandaEntreSeries[] = [{ superior: inicio, inferior: inicio + 1, color: ADMISIBLE_RELLENO }];
   return {
+    clave,
     titulo,
     etiquetaX: ETIQUETA_DE_EJE[ejeX],
     etiquetaY: `${nombre} [G]`,
     x: columnas.x[ejeX] as number[],
+    decimalesX: DECIMALES_DE_EJE[ejeX],
+    ...formatoDe(clave),
     series,
     franjas: columnas.franjas[ejeX],
     bandas,
@@ -249,10 +325,13 @@ export function figurasDeJerk(columnas: Columnas, ejeX: EjeX): DatosDeFigura[] {
       ? `Jerk de ${nombre} del prototipo — límite de la norma`
       : `Jerk de ${nombre} del modelo — presupuesto √λ × norma`;
     return {
+      clave,
       titulo,
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: `d${nombre}/dt [G/s]`,
       x: columnas.x[ejeX] as number[],
+      decimalesX: DECIMALES_DE_EJE[ejeX],
+      ...formatoDe(clave),
       series: [
         { etiqueta: `Jerk de ${nombre}`, valores, color: SERIE[0], ancho: 1.6 },
         { etiqueta: 'Presupuesto de onset', valores: presupuesto, color: LIMITE, ancho: 1.2, trazos: [6, 4] },
@@ -267,10 +346,13 @@ export function figurasDeCinematica(columnas: Columnas, ejeX: EjeX): DatosDeFigu
   const x = columnas.x[ejeX] as number[];
   return [
     {
+      clave: 'velocidad',
       titulo: 'Velocidad',
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: 'v [m/s]',
       x,
+      decimalesX: DECIMALES_DE_EJE[ejeX],
+      ...formatoDe('velocidad'),
       series: [
         { etiqueta: 'Centro de masa (heartline)', valores: columna(columnas, 'velocidad'), color: SERIE[0], ancho: 1.8 },
         { etiqueta: 'Punto del riel', valores: columna(columnas, 'velocidadRiel'), color: SERIE[1], ancho: 1, trazos: [4, 3] },
@@ -278,10 +360,13 @@ export function figurasDeCinematica(columnas: Columnas, ejeX: EjeX): DatosDeFigu
       franjas: columnas.franjas[ejeX],
     },
     {
+      clave: 'aceleracion',
       titulo: 'Aceleración tangencial del centro de masa',
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: 'a_t [m/s²]',
       x,
+      decimalesX: DECIMALES_DE_EJE[ejeX],
+      ...formatoDe('aceleracionTangencial'),
       series: [
         { etiqueta: 'Aceleración tangencial', valores: columna(columnas, 'aceleracionTangencial'), color: SERIE[0], ancho: 1.6 },
         { etiqueta: 'cero', valores: constante(0, columnas.cantidad), color: COLOR_CERO, ancho: 1, trazos: [2, 4], ocultarEnLeyenda: true },
@@ -289,25 +374,30 @@ export function figurasDeCinematica(columnas: Columnas, ejeX: EjeX): DatosDeFigu
       franjas: columnas.franjas[ejeX],
     },
     {
+      clave: 'energia',
       titulo: 'Energía mecánica total del centro de masa',
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: 'E [J]',
       x,
+      decimalesX: DECIMALES_DE_EJE[ejeX],
+      ...formatoDe('energiaTotal'),
       series: [{ etiqueta: 'Energía total', valores: columna(columnas, 'energiaTotal'), color: SERIE[0], ancho: 1.6 }],
       franjas: columnas.franjas[ejeX],
     },
   ];
 }
 
-const COLOR_CERO = 'rgba(154, 163, 178, 0.6)';
 
 export function figurasDeRoll(columnas: Columnas, ejeX: EjeX): DatosDeFigura[] {
   return [
     {
+      clave: 'roll',
       titulo: 'Roll contra el marco de transporte y |peralte| contra la vertical',
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: 'ángulo [°]',
       x: columnas.x[ejeX] as number[],
+      decimalesX: DECIMALES_DE_EJE[ejeX],
+      ...formatoDe('anguloRoll'),
       series: [
         { etiqueta: 'φ: roll contra el marco de transporte', valores: columna(columnas, 'anguloRoll', RAD_A_GRADOS), color: SERIE[0], ancho: 1.8 },
         {
@@ -326,10 +416,13 @@ export function figurasDeCurvatura(columnas: Columnas, ejeX: EjeX): DatosDeFigur
   const limite = columnas.radioMinimoFabricable && columnas.radioMinimoFabricable > 0 ? 1 / columnas.radioMinimoFabricable : NaN;
   return [
     {
+      clave: 'curvatura',
       titulo: 'Curvatura del riel y de la heartline — el riel es el que limita la impresora',
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: 'κ [1/m]',
       x: columnas.x[ejeX] as number[],
+      decimalesX: DECIMALES_DE_EJE[ejeX],
+      ...formatoDe('curvaturaRiel'),
       series: [
         { etiqueta: 'Riel (curvatura impuesta)', valores: columna(columnas, 'curvaturaRiel'), color: SERIE[0], ancho: 1.8 },
         { etiqueta: 'Heartline (derivada)', valores: columna(columnas, 'curvatura'), color: SERIE[1], ancho: 1.4 },
@@ -353,6 +446,7 @@ export function sinHuecosEnX(figura: DatosDeFigura): DatosDeFigura {
   return {
     ...figura,
     x: conservar.map((i) => figura.x[i]!),
+    nodos: figura.nodos ? conservar.map((i) => figura.nodos![i]!) : undefined,
     series: figura.series.map((s) => ({ ...s, valores: conservar.map((i) => s.valores[i] ?? null) })),
   };
 }
@@ -372,5 +466,126 @@ export function figurasDePestana(pestana: Pestana, columnas: Columnas, ejeX: Eje
         return figurasDeCurvatura(columnas, ejeX);
     }
   })();
-  return figuras.map(sinHuecosEnX);
+  // El indice de nodo global viaja con cada figura: es lo que hace que el
+  // cursor del grafico, el marcador del 3D y el reproductor hablen de lo mismo.
+  const nodos = Array.from(columnas.nodos);
+  return figuras.map((figura) => sinHuecosEnX({ ...figura, nodos }));
+}
+
+/** Lo que se muestra de una serie cuando se mira un rango del grafico. */
+export interface EstadisticaDeSerie {
+  etiqueta: string;
+  maximo: number | null;
+  /** Valor de x donde ocurre el maximo: leer un pico de G es querer saber DONDE. */
+  xDelMaximo: number | null;
+  minimo: number | null;
+  xDelMinimo: number | null;
+  promedio: number | null;
+  /** Nodos con dato dentro del rango. */
+  cantidad: number;
+}
+
+/**
+ * Maximo, minimo, promedio y donde ocurre el maximo de cada serie visible,
+ * sobre el rango [desde, hasta] del eje x. Puro: se testea en Node.
+ */
+export function estadisticaDeRango(figura: DatosDeFigura, desde: number, hasta: number): EstadisticaDeSerie[] {
+  const dentro: number[] = [];
+  figura.x.forEach((v, i) => {
+    if (typeof v === 'number' && v >= desde && v <= hasta) dentro.push(i);
+  });
+  return figura.series
+    .filter((s) => !s.ocultarEnLeyenda)
+    .map((serie) => {
+      let maximo: number | null = null;
+      let minimo: number | null = null;
+      let xDelMaximo: number | null = null;
+      let xDelMinimo: number | null = null;
+      let suma = 0;
+      let cantidad = 0;
+      for (const i of dentro) {
+        const v = serie.valores[i];
+        if (v === null || v === undefined || !Number.isFinite(v)) continue;
+        if (maximo === null || v > maximo) {
+          maximo = v;
+          xDelMaximo = figura.x[i] ?? null;
+        }
+        if (minimo === null || v < minimo) {
+          minimo = v;
+          xDelMinimo = figura.x[i] ?? null;
+        }
+        suma += v;
+        cantidad++;
+      }
+      return { etiqueta: serie.etiqueta, maximo, xDelMaximo, minimo, xDelMinimo, promedio: cantidad > 0 ? suma / cantidad : null, cantidad };
+    });
+}
+
+// ------------------------------------------------------------ comparacion A/B
+// (fase 4.8) Un layout fijado como A se superpone al vivo (B): mismas
+// figuras, las series de DATOS de A en tono mas claro. Los limites, bandas y
+// franjas son los de B (son los que se estan verificando). Como A y B tienen
+// sus propios nodos, el eje x es la union ordenada de los dos y cada serie
+// lleva null donde no tiene punto; la figura une esos huecos (unirHuecos).
+
+const COLOR_DE_A: Partial<Record<SerieDeFigura['color'], SerieDeFigura['color']>> = {
+  serie1: 'comparacion1',
+  serie2: 'comparacion2',
+  serie3: 'comparacion3',
+};
+
+/** Etiqueta de una serie con la letra del diseno delante: la leyenda dice cual es cual. */
+export const conLetra = (letra: 'A' | 'B', etiqueta: string) => `${letra} · ${etiqueta}`;
+
+/** Superpone a la figura viva (B) las series de datos de la misma figura de A. Puro. */
+export function superponerComparacion(b: DatosDeFigura, a: DatosDeFigura | undefined): DatosDeFigura {
+  if (!a) return b;
+  const deA = a.series.filter((s) => COLOR_DE_A[s.color] !== undefined && !s.ocultarEnLeyenda);
+  if (deA.length === 0) return b;
+
+  // Union ordenada de los dos ejes x; un x que esta en los dos es un solo punto.
+  const x: number[] = [];
+  const indiceB: number[] = [];
+  const indiceA: number[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < b.x.length || j < a.x.length) {
+    const xb = b.x[i];
+    const xa = a.x[j];
+    if (xa === undefined || (xb !== undefined && xb < xa)) {
+      x.push(xb!);
+      indiceB.push(i++);
+      indiceA.push(-1);
+    } else if (xb === undefined || xa < xb) {
+      x.push(xa);
+      indiceB.push(-1);
+      indiceA.push(j++);
+    } else {
+      x.push(xb);
+      indiceB.push(i++);
+      indiceA.push(j++);
+    }
+  }
+  const tomar = (valores: (number | null)[], indices: number[]) => indices.map((k) => (k < 0 ? null : valores[k] ?? null));
+  // El nodo global de un punto que solo tiene A es el ultimo de B visto: la
+  // lista queda creciente (la busqueda binaria del cursor la necesita asi).
+  let nodos: number[] | undefined;
+  if (b.nodos) {
+    nodos = [];
+    let ultimo = b.nodos[0] ?? 0;
+    for (const k of indiceB) {
+      if (k >= 0) ultimo = b.nodos[k]!;
+      nodos.push(ultimo);
+    }
+  }
+  return {
+    ...b,
+    x,
+    nodos,
+    unirHuecos: true,
+    series: [
+      ...b.series.map((s) => ({ ...s, etiqueta: COLOR_DE_A[s.color] ? conLetra('B', s.etiqueta) : s.etiqueta, valores: tomar(s.valores, indiceB) })),
+      ...deA.map((s) => ({ ...s, etiqueta: conLetra('A', s.etiqueta), color: COLOR_DE_A[s.color]!, ancho: 1.4, valores: tomar(s.valores, indiceA) })),
+    ],
+  };
 }

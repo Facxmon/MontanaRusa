@@ -2,7 +2,18 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { analizarLayout } from '../src/contrato/cargar';
-import { columna, extraerColumnas, figurasDePestana, sinHuecosEnX, PESTANAS } from '../src/graficos/series';
+import {
+  columna,
+  estadisticaDeRango,
+  extraerColumnas,
+  figurasDePestana,
+  indiceDeNodo,
+  iniciosDeElemento,
+  nodoGlobalDe,
+  sinHuecosEnX,
+  ubicacionDeNodo,
+  PESTANAS,
+} from '../src/graficos/series';
 
 const cargar = (caso: string) =>
   analizarLayout(readFileSync(fileURLToPath(new URL(`../../golden/${caso}.json`, import.meta.url)), 'utf8'));
@@ -90,10 +101,89 @@ describe('figurasDePestana', () => {
       etiquetaX: '',
       etiquetaY: '',
       x: [0, 1, null as unknown as number, 3],
-      series: [{ etiqueta: 'a', valores: [1, 2, 3, 4], color: '#fff' }],
+      decimales: 2,
+      decimalesX: 3,
+      series: [{ etiqueta: 'a', valores: [1, 2, 3, 4], color: 'serie1' }],
       franjas: [],
     });
     expect(figura.x).toEqual([0, 1, 3]);
     expect(figura.series[0]!.valores).toEqual([1, 2, 4]);
+  });
+});
+
+describe('nodos globales: el estado que comparten graficos, via 3D y reproductor', () => {
+  it('el indice global coincide con el de aplanarNodos (contrato, seccion 6)', () => {
+    const inicios = iniciosDeElemento(circuito);
+    expect(inicios[0]).toBe(0);
+    circuito.elementos.forEach((e, i) => {
+      // El nodo 0 de un elemento es el ultimo del anterior: mismo indice global.
+      if (i > 0) expect(nodoGlobalDe(circuito, i, 0)).toBe(nodoGlobalDe(circuito, i - 1, circuito.elementos[i - 1]!.nodos.numeroDeNodos - 1));
+      expect(nodoGlobalDe(circuito, i, 0)).toBe(inicios[i]! - (i > 0 ? 1 : 0));
+    });
+  });
+
+  it('ubicacionDeNodo es la inversa de nodoGlobalDe', () => {
+    circuito.elementos.forEach((e, i) => {
+      for (const local of [1, 5, e.nodos.numeroDeNodos - 1]) {
+        const global = nodoGlobalDe(circuito, i, local);
+        expect(ubicacionDeNodo(circuito, global), `${i}/${local}`).toMatchObject({ elemento: i, nodoLocal: local });
+      }
+    });
+  });
+
+  it('cada nodo global cae en un subtramo del elemento', () => {
+    const u = ubicacionDeNodo(circuito, nodoGlobalDe(circuito, 2, 10));
+    expect(u?.subtramo).toBeTruthy();
+  });
+
+  it('las columnas traen un nodo global por punto, creciente, y se puede buscar', () => {
+    const c = extraerColumnas(circuito, null);
+    expect(c.nodos.length).toBe(c.cantidad);
+    expect(c.nodos[0]).toBe(0);
+    for (let i = 1; i < c.nodos.length; i++) expect(c.nodos[i]!).toBeGreaterThan(c.nodos[i - 1]!);
+    expect(indiceDeNodo(c.nodos, c.nodos[123]!)).toBe(123);
+    expect(indiceDeNodo(c.nodos, -1)).toBeNull();
+  });
+
+  it('las figuras llevan el indice global filtrado igual que la x', () => {
+    for (const pestana of PESTANAS) {
+      const c = extraerColumnas(circuito, 1);
+      for (const figura of figurasDePestana(pestana.clave, c, 'tiempo')) {
+        expect(figura.nodos?.length, pestana.clave).toBe(figura.x.length);
+      }
+    }
+  });
+});
+
+describe('estadisticaDeRango', () => {
+  const c = extraerColumnas(circuito, null);
+  const [figura] = figurasDePestana('cinematica', c, 'arco');
+
+  it('el rango completo da el maximo, el minimo y el promedio de la serie entera', () => {
+    const x = figura!.x as number[];
+    const [velocidad] = estadisticaDeRango(figura!, x[0]!, x[x.length - 1]!);
+    const valores = figura!.series[0]!.valores.filter((v): v is number => v !== null);
+    expect(velocidad!.maximo).toBeCloseTo(Math.max(...valores), 12);
+    expect(velocidad!.minimo).toBeCloseTo(Math.min(...valores), 12);
+    expect(velocidad!.promedio).toBeCloseTo(valores.reduce((a, b) => a + b, 0) / valores.length, 12);
+    expect(velocidad!.cantidad).toBe(valores.length);
+  });
+
+  it('dice DONDE ocurre el maximo, que es lo que se quiere saber de un pico', () => {
+    const x = figura!.x as number[];
+    const [velocidad] = estadisticaDeRango(figura!, x[0]!, x[x.length - 1]!);
+    const donde = figura!.series[0]!.valores.indexOf(velocidad!.maximo);
+    expect(velocidad!.xDelMaximo).toBe(x[donde]);
+  });
+
+  it('un rango vacio no inventa numeros', () => {
+    const [velocidad] = estadisticaDeRango(figura!, -100, -99);
+    expect(velocidad).toMatchObject({ maximo: null, minimo: null, promedio: null, cantidad: 0 });
+  });
+
+  it('no lista las series ocultas en la leyenda', () => {
+    const [g] = figurasDePestana('g', c, 'arco');
+    const visibles = g!.series.filter((s) => !s.ocultarEnLeyenda).length;
+    expect(estadisticaDeRango(g!, 0, 1).length).toBe(visibles);
   });
 });

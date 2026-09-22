@@ -123,6 +123,16 @@ export interface Elemento {
   parametrosUsados: {
     [k: string]: unknown;
   };
+  /**
+   * Opcional (desde 1.1.0). Los parámetros que esta instancia pisó sobre parametros.valores, en SI y camelCase, con las mismas claves que parametros.defaults. Ausente = sin ajustes. MATLAB construye con parámetros globales y no lo emite; eso es válido.
+   */
+  ajustes?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Opcional (desde 1.1.0). Claves de `ajustes` que ni el modo de curvatura ni el tipo de este elemento consumen (AjustarParametros.m): se aplicaron pero no tuvieron efecto. Ausente = ninguno.
+   */
+  inertes?: string[];
   nodos: Nodos;
   subtramos: Subtramo[];
   resumen: ResumenElemento;

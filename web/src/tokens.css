@@ -1,0 +1,276 @@
+/*
+ * Tokens de diseno: la unica fuente de color, espaciado, radio, tipografia y
+ * movimiento de la web. Ningun otro archivo (CSS o TS) puede tener un
+ * literal de color: todo se lee de aca, el CSS con var() y el JS con tema.ts.
+ *
+ * Dos capas:
+ *  1. Paleta cruda: valores concretos sin semantica (--gris-950, --azul-400).
+ *  2. Tokens semanticos por tema: que color cumple cada rol (--superficie-1,
+ *     --texto-2, --acento). Estan dentro de :root[data-tema="..."] para que
+ *     cambiar de tema sea cambiar un atributo en <html>.
+ *
+ * Los tokens que lee JavaScript (escena 3D, canvas de los graficos) se
+ * resuelven a hex o a rgba(r, g, b, a) con comas: THREE.Color y el canvas no
+ * entienden color-mix() ni rgb(r g b / a). Por eso la paleta tiene los
+ * tripletes --xxx-rgb para componer transparencias.
+ */
+
+:root {
+  /* ---------- paleta cruda ---------- */
+  --gris-950: #0f1115;
+  --gris-925: #1c212b;
+  --gris-900: #171a21;
+  --gris-850: #1a1d24;
+  --gris-800: #232833;
+  --gris-700: #2a2f3a;
+  --gris-650: #5c6576;
+  --gris-600: #3a4150;
+  --gris-500: #8a94a6;
+  --gris-400: #9aa3b2;
+  --gris-300: #c9d0dc;
+  --gris-200: #dfe6f2;
+  --gris-100: #e6e8ee;
+  --gris-050: #f5f6f8;
+  --blanco: #ffffff;
+
+  --azul-300: #9ccdff;
+  --azul-400: #6cb6ff;
+  --azul-500: #3987e5;
+  --azul-600: #256abf;
+  --azul-700: #1c5cab;
+  --azul-gris-500: #8aa4c8;
+
+  --verde-500: #3ddc84;
+  --verde-600: #199e70;
+  --verde-700: #0b7a55;
+  --verde-norma-600: #0ca30c;
+
+  --rojo-100: #ffd7d7;
+  --rojo-400: #e66767;
+  --rojo-500: #ff5c5c;
+  --rojo-600: #d03b3b;
+  --rojo-700: #b3261e;
+  --rojo-800: #551111;
+  --rojo-900: #3a1214;
+
+  --naranja-500: #d95926;
+  --ambar-500: #ffb454;
+  --ambar-800: #8a5300;
+
+  /* Tripletes para transparencias: rgba(var(--gris-400-rgb), 0.14). */
+  --gris-950-rgb: 15, 17, 21;
+  --gris-400-rgb: 154, 163, 178;
+  --blanco-rgb: 255, 255, 255;
+  --azul-400-rgb: 108, 182, 255;
+  --verde-norma-600-rgb: 12, 163, 12;
+  --rojo-500-rgb: 255, 92, 92;
+  --azul-500-rgb: 57, 135, 229;
+  --azul-600-rgb: 37, 106, 191;
+  --naranja-500-rgb: 217, 89, 38;
+  --verde-600-rgb: 25, 158, 112;
+  --rojo-600-rgb: 208, 59, 59;
+
+  /* ---------- espaciado ---------- */
+  --esp-1: 4px;
+  --esp-2: 8px;
+  --esp-3: 12px;
+  --esp-4: 16px;
+  --esp-5: 24px;
+  --esp-6: 32px;
+  --esp-7: 48px;
+  --esp-8: 64px;
+
+  /* ---------- radios ---------- */
+  --radio-chico: 4px;
+  --radio: 6px;
+  --radio-grande: 10px;
+
+  /* ---------- tipografia ---------- */
+  --fuente: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --texto-xs: 11px;
+  --texto-sm: 12.5px;
+  --texto-base: 14px;
+  --texto-lg: 18px;
+  --texto-xl: 24px;
+
+  /* ---------- movimiento ---------- */
+  --dur-rapida: 120ms;
+  --dur-media: 200ms;
+  --dur-lenta: 400ms;
+  --curva: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ---------- dimensiones de la interfaz ---------- */
+  --ancho-panel: 420px;
+  --alto-barra: 48px;
+  --ancho-icono: 18px;
+  /* Piso del ancho de los inputs numericos; el ancho real sale de los
+     decimales de la unidad de presentacion (--digitos, ver estilos.css). */
+  --ancho-campo-chico: 62px;
+  /* HUD del reproductor: un numero con signo y dos decimales ("-99.99") y el nombre del elemento. */
+  --ancho-hud-numero: 6ch;
+  --ancho-hud-elemento: 18ch;
+  /* Popover de ayuda del "?" de cada parametro. */
+  --ancho-popover: 300px;
+  /* Valor de la leyenda de uPlot. */
+  --ancho-leyenda-valor: 7ch;
+  --alto-figura: 240px;
+  /* Tooltip del cursor de los graficos. */
+  --ancho-tooltip-figura: 260px;
+}
+
+
+/* ---------- escena 3D: OSCURA EN LOS DOS TEMAS (fase 4.5) ----------
+   Decision tomada: el tema claro aplica a la interfaz y a los graficos 2D;
+   el viewport 3D queda oscuro. Los visores 3D se leen mejor en oscuro, y las
+   escalas perceptualmente uniformes de la via (colores.ts) tienen un
+   extremo de baja luminosidad que desaparece sobre blanco: un 3D claro
+   obligaria a redisenar y revalidar toda la paleta de la via. Por eso estos
+   tokens viven fuera de los bloques de tema. Three.js los lee en hex. */
+:root {
+  --escena-fondo: var(--gris-950);
+  --escena-fondo-arriba: var(--gris-925);
+  --escena-cielo: var(--gris-200);
+  --escena-suelo: var(--gris-850);
+  --escena-sol: var(--blanco);
+  --escena-contraluz: var(--azul-gris-500);
+  --escena-grilla-fuerte: var(--gris-600);
+  --escena-grilla: var(--gris-800);
+  --escena-rotulo: var(--gris-500);
+  --escena-uniones: var(--gris-500);
+  --escena-carro: var(--ambar-500);
+  --escena-pasajero: var(--rojo-500);
+  --escena-pasajero-brillo: var(--rojo-800);
+  /* Marcador del nodo bajo el cursor de los graficos. */
+  --escena-marcador: var(--azul-400);
+  /* Caja disponible (entra / se sale), proyeccion al piso y gizmo de ejes. */
+  --escena-caja: var(--verde-600);
+  --escena-caja-fuera: var(--rojo-500);
+  --escena-proyeccion: var(--azul-gris-500);
+  --escena-eje-x: var(--rojo-400);
+  --escena-eje-y: var(--verde-500);
+  --escena-eje-z: var(--azul-400);
+}
+
+/* ---------- tema oscuro (el default del proyecto) ---------- */
+:root[data-tema="oscuro"] {
+  color-scheme: dark;
+
+  --superficie-0: var(--gris-950);
+  --superficie-1: var(--gris-900);
+  --superficie-2: var(--gris-800);
+  --superficie-3: var(--gris-700);
+  /* Barras que flotan sobre la vista 3D, y la sombra de menus y avisos. */
+  --superficie-flotante: rgba(var(--gris-950-rgb), 0.85);
+  --sombra-flotante: 0 8px 24px rgba(var(--gris-950-rgb), 0.45);
+
+  --texto-1: var(--gris-100);
+  --texto-2: var(--gris-400);
+  --texto-3: var(--gris-500);
+
+  --borde-sutil: var(--gris-700);
+  --borde-fuerte: var(--gris-400);
+  /* Marco del viewport 3D: en oscuro se funde con la interfaz. */
+  --marco-vista: transparent;
+
+  --acento: var(--azul-400);
+  --acento-hover: var(--azul-300);
+  --acento-suave: rgba(var(--azul-400-rgb), 0.15);
+  --destello: rgba(var(--azul-400-rgb), 0.35);
+  --texto-sobre-acento: var(--gris-950);
+  /* Botones: un escalon mas claro que la tarjeta, con borde propio. */
+  --superficie-boton-hover: var(--gris-600);
+  --borde-boton: var(--gris-600);
+  --sombra-boton: 0 1px 0 rgba(var(--gris-950-rgb), 0.5);
+  --exito: var(--verde-500);
+  --alerta: var(--ambar-500);
+  --falla: var(--rojo-500);
+  --falla-fondo: var(--rojo-900);
+  --falla-texto: var(--rojo-100);
+  --falla-tenue: rgba(var(--rojo-500-rgb), 0.08);
+  --informativo: var(--gris-400);
+
+  /* Graficos (uPlot y el canvas de las franjas). Series validadas con
+     validate_palette.js de la skill dataviz sobre --superficie-0: todos los
+     pares, contraste >= 3:1, CVD >= 9,4. Limite y admisible son colores de
+     ESTADO (critico y bueno): fijos en los dos temas; el admisible sube de
+     0,55 a 0,70 de opacidad porque a 0,55 quedaba en 2,5:1 sobre el fondo. */
+  --grafico-texto: var(--gris-400);
+  --grafico-grilla: rgba(var(--gris-400-rgb), 0.14);
+  --grafico-franja-a: rgba(var(--blanco-rgb), 0.025);
+  --grafico-franja-b: rgba(var(--blanco-rgb), 0.06);
+  --serie-1: var(--azul-500);
+  --serie-2: var(--naranja-500);
+  --serie-3: var(--verde-600);
+  /* Comparacion A/B (fase 4.8): el diseno fijado como A, en tono mas claro. */
+  --serie-comparacion-1: rgba(var(--azul-500-rgb), 0.45);
+  --serie-comparacion-2: rgba(var(--naranja-500-rgb), 0.45);
+  --serie-comparacion-3: rgba(var(--verde-600-rgb), 0.45);
+  --serie-limite: var(--rojo-600);
+  --serie-admisible-trazo: rgba(var(--verde-norma-600-rgb), 0.7);
+  --serie-admisible-relleno: rgba(var(--verde-norma-600-rgb), 0.10);
+  --serie-cero: rgba(var(--gris-400-rgb), 0.6);
+}
+
+/* ---------- tema claro (fase 4.5): interfaz y graficos 2D ----------
+   Calibrado, no invertido: cada texto de estado supera 4,5:1 sobre las tres
+   superficies (el ambar y el verde del oscuro no llegaban a 2:1 sobre
+   blanco), y la paleta de series es la validada para fondo claro. */
+:root[data-tema="claro"] {
+  color-scheme: light;
+
+  --superficie-0: var(--gris-050);
+  --superficie-1: var(--blanco);
+  --superficie-2: var(--gris-100);
+  --superficie-3: var(--gris-100);
+  --superficie-flotante: rgba(var(--blanco-rgb), 0.9);
+  --sombra-flotante: 0 8px 24px rgba(var(--gris-950-rgb), 0.15);
+
+  --texto-1: var(--gris-950);
+  --texto-2: var(--gris-600);
+  --texto-3: var(--gris-650);
+
+  --borde-sutil: var(--gris-200);
+  --borde-fuerte: var(--gris-500);
+  /* Un viewport oscuro dentro de una interfaz clara: marco explicito para
+     que se lea como intencional y no como una zona rota. */
+  --marco-vista: var(--gris-500);
+
+  --acento: var(--azul-600);
+  --acento-hover: var(--azul-700);
+  --acento-suave: rgba(var(--azul-400-rgb), 0.18);
+  --destello: rgba(var(--azul-400-rgb), 0.4);
+  --texto-sobre-acento: var(--blanco);
+  --superficie-boton-hover: var(--gris-200);
+  --borde-boton: var(--gris-300);
+  --sombra-boton: 0 1px 0 rgba(var(--gris-950-rgb), 0.06);
+  --exito: var(--verde-700);
+  --alerta: var(--ambar-800);
+  --falla: var(--rojo-700);
+  --falla-fondo: var(--rojo-100);
+  --falla-texto: var(--rojo-900);
+  --falla-tenue: rgba(var(--rojo-600-rgb), 0.07);
+  --informativo: var(--gris-650);
+
+  /* Series validadas sobre --superficie-0 claro (y blanco): todos los pares,
+     contraste >= 3:1 (azul 5,0; naranja 3,6; aqua 3,2), CVD >= 9,4. Los
+     pasos "claros" de referencia de la skill (#eb6834, #1baf7a) quedaban
+     por debajo de 3:1 sobre blanco; por eso naranja y aqua usan el mismo
+     paso que el oscuro y el azul baja un escalon. El admisible va opaco
+     (3,35:1; con 0,55 de opacidad caia a 2:1) y el eje cero pasa a gris
+     opaco (3,1:1). */
+  --grafico-texto: var(--gris-600);
+  --grafico-grilla: rgba(var(--gris-400-rgb), 0.35);
+  --grafico-franja-a: rgba(var(--gris-950-rgb), 0.025);
+  --grafico-franja-b: rgba(var(--gris-950-rgb), 0.06);
+  --serie-1: var(--azul-600);
+  --serie-2: var(--naranja-500);
+  --serie-3: var(--verde-600);
+  --serie-comparacion-1: rgba(var(--azul-600-rgb), 0.4);
+  --serie-comparacion-2: rgba(var(--naranja-500-rgb), 0.4);
+  --serie-comparacion-3: rgba(var(--verde-600-rgb), 0.4);
+  --serie-limite: var(--rojo-600);
+  --serie-admisible-trazo: var(--verde-norma-600);
+  --serie-admisible-relleno: rgba(var(--verde-norma-600-rgb), 0.12);
+  --serie-cero: var(--gris-500);
+}

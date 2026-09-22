@@ -1,0 +1,190 @@
+/* Portada del portfolio (index.html): solo tokens y tipografia, sin nada del
+   visualizador, para que la pagina cargue sin Three.js ni uPlot. Mismos
+   tokens y la misma Plex que la app: se lee como un solo producto.
+
+   Presupuesto de carga (< 1 s en 3G): en el build este CSS va DENTRO del
+   HTML (plugins/cssEnLinea.ts) y la portada usa solo Plex Sans 400 y 600,
+   las dos que index.html precarga. Nada de Mono ni de 500 aca: cada peso
+   nuevo es otro pedido de ~560 ms de latencia en 3G. */
+
+@import './tokens.css';
+@import './fuentes.css';
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--superficie-0);
+  color: var(--texto-1);
+  font-family: var(--fuente);
+  font-size: var(--texto-base);
+  line-height: 1.55;
+}
+body { font-size: 16px; }
+
+a { color: var(--acento); text-underline-offset: 3px; }
+a:focus-visible, .portada-cta:focus-visible { outline: 2px solid var(--acento); outline-offset: 3px; border-radius: var(--radio-chico); }
+
+/* Los placeholders que escribe el autor: que se vean a la legua. */
+.marcador {
+  display: block;
+  padding: var(--esp-2) var(--esp-3);
+  border: 1px dashed var(--alerta);
+  border-radius: var(--radio);
+  color: var(--alerta);
+  font-size: var(--texto-sm);
+  font-style: italic;
+  background: transparent;
+}
+span.marcador { display: inline-block; padding: 0 var(--esp-2); }
+
+/* ---------- barra ---------- */
+.portada-barra {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-4);
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: var(--esp-3) var(--esp-4);
+  background: var(--superficie-0);
+  border-bottom: 1px solid var(--borde-sutil);
+}
+.portada-marca { color: var(--texto-1); font-weight: 600; text-decoration: none; }
+.portada-barra nav { display: flex; gap: var(--esp-4); flex-wrap: wrap; }
+.portada-barra nav a { color: var(--texto-2); text-decoration: none; font-size: var(--texto-sm); }
+.portada-barra nav a:hover { color: var(--texto-1); }
+
+/* ---------- contenido ---------- */
+.portada {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 var(--esp-4);
+}
+
+.portada-heroe { padding: var(--esp-8) 0 var(--esp-7); max-width: 760px; }
+.portada-sobretitulo {
+  margin: 0 0 var(--esp-3);
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--acento);
+}
+.portada-heroe h1 {
+  margin: 0 0 var(--esp-4);
+  font-size: clamp(36px, 6vw, 60px);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+.portada-bajada { margin: 0 0 var(--esp-4); color: var(--texto-2); font-size: var(--texto-lg); }
+.portada-heroe .marcador { margin-bottom: var(--esp-6); }
+
+.portada-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-4); }
+.portada-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-4) var(--esp-6);
+  background: var(--acento);
+  color: var(--texto-sobre-acento);
+  border-radius: var(--radio-grande);
+  font-size: var(--texto-lg);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--sombra-boton);
+  transition: background var(--dur-rapida) var(--curva);
+}
+.portada-cta:hover { background: var(--acento-hover); }
+.portada-flecha { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform var(--dur-rapida) var(--curva); }
+.portada-cta:hover .portada-flecha { transform: translateX(3px); }
+.portada-secundario { color: var(--texto-2); }
+.portada-secundario:hover { color: var(--texto-1); }
+
+.portada-seccion { padding: var(--esp-7) 0; border-top: 1px solid var(--borde-sutil); }
+.portada-seccion h2, .portada-final h2 {
+  margin: 0 0 var(--esp-4);
+  font-size: var(--texto-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.portada-seccion > p { max-width: 68ch; margin: 0 0 var(--esp-3); }
+
+/* Video: el alto queda reservado antes de que exista (sin saltos de layout). */
+.video { margin: 0; }
+.video-marco {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio-grande);
+  background: var(--escena-fondo);
+}
+.video-marco iframe, .video-marco video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.video-marcador { position: absolute; inset: var(--esp-4); display: flex; align-items: center; justify-content: center; text-align: center; }
+.video figcaption { margin-top: var(--esp-3); }
+
+.portada-grilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--esp-4);
+  margin: var(--esp-5) 0;
+}
+.portada-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+  padding: var(--esp-4);
+  background: var(--superficie-1);
+  border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio-grande);
+}
+.portada-tarjeta h3 { margin: 0; font-size: var(--texto-base); font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--texto-2); }
+.portada-lista { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--esp-1); }
+.portada-lista li { padding-left: var(--esp-4); position: relative; }
+.portada-lista li::before { content: ""; position: absolute; left: 0; top: 0.65em; width: 6px; height: 6px; border-radius: 50%; background: var(--acento); }
+.portada-tarjeta .marcador { margin-top: auto; }
+
+.portada-final {
+  margin: var(--esp-7) 0;
+  padding: var(--esp-7) var(--esp-6);
+  background: var(--superficie-1);
+  border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio-grande);
+  text-align: center;
+}
+.portada-final p { max-width: 56ch; margin: 0 auto var(--esp-5); color: var(--texto-2); }
+
+.portada-contacto { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--esp-3); }
+.portada-contacto-etiqueta { display: inline-block; min-width: 12ch; color: var(--texto-2); font-size: var(--texto-sm); }
+
+.portada-pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-5);
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: var(--esp-6) var(--esp-4) var(--esp-7);
+  border-top: 1px solid var(--borde-sutil);
+  font-size: var(--texto-sm);
+}
+.portada-pie a { color: var(--texto-2); }
+
+@media (max-width: 640px) {
+  .portada-barra nav { display: none; }
+  .portada-heroe { padding-top: var(--esp-7); }
+  .portada-cta { width: 100%; justify-content: center; }
+  .portada-final { padding: var(--esp-6) var(--esp-4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}

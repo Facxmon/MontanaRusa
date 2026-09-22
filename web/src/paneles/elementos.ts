@@ -2,12 +2,13 @@
 // criterios. Click elige (o des-elige) el elemento; "Todo el layout" vuelve
 // a la vista completa.
 
-import type { Estado } from '../estado';
-import { el, vaciar } from './dom';
+import { esRecalculo, type Estado } from '../estado';
+import { destellarCambios, el, tarjeta, vaciar, valoresPorClave } from './dom';
 import { formatear } from './formato';
 
 export function montarElementos(contenedor: HTMLElement, estado: Estado): void {
-  const dibujar = () => {
+  const dibujar = (destellar = false) => {
+    const antes = destellar ? valoresPorClave(contenedor) : null;
     const { layout, elemento } = estado.get();
     vaciar(contenedor);
     if (!layout) return;
@@ -35,16 +36,25 @@ export function montarElementos(contenedor: HTMLElement, estado: Estado): void {
         el('span', { class: 'elemento-tipo' }, `${i + 1}. ${e.tipo}`),
         el(
           'span',
-          { class: 'elemento-datos' },
+          { class: 'elemento-datos', 'data-clave': `elemento-${i}` },
           `${e.nodos.numeroDeNodos} nodos · Gz máx ${formatear(e.resumen.gzMaxima, 'G')} · ${formatear(e.resumen.longitudRecorrida, 'm')}`,
         ),
       ),
     );
 
-    contenedor.append(el('h2', {}, 'Elementos'), el('div', { class: 'lista' }, botonTodo, botones));
+    const noPasan = layout.elementos.filter((e) => !e.criterios.todosPasan).length;
+    contenedor.append(tarjeta(
+      {
+        clave: 'elementos',
+        titulo: 'Elementos',
+        resumen: `${layout.elementos.length} elementos · ${noPasan ? `${noPasan} con criterios que no pasan` : 'todos pasan'}${elemento === null ? '' : ` · elegido: ${elemento + 1}`}`,
+      },
+      el('div', { class: 'lista' }, botonTodo, botones),
+    ));
+    if (antes) destellarCambios(contenedor, antes);
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {
-    if (nuevo.layout !== anterior.layout || nuevo.elemento !== anterior.elemento) dibujar();
+    if (nuevo.layout !== anterior.layout || nuevo.elemento !== anterior.elemento) dibujar(esRecalculo(nuevo, anterior));
   });
 }

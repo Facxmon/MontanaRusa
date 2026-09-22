@@ -7,12 +7,26 @@
 import type { Carro } from '../escena/carro';
 import type { Escena } from '../escena/escena';
 import type { Estado } from '../estado';
+import { nodoGlobalDe, ubicacionDeNodo } from '../graficos/series';
 import { el } from './dom';
-import { formatear } from './formato';
+import { numeroDeMagnitud, SIN_DATO } from './formato';
 
 const VELOCIDADES = [0.1, 0.25, 0.5, 1, 2];
 
-export function montarReproductor(contenedor: HTMLElement, estado: Estado, escena: Escena, carro: Carro): void {
+export interface Reproductor {
+  /** Suelta el listener de teclado de document y el callback por cuadro. */
+  destruir(): void;
+  /** Lleva el carro al instante en que pasa por ese nodo global (clic en un grafico). */
+  irANodo(nodo: number): void;
+}
+
+/**
+ * El reproductor es el otro extremo del cursor ligado (fase 3.6): mientras
+ * corre publica en estado.nodo el nodo global por el que va pasando, que es
+ * lo que mueve el cursor de los graficos y el marcador del 3D; y irANodo()
+ * hace el camino inverso cuando se hace clic en un punto de un grafico.
+ */
+export function montarReproductor(contenedor: HTMLElement, estado: Estado, escena: Escena, carro: Carro): Reproductor {
   let reproduciendo = false;
   let tiempo = 0;
   let factor = 0.5;
@@ -44,7 +58,29 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
     mostrarCarro = casillaCarro.checked;
     carro.mostrar(mostrarCarro);
   });
-  const hud = el('span', { class: 'reproductor-hud' });
+  // HUD: un span por campo dentro de una grilla de columnas fijas, para que un
+  // valor que cambia de ancho no mueva lo que tiene a la derecha. Los numeros
+  // van con decimales fijos (formato.ts) y cifras tabulares (CSS).
+  const hudTiempo = el('span', { class: 'hud-valor' }, SIN_DATO);
+  const hudElemento = el('span', { class: 'hud-elemento' });
+  const hudVelocidad = el('span', { class: 'hud-valor' }, SIN_DATO);
+  const hudGz = el('span', { class: 'hud-valor' }, SIN_DATO);
+  const hudGy = el('span', { class: 'hud-valor' }, SIN_DATO);
+  const hud = el(
+    'span',
+    { class: 'reproductor-hud' },
+    el('span', {}, 't ='),
+    hudTiempo,
+    el('span', {}, 's ·'),
+    hudElemento,
+    el('span', {}, '· v ='),
+    hudVelocidad,
+    el('span', {}, 'm/s · Gz ='),
+    hudGz,
+    el('span', {}, 'G · Gy ='),
+    hudGy,
+    el('span', {}, 'G'),
+  );
 
   contenedor.append(
     botonPlay,
@@ -78,19 +114,37 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
     if (!donde) return;
     const { layout } = estado.get();
     const tipo = layout?.elementos[donde.elemento]?.tipo ?? '';
-    hud.textContent =
-      `t = ${tiempo.toFixed(2)} s · ${donde.elemento + 1}. ${tipo} · v = ${formatear(donde.velocidad, 'm/s')} · ` +
-      `Gz = ${formatear(donde.gz, 'G')} · Gy = ${formatear(donde.gy, 'G')}`;
+    hudTiempo.textContent = numeroDeMagnitud(tiempo, 'tiempo');
+    const nombre = `${donde.elemento + 1}. ${tipo}`;
+    hudElemento.textContent = nombre;
+    hudElemento.title = nombre;
+    hudVelocidad.textContent = numeroDeMagnitud(donde.velocidad, 'velocidad');
+    hudGz.textContent = numeroDeMagnitud(donde.gz, 'gz');
+    hudGy.textContent = numeroDeMagnitud(donde.gy, 'gy');
     if (seguir) escena.centrarEn(donde.posicion);
+    // Cursor ligado: el nodo por el que va el carro es el que resalta el 3D y
+    // el que marcan los graficos. Se publica solo cuando cambia de nodo.
+    if (layout) {
+      const nodo = nodoGlobalDe(layout, donde.elemento, donde.nodo);
+      if (estado.get().nodo !== nodo) estado.set({ nodo });
+    }
   }
 
-  escena.enCadaCuadro((dt) => actualizar(dt));
+  const sacarDelCuadro = escena.enCadaCuadro((dt) => actualizar(dt));
 
-  document.addEventListener('keydown', (evento) => {
-    if (evento.code !== 'Space' || evento.target instanceof HTMLInputElement || evento.target instanceof HTMLSelectElement) return;
+  // La barra espaciadora se escucha en document (el foco puede estar en
+  // cualquier lado); se guarda la referencia para poder sacarlo al destruir.
+  const alTeclear = (evento: KeyboardEvent) => {
+    if (evento.code !== 'Space') return;
+    // Con el foco en un control, la barra espaciadora es de ese control
+    // (activar un boton, una pestana, abrir un <details>, tildar): play/pausa
+    // solo cuando el foco no esta en nada interactivo (fase 4.9).
+    const objetivo = evento.target as HTMLElement | null;
+    if (objetivo?.closest?.('input, select, textarea, button, a[href], summary, [role="tab"], [role="radio"], [contenteditable="true"], dialog')) return;
     evento.preventDefault();
     alternar();
-  });
+  };
+  document.addEventListener('keydown', alTeclear);
 
   const reiniciar = () => {
     const { layout } = estado.get();
@@ -107,7 +161,27 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
     actualizar(0, true);
   };
   reiniciar();
-  estado.suscribir((nuevo, anterior) => {
+  const cancelar = estado.suscribir((nuevo, anterior) => {
     if (nuevo.layout !== anterior.layout) reiniciar();
   });
+  return {
+    destruir() {
+      document.removeEventListener('keydown', alTeclear);
+      sacarDelCuadro();
+      cancelar();
+    },
+    irANodo(nodo: number) {
+      const { layout } = estado.get();
+      if (!layout) return;
+      const ubicacion = ubicacionDeNodo(layout, nodo);
+      if (!ubicacion) return;
+      const instante = carro.tiempoDelNodo(ubicacion.elemento, ubicacion.nodoLocal);
+      if (instante === null) return;
+      reproduciendo = false;
+      botonPlay.textContent = '▶';
+      tiempo = instante;
+      barra.value = String(tiempo);
+      actualizar(0, true);
+    },
+  };
 }
