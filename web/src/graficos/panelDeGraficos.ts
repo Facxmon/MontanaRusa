@@ -13,6 +13,7 @@
 // el bloque de valores del panel lateral y el reproductor (fase 3.6).
 
 import type { Estado } from '../estado';
+import { alCambiarTema } from '../tema';
 import { leerAlmacen, escribirAlmacen } from '../paneles/almacen';
 import { el, vaciar } from '../paneles/dom';
 import { montarPestanas } from '../paneles/pestanas';
@@ -270,6 +271,9 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
 
   const actualizarBarra = armarBarra();
   dibujarFiguras();
+  // uPlot congela los colores de trazo dentro de sus opciones: al cambiar de
+  // tema las figuras se recrean (mismo camino que un cambio de pestana).
+  const soltarTema = alCambiarTema(() => dibujarFiguras());
   const cancelar = estado.suscribir((nuevo, anterior) => {
     if (nuevo.pestana !== anterior.pestana || nuevo.ejeX !== anterior.ejeX) actualizarBarra(nuevo);
     if (
@@ -294,6 +298,7 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
   });
   return () => {
     document.removeEventListener('keydown', alTeclear);
+    soltarTema();
     cancelar();
     for (const f of figuras) f.destruirDelTodo();
     figuras = [];

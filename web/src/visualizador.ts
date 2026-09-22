@@ -42,6 +42,7 @@ import { montarResumenElemento, montarResumenLayout } from './paneles/resumen';
 import { montarSelectorDeCaso } from './paneles/selectorDeCaso';
 import { montarSelectorDePanel } from './paneles/selectorDePanel';
 import { montarSelectorDeVista } from './paneles/selectorDeVista';
+import { montarSelectorDeTema } from './paneles/selectorDeTema';
 import { montarVeredicto } from './paneles/veredicto';
 
 const BASE = import.meta.env.BASE_URL;
@@ -290,6 +291,8 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     if (nuevo.diseno && nuevo.diseno !== anterior.diseno) guardador.guardar(nuevo.diseno, nuevo.origen);
   });
 
+  const soltarTema = montarSelectorDeTema(zonas.derecha);
+  zonas.derecha.append(el('span', { class: 'barra-separador', 'aria-hidden': 'true' }));
   montarGenerar(zonas.derecha, estado, { generar, detener });
   const destruirAtajos = montarAtajos({ generar, detener, deshacer, rehacer });
 
@@ -425,6 +428,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
       guardador.cancelar();
       window.removeEventListener('hashchange', alCambiarElHash);
       destruirAtajos();
+      soltarTema();
       sacarMarcadorDelCuadro();
       destruirImportar();
       destruirGuardar();

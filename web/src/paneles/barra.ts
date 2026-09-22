@@ -26,7 +26,7 @@ export function montarBarra(contenedor: HTMLElement): ZonasDeBarra {
   return { izquierda, centro, derecha };
 }
 
-export type NombreDeIcono = 'deshacer' | 'rehacer' | 'importar' | 'guardar' | 'menu' | 'generar' | 'detener' | 'link' | 'paquete' | 'cerrar';
+export type NombreDeIcono = 'deshacer' | 'rehacer' | 'importar' | 'guardar' | 'menu' | 'generar' | 'detener' | 'link' | 'paquete' | 'cerrar' | 'sol' | 'luna' | 'auto';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -42,6 +42,9 @@ const TRAZOS: Record<NombreDeIcono, { trazos?: string[]; rellenos?: string[] }> 
   link: { trazos: ['M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71', 'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'] },
   paquete: { trazos: ['M21 8 12 3 3 8v8l9 5 9-5z', 'M3 8l9 5 9-5', 'M12 13v8'] },
   cerrar: { trazos: ['M6 6l12 12', 'M18 6 6 18'] },
+  sol: { trazos: ['M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'M12 2v2', 'M12 20v2', 'm4.93 4.93 1.41 1.41', 'm17.66 17.66 1.41 1.41', 'M2 12h2', 'M20 12h2', 'm6.34 17.66-1.41 1.41', 'm19.07 4.93-1.41 1.41'] },
+  luna: { trazos: ['M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z'] },
+  auto: { trazos: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z'], rellenos: ['M12 3a9 9 0 0 0 0 18z'] },
 };
 
 export function icono(nombre: NombreDeIcono): SVGSVGElement {

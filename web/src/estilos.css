@@ -75,6 +75,11 @@ html, body {
 .boton-barra:hover:not(:disabled) { background: var(--superficie-2); border-color: var(--borde-sutil); }
 .boton-barra:disabled { color: var(--texto-3); cursor: default; }
 .boton-barra:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
+/* Selector de tema: tres botones de radio con icono, juntos. */
+.selector-de-tema { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--borde-sutil); border-radius: var(--radio); }
+.selector-de-tema .boton-tema { width: var(--esp-5); height: var(--esp-5); color: var(--texto-2); }
+.selector-de-tema .boton-tema .icono { width: var(--esp-4); height: var(--esp-4); }
+.selector-de-tema .boton-tema[aria-checked="true"] { background: var(--superficie-3); color: var(--texto-1); border-color: var(--borde-sutil); }
 .barra-opcion { display: inline-flex; align-items: center; gap: var(--esp-1); font-size: var(--texto-sm); color: var(--texto-2); white-space: nowrap; cursor: pointer; }
 .barra-opcion input { accent-color: var(--acento); margin: 0; }
 
@@ -253,6 +258,12 @@ html, body {
 }
 
 .vista3d[hidden], .graficos[hidden] { display: none; }
+/* El viewport 3D es oscuro en los dos temas (fase 4.5): en el claro lleva un
+   marco y se separa del borde, para que se lea como una ventana intencional
+   y no como una zona que no cargo. En el oscuro el marco es transparente. */
+.vista3d { border: 1px solid var(--marco-vista); }
+:root[data-tema="claro"] .vista3d { margin: var(--esp-2); border-radius: var(--radio-grande); }
+:root[data-tema="claro"] .principal.partido .vista3d { margin-bottom: 0; }
 /* Vista "Ambos": la via arriba y los graficos abajo, con una linea en el medio. */
 .principal.partido .graficos { border-top: 1px solid var(--borde-sutil); }
 .vista3d canvas { display: block; }

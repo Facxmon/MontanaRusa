@@ -2,6 +2,14 @@
 <html lang="es" data-tema="oscuro">
   <head>
     <meta charset="utf-8" />
+    <script>
+      // Tema antes del primer pintado (fase 4.5, ver src/preferenciaDeTema.ts):
+      // auto / claro / oscuro en localStorage; sin nada guardado, oscuro.
+      try {
+        var p = localStorage.getItem('montanarusa.tema');
+        if (p === 'claro' || (p === 'auto' && !matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.dataset.tema = 'claro';
+      } catch (e) {}
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Montaña rusa en miniatura</title>
     <meta name="description" content="Diseño y verificación de una montaña rusa en miniatura: geometría de la vía, normativa de aceleraciones y visualizador 3D." />
