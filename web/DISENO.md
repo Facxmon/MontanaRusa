@@ -263,3 +263,126 @@ silencio. `nucleo/serializar.ts` es la única:
 `npm run build` en verde con `golden-port.test.ts` y `golden/` intactos; en el
 navegador, dos hélices con radios 0,7 y 0,4 en la misma secuencia se ven distintas en el 3D, y al
 tipear un valor y pasar con Tab el foco queda en el campo siguiente durante y después del recálculo.
+
+---
+
+# Fase 2 (2026-09-22): control — barra, Generar/Detener, deshacer, guardar, importar
+
+## La barra de aplicación
+
+Una barra que cruza todo el ancho, arriba de todo, en tres zonas: **archivo y edición** a la izquierda
+(deshacer, rehacer, importar, `.json` y el menú Guardar), el **selector de vista** en el centro y
+**Generar / Detener** a la derecha. `.visualizador` pasa de una fila de `100vh` a una fila de barra de
+altura fija más una de contenido. Las pestañas "Vía 3D / Gráficos" estaban flotando en
+`position: absolute` sobre el área principal, justo donde iban los botones de archivo: se mudaron al
+centro de la barra, que era la forma de resolver el choque sin apilar dos barras. El banner de errores
+baja debajo de la barra.
+
+Los iconos son SVG en línea con `currentColor` (no hay librería de iconos y Plex no trae glifos de
+flechas); todo botón con icono lleva `aria-label` y un `title` que incluye el atajo de teclado.
+
+## El cálculo es explícito
+
+Antes, cada edición programaba un recálculo con 400 ms de debounce: editar cinco campos eran hasta cinco
+cálculos de entre 0,3 y 3 s, y en el medio la pantalla mostraba layouts de estados a medio escribir. Ahora:
+
+- `estado.disenoCalculado` es **el diseño al que corresponde el layout en pantalla**. Generar está
+  habilitado cuando `diseno !== disenoCalculado`, y con cambios pendientes muestra un punto de acento.
+- Mientras calcula, el botón pasa a **Detener** con progreso determinado: `calcularLayout` recibe un
+  `alAvanzar?` **opcional** (así los tests existentes no cambian) que se llama después de cada elemento,
+  el worker postea `{ id, progreso }` además de la respuesta final y `ClienteDeCalculo` expone el
+  callback, conservando el descarte por `id` y `PedidoSuperado`.
+- **Al abortar no se toca `estado.layout`**: en pantalla queda el último layout completo, nunca uno a
+  medias. Mientras calcula se ve atenuado (opacidad 0,6) en vez de blanquearse.
+- Atajos `Ctrl+Enter` y `Esc`; casilla **auto-generar** que restaura el debounce de antes, apagada por
+  defecto y persistida en `localStorage`.
+
+### Por qué Detener es `terminate()` y no otra cosa
+
+`ClienteDeCalculo.abortar()` hace `worker.terminate()` y crea un worker nuevo. **No revertir esto sin leer
+lo que sigue.** Un Web Worker no se puede interrumpir de forma cooperativa salvo que el núcleo chequee una
+bandera en cada iteración de sus loops, lo que ensuciaría el port literal de MATLAB (la propiedad que
+sostiene `golden-port.test.ts`). La alternativa, `SharedArrayBuffer` + `Atomics`, exige los headers de
+aislamiento COOP/COEP, que GitHub Pages no permite configurar. `terminate()` es inmediato y garantizado, y
+recrear el worker cuesta decenas de milisegundos porque el módulo ya está en el caché del navegador.
+
+## Deshacer / rehacer
+
+Es barato porque `diseno` es un objeto plano que se reemplaza entero en cada edición: alcanza con guardar
+la referencia anterior. `historial.ts` (puro, testeado) tiene las pilas `pasado` / `futuro` con tope de 50
+y guarda **solo el diseño**, nunca el layout (megabytes, se recalcula). `describirCambio` deduce qué se
+tocó comparando dos diseños, así ningún panel tiene que avisar: devuelve el **campo** (`global:Nombre`,
+`eN:Nombre`, `ei:velocidad`) cuando cambió uno solo y la etiqueta del tooltip (*"deshacer: radioDeLaHelice
+de 2. Hélice"*). Ediciones consecutivas al mismo campo dentro de 500 ms se funden en una entrada, así
+tipear `0.75` no son cuatro deshacer. El deshacer opera sobre el **borrador**: vuelve el diseño, elige la
+instancia del cambio, Generar vuelve a marcar cambios pendientes y no se recalcula solo.
+
+**Ctrl+Z con el foco en un campo de texto** (decisión, documentada también en `paneles/atajos.ts`): si el
+campo tiene una edición **sin confirmar** (`value !== defaultValue`; cada campo iguala `defaultValue` a
+`value` en su `change`), `Ctrl+Z` queda para el deshacer de texto del navegador y revierte lo que se está
+tipeando; en cualquier otro caso —campo ya confirmado, `select`, botón o sin foco— es de la aplicación y
+deshace el último cambio del diseño. Así, arrepentirse a mitad de tipear vuelve el texto, y `Ctrl+Z`
+después de confirmar con Tab o Enter deshace el campo entero, que es lo que se espera de "campo por campo".
+
+## Guardar: tres salidas sobre `serializarDiseno`
+
+1. **Solo parámetros** (`.json`, ~0,5 kB en el circuito de demo): `serializarDiseno` con sangría, botón
+   propio y visible. Es lo que se versiona en git y lo que se comparte.
+2. **Paquete completo** (`.zip`, con fflate): `layout.json` (el contrato entero), `parametros.json`,
+   `series.csv`, `graficos/<pestaña>-<figura>.png` de las cinco pestañas, `vista-3d.png` y `LEEME.txt`
+   con fecha, versiones, caso de origen y contenido. Los textos los arma `nucleo/descargar.ts`, que es
+   puro y se testea en Node. El CSV no es opcional: es lo que hace que las figuras se puedan re-graficar
+   en cualquier lado.
+3. **Copiar link**: el diseño en el hash (`#d=<aTextoCompacto>`), 246 caracteres en el circuito de demo.
+   Al cargar la página con hash se abre ese diseño y se calcula, y el hash se saca con `replaceState`
+   (si no, recargar volvería a abrir el del link y no el último borrador). Es el requisito fundacional de
+   `CONTRATO_VISUALIZADOR.md` §9: que la herramienta se use desde cualquier lado con un link.
+
+### PNG y no JPG (y a 2×)
+
+Las imágenes van en **PNG**. Curvas finas sobre fondo oscuro es el peor caso para JPG: deja halos
+alrededor de cada trazo *y* encima pesa más que el PNG en este tipo de imagen. Se exportan a **2×** para
+que sirvan impresas en la memoria de cálculo:
+
+- Las figuras se dibujan fuera de pantalla al doble de tamaño CSS con trazos, fuentes y ejes escalados al
+  doble (`opcionesDeFigura(datos, tamaño, clave, escala)`, extraída de `Figura` junto con el dibujo de las
+  franjas) y se componen en un canvas propio con fondo, título y leyenda, que en pantalla son DOM. Hay
+  que **esperar un tick**: uPlot dimensiona y dibuja su canvas en un microtask, no en el constructor, y
+  sin eso se exporta un canvas de 300×150 vacío.
+- La vista 3D **no** usa `preserveDrawingBuffer` (costaría rendimiento en cada cuadro): se hace `render()`
+  y `toDataURL()` en el mismo tick. Se captura a 2560×1440 fijos y no al tamaño del contenedor, para que
+  la imagen sirva impresa aunque la ventana esté chica o la pestaña de gráficos esté al frente.
+
+## Importar
+
+Botón en la barra y arrastrar-y-soltar sobre toda la ventana. `nucleo/importar.ts` decide por los campos
+del JSON si es el `.json` de solo parámetros o un layout completo del contrato (del que reconstruye el
+diseño con `disenoDesdeLayout`) y deja hablar al validador que corresponde, de modo que el error nunca es
+genérico: JSON inválido con la posición del parser, MAJOR incompatible con el mensaje de
+`contrato/cargar.ts`, parámetro o tipo de elemento desconocido y valor de forma equivocada con el campo y
+lo esperado (`serializar.ts`), y para cualquier otra cosa, qué claves trae el archivo y cuáles tiene cada
+formato.
+
+## Persistencia y errores por campo
+
+- El diseño se guarda **serializado** en `localStorage` (debounce de 1 s, ~1 kB; nunca el layout) y se
+  restaura al abrir con un aviso discreto y un botón para descartarlo. `paneles/almacen.ts` envuelve
+  `localStorage` para que una ventana privada o el almacenamiento lleno no rompan nada.
+- **Precedencia al cargar**: hash de la URL > `?caso=` > `localStorage` > primer golden del índice.
+- **Errores por campo**: `diagnostico.ts` busca en el mensaje del núcleo los nombres de
+  `ParametrosPorDefecto()` (nombre completo, sin letras alrededor) y resalta esos campos en el formulario
+  con el mensaje debajo, además del banner, abriendo el grupo cerrado que los contenga. No hace falta que
+  el núcleo devuelva códigos: si mañana un mensaje nombra otro parámetro, el resaltado aparece solo. Única
+  excepción documentada: los mensajes del modo nombran el **valor** y no el parámetro ("El modo
+  FuerzaGConstante pide +Gz pero…"), así que los cuatro modos cuentan como `ModoCurvatura`. La instancia
+  donde falló el cálculo llega por `ErrorDeCalculo.elemento` y marca su fila de la secuencia.
+
+## Verificado
+
+`npm test` (189 tests, ~14 s) y `npm run build` en verde, con `golden-port.test.ts` y `golden/` intactos.
+En el navegador, sobre `circuito-demolayout`: cinco ediciones seguidas disparan **cero** cálculos y
+Generar dispara exactamente uno (contando los `postMessage` al worker); Detener a mitad de camino (2/4)
+deja el layout anterior completo en pantalla y la app utilizable al instante; el contador del botón avanza
+1/4, 2/4, 3/4; `Ctrl+Z` deshace campo por campo con el tooltip diciendo cuál; el link copiado abre el
+mismo diseño en otra carga; el `.zip` trae 16 archivos (1,6–3 MB según el caso) con las figuras a 1920 px
+de ancho y la vista 3D a 2560×1440; recargar la página restaura el diseño con el aviso.
