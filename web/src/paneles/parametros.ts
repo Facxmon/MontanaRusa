@@ -39,6 +39,7 @@ import { ayudaDeCampo } from './ayuda';
 import { el } from './dom';
 import {
   aSI,
+  digitosDeEntrada,
   elementosQueLoConsumen,
   etiquetaDe,
   fueraDelRango,
@@ -67,10 +68,18 @@ type Actualizar = (nombre: NombreDeParametro, valor: unknown) => void;
  *
  * Salirse del rango sugerido es un AVISO, nunca un bloqueo: si el valor
  * rompe algo, el que se tiene que quejar es el criterio de aceptacion.
+ *
+ * EL VALOR EXACTO VIVE EN LA CLOSURE, NO EN EL INPUT. `exportar.ts`
+ * redondea todo a 6 cifras al escribir el JSON (deliberado, y cubierto por
+ * los tests de paridad con MATLAB), asi que deg2rad(55) vuelve del JSON como
+ * 0,959931 y en grados da 54,99999493. Mostrando con los decimales de la
+ * unidad se lee "55.0", y como al estado se escribe SOLO si el texto cambio,
+ * un campo que el usuario no toca conserva su valor original exacto y no
+ * suma un error de ida y vuelta por cada dibujo del formulario.
  */
 function entradaNumerica(valorSI: number, etiqueta: Etiqueta, alCambiar: (v: number) => void): HTMLInputElement {
   const unidad = etiqueta.unidadDePresentacion;
-  const mostrado = textoDeEntrada(valorSI, unidad);
+  let mostrado = textoDeEntrada(valorSI, unidad);
   const entrada = el('input', {
     type: 'number',
     step: unidad ? String(unidad.paso) : 'any',
@@ -82,10 +91,16 @@ function entradaNumerica(valorSI: number, etiqueta: Etiqueta, alCambiar: (v: num
       if (texto.trim() === '' || !Number.isFinite(numero)) return;
       // Confirmado: defaultValue marca lo que ya esta en el diseno (atajos.ts decide con eso a quien va Ctrl+Z).
       campo.defaultValue = texto;
+      // Foco y blur sin tocar nada, o volver a tipear lo mismo, no es una
+      // edicion: escribir aca convertiria "55.0" en deg2rad(55) y cambiaria
+      // el diseno sin que nadie lo haya pedido.
+      if (texto === mostrado) return;
+      mostrado = texto;
       avisarDelRango(campo, numero, etiqueta);
       alCambiar(aSI(numero, unidad));
     },
   });
+  entrada.style.setProperty('--digitos', String(digitosDeEntrada(etiqueta)));
   avisarDelRango(entrada, Number(mostrado), etiqueta);
   return entrada;
 }

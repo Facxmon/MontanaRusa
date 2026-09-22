@@ -452,8 +452,12 @@ summary { cursor: pointer; font-size: var(--texto-sm); color: var(--texto-1); pa
 }
 .campo-etiqueta { color: var(--texto-1); overflow-wrap: anywhere; }
 .campo-etiqueta small { color: var(--texto-2); }
+/* El ancho sale de la unidad de presentacion: --digitos lo pone
+   entradaNumerica con digitosDeEntrada() (signo + enteros del rango + los
+   decimales declarados), para que ningun valor razonable desborde. */
 .campo input[type="number"], .campo input[type="text"] {
-  width: var(--ancho-campo);
+  width: calc(var(--digitos, 8) * 1ch + var(--esp-6));
+  min-width: var(--ancho-campo-chico);
   padding: var(--esp-1) var(--esp-2);
   background: var(--superficie-0);
   color: var(--texto-1);
@@ -468,10 +472,10 @@ summary { cursor: pointer; font-size: var(--texto-sm); color: var(--texto-1); pa
 /* Fuera del rango sugerido: aviso, nunca bloqueo (lo dicen los criterios). */
 .campo input[type="number"].fuera-de-rango { border-color: var(--alerta); color: var(--alerta); }
 .campo-vector { display: inline-flex; gap: var(--esp-1); }
-.campo-vector input[type="number"] { width: var(--ancho-campo-chico); }
+.campo-vector input[type="number"] { width: calc(var(--digitos, 6) * 1ch + var(--esp-5)); min-width: 0; }
 .campo-caja { display: inline-flex; flex-direction: column; gap: var(--esp-1); }
 .campo-fila { display: inline-flex; gap: var(--esp-1); align-items: center; font-family: var(--mono); font-size: var(--texto-xs); color: var(--texto-2); }
-.campo-fila input[type="number"] { width: var(--ancho-campo-chico); }
+.campo-fila input[type="number"] { width: calc(var(--digitos, 6) * 1ch + var(--esp-5)); min-width: 0; }
 .campo-anulable { display: inline-flex; flex-direction: column; gap: var(--esp-1); align-items: flex-end; }
 .campo-vacio { font-size: var(--texto-xs); color: var(--texto-2); }
 
