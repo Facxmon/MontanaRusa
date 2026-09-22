@@ -386,3 +386,95 @@ deja el layout anterior completo en pantalla y la app utilizable al instante; el
 1/4, 2/4, 3/4; `Ctrl+Z` deshace campo por campo con el tooltip diciendo cuál; el link copiado abre el
 mismo diseño en otra carga; el `.zip` trae 16 archivos (1,6–3 MB según el caso) con las figuras a 1920 px
 de ancho y la vista 3D a 2560×1440; recargar la página restaura el diseño con el aviso.
+
+---
+
+# Fase 3 (2026-09-22): lectura — nombres, unidades, tooltips y gráficos
+
+Nada de esta fase toca el contrato ni el núcleo: **el JSON sigue en SI y radianes**, y todas las
+conversiones que se agregan son de presentación, como ya lo era el rad → ° de `formato.ts`.
+
+## Qué cambió y por qué
+
+| Pieza | Qué se hizo | Por qué |
+|---|---|---|
+| `src/paneles/etiquetas.ts` | Un `Record<NombreDeParametro, Etiqueta>` con nombre humano, ayuda, unidad de presentación, rango sugerido y grupo, más las cuatro funciones de conversión (`aPresentacion`, `aSI`, `textoDeEntrada`, `textoConUnidad`). La **`ayuda` no se escribe ahí**: sale de las descripciones que ya declaran `ParametrosDelModo`, `ParametrosDeAceptacion`, `ParametrosGenerales` y `DECLARACIONES_DE_ELEMENTOS`, las mismas que viajan en `parametros.esquema` del contrato. | El formulario mostraba `radioDeLaHelice` y `semianchoDeSuavizadoNormativo` en camelCase, y la descripción solo existía como `title`. Lo único que faltaba era el nombre humano: reescribir las descripciones habría creado una segunda fuente de verdad que se desincroniza en silencio. La excepción es `ModoCurvatura`, que el exportador deja fuera de las cuatro listas a propósito (§3 del contrato) y por lo tanto no tiene descripción que reusar. |
+| `src/paneles/ayuda.ts` | El `?` al lado de cada etiqueta abre un popover con el **atributo nativo `popover`**, sin librerías. Se abre con hover, con foco de teclado y con clic (que además lo fija); `aria-describedby` apunta al popover. Contenido: nombre, qué modifica, unidad, valor por defecto, rango sugerido, en qué modos se consume, qué elementos lo declaran y la clave del JSON. | `title=` tarda cerca de un segundo, no se puede estilar, no existe en táctil y el `overflow` del panel lateral lo recorta. El popover se dibuja en el **top layer**, así que ningún scroll lo puede cortar, y trae Esc y clic-afuera gratis. |
+| Unidades de presentación | Radios, avances y dimensiones del carro en **cm**; pasos, holguras y diámetros en **mm**; área frontal en **cm²**; masa en **gramos**; ángulos en grados (como ya estaban). Cada input recibe el `step` de su unidad (0,5 cm, 0,1 mm, 1°) en lugar del `step="any"` anterior. | Los valores estaban en unidades demasiado grandes para el modelo: `radioDeLaHelice` se editaba como `0,7` y `pasoGeneracion` como `0,002`. Con `step="any"` las flechitas del teclado no servían para nada. |
+| Grupo "Avanzado — numérico" | Las diez tolerancias, topes de iteración y pasos de dibujo (`TolNorma`, `TolPuntoFijo`, `TolCierrePitch`, `MaxIteraciones*`, `MargenDeOnset`, `PasosEntreOrtonormalizaciones`, `VersoresEnGrafico3D`, `ToleranciaVelocidadDeDiseno`) se marcan `grupo: 'solver'` y van a un desplegable propio, cerrado. Aceptación queda en 12 campos y Generales en 26. | No son decisiones de diseño sino del solver, y mezclarlas con los radios era parte de por qué el panel abrumaba. |
+| Redondeo de los inputs | Se muestra con los decimales declarados y el **valor exacto vive en una variable de la closure** de `entradaNumerica`; al estado se escribe **solo si el texto cambió**. El ancho del input sale de la unidad (`--digitos` = signo + enteros del rango + decimales). | La página publicada mostraba `peralteDeLaHelice = 54,9999949` y `anguloDelGiro = 120,000288`, que además desbordaban el input de 96 px. La causa no era el formulario sino la vuelta por el JSON: `exportar.ts` redondea a `Number(v.toPrecision(6))` (deliberado y cubierto por los tests de paridad), así que `deg2rad(55)` vuelve como `0,959931` = 54,99999493°. El redondeo del export **no se tocó**; lo que se arregló es que un campo que el usuario no toca no acumule error de ida y vuelta. |
+| Gráficos | Expandir por figura (Esc vuelve), alto configurable 240/360/480 persistido, zoom en Y, zoom con la rueda, desplazamiento con Shift o con la rueda apretada, cartel de ayuda una sola vez, tooltip en el cursor, estadística del rango elegido (máximo, mínimo, promedio y **dónde** ocurre el máximo), exportar PNG a 2× y CSV por figura, y la leyenda arriba del gráfico en una línea. | `height` estaba clavado en el método privado `tamano()`; el zoom por arrastre existía pero nada lo indicaba; leer un pico de G obligaba a estimar a ojo. **No se cambió uPlot por otra librería**: es más chica y más rápida que las alternativas y nada de esto la necesita. |
+| Cursor ligado | El **índice de nodo global** es el estado compartido (`estado.nodo`). Mover el cursor sobre un gráfico mueve un marcador sobre la vía 3D; mover el carro con el reproductor mueve el cursor de los gráficos; un clic en un punto lleva el reproductor a ese instante. Vista nueva **"Ambos"**, que parte el área principal. | Es lo que convierte "gráficos al lado de un 3D" en un instrumento. La vista "Ambos" no es cosmética: con las dos vistas excluyentes de antes, "pasar el mouse por un pico de Gz ilumina ese punto de la vía" no se podía ver nunca. |
+| Veredicto e inertes | `contrato/veredicto.ts` (puro) y `paneles/veredicto.ts`: pasa / no pasa en grande, Gz máxima, Gz mínima y \|Gy\| máxima con el elemento, el subtramo y el arco donde ocurren, el criterio que peor está, y los `inertes` que la fase 1 dejó en el layout exportado. | Los criterios de aceptación son el diferencial del proyecto (aplican ASTM F2291) y eran una lista al final de un panel al que había que scrollear, visible solo con un elemento elegido. Es presentación: el cálculo ya estaba en `AjustarParametros` y en los `criterios` del JSON. |
+
+## Invariantes: uno que cambia y uno nuevo
+
+**Cambia el invariante del formulario.** Hasta la fase 2 valía que *"el formulario sale del esquema del
+JSON, no de una lista escrita en la web: si MATLAB o el port declaran un parámetro nuevo, aparece solo"*.
+`etiquetas.ts` **es** una lista escrita en la web y por lo tanto se puede desincronizar del núcleo. Lo
+reemplaza un invariante equivalente y verificable:
+
+> **`test/etiquetas.test.ts` recorre `Object.keys(ParametrosPorDefecto())` y falla si algún parámetro no
+> tiene entrada en `etiquetas.ts`.** La desincronización pasa a ser un test rojo y no un bug silencioso.
+
+El test comprueba además que ningún nombre humano sea el camelCase del parámetro, que la ayuda no esté
+vacía y salga del núcleo, que los numéricos declaren unidad y los no numéricos no, que los valores por
+defecto caigan dentro de su rango sugerido y que ninguno desborde el ancho declarado del input. La otra
+mitad del invariante viejo se conserva: **las cuatro listas y las descripciones siguen saliendo del
+núcleo**, no del diccionario.
+
+**La unidad de presentación se declara parámetro por parámetro, no por tipo de dimensión.**
+`RadioDeReferenciaReal` (8 m) y `LargoCarroReal` (2,2 m) son longitudes igual que `RadioDeLaHelice`
+(0,7 m), pero son del **prototipo** y no del modelo: pasarlos a centímetros borraría de la pantalla la
+diferencia de escala que ancla λ de Froude, que es de lo que trata el proyecto. Por eso la unidad no se
+puede derivar de la unidad SI que declara el núcleo, y por eso está escrito también en la cabecera de
+`etiquetas.ts` para que nadie lo "corrija".
+
+Corolario práctico: un parámetro nuevo aparece en el formulario solo (lo declara el núcleo) pero con el
+test en rojo hasta que se le escriba nombre, unidad y rango.
+
+## Decisiones de esta fase
+
+- **`popover` nativo y posición calculada a mano.** El anchor positioning de CSS sigue siendo solo de
+  Chromium, y un popover sin posicionar se dibuja centrado en la pantalla, que sería peor que el `title`.
+  `ayuda.ts` usa `getBoundingClientRect` del botón y acota a la ventana. El clic lo maneja un listener y
+  **no** el atributo `popovertarget`: el toggle nativo corre después de los listeners y cerraría lo que
+  el hover acababa de abrir.
+- **El `mousedown` del desplazamiento de los gráficos se escucha en `u.root` en fase de captura.** uPlot
+  registra el suyo sobre `u.over` en el constructor, o sea antes que cualquier listener que se agregue en
+  el hook `ready`; desde un ancestro en captura es la única forma de ganarle para que no arranque una
+  selección.
+- **La rueda queda tomada por el zoom mientras el puntero está sobre una figura**, que es lo que se pidió.
+  La lista de figuras se recorre con la barra de la derecha o expandiendo una (⤢), y el cartel de ayuda
+  lo dice. Invertirlo (pedir Ctrl para el zoom) es cambiar una condición en `figura.ts`.
+- **El marcador del 3D se aplica en el `requestAnimationFrame` de la escena.** `via.marcarNodo()` solo
+  anota el pedido y `via.actualizarMarcador()` lo aplica desde `escena.enCadaCuadro`: el cursor se mueve
+  en cada evento de mouse y el carro en cada cuadro, y tocar Three.js ahí sería trabajo tirado entre dos
+  cuadros. Por la misma razón la tabla de "valores en el cursor" se arma una vez por layout y después
+  solo se le reescribe el texto a cada celda.
+- **El "criterio peor" compara margenes relativos al límite.** Los criterios están en unidades distintas
+  (metros contra G contra radianes) y comparar margenes crudos sería sumar peras con manzanas. Si todos
+  pasan, se muestra el más ajustado en vez de nada.
+- **El reproductor pasa a vivir dentro de `.vista3d`.** Flotando sobre `.principal` quedaría sobre los
+  gráficos al partir el área en la vista "Ambos".
+- **`slug` y `descargarArchivo` se mudan a `paneles/archivo.ts`.** Los botones de exportar de cada figura
+  los necesitan, y que `graficos/` importara `guardar.ts` (que importa `graficos/series` y
+  `graficos/exportarFigura`) cerraría un ciclo entre los dos módulos.
+
+## Verificado
+
+`npm test` (227 tests) y `npm run build` en verde, con `golden-port.test.ts` y `golden/` intactos. En el
+navegador, sobre `circuito-demolayout`:
+
+- los 61 inputs del panel entran en su caja, la hélice se edita como `70,0 cm` y `55,0°`,
+  `radioDeReferenciaReal` sigue en `8,00 m`, y reconfirmar un campo sin cambiarlo **no** marca cambios
+  pendientes mientras que editarlo sí;
+- el `?` abre al instante, no lo recorta el panel y el clic lo deja fijo;
+- se hace zoom arrastrando, la estadística del rango aparece con el máximo, el mínimo, el promedio y
+  dónde ocurre el máximo, y el doble clic vuelve;
+- moviendo el mouse por la curva de Gx el marcador azul recorre la hélice en el 3D, un clic lleva el
+  reproductor a ese instante, y con play el cursor de los gráficos avanza solo y el bloque de valores
+  sigue al carro entre elementos;
+- el panel abre con "No pasa — 8 de 105 criterios" y el criterio peor (`Altura del riel sobre el suelo`,
+  4. DiveLoop, margen −0,325 m); pisando `RadioDelLoop` en una instancia y cambiándola a `Helice`, el
+  aviso de inerte aparece en el panel de resultados.
