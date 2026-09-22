@@ -21,6 +21,7 @@ import type { EntradaDeDiseno } from './nucleo/calcular';
 import { CalculoAbortado, ClienteDeCalculo, ErrorDeCalculo, PedidoSuperado } from './nucleo/cliente';
 import { deserializarDiseno, desdeTextoCompacto } from './nucleo/serializar';
 import { montarAtajos } from './paneles/atajos';
+import { montarBienvenida } from './paneles/bienvenida';
 import { montarAviso } from './paneles/aviso';
 import { montarCriterios } from './paneles/criterios';
 import { montarValoresDelCursor } from './paneles/cursor';
@@ -66,6 +67,7 @@ function armarDom() {
 
   const selectorDeCaso = el('section');
   const selectorDePanel = el('nav', { class: 'pestanas pestanas-panel', role: 'tablist', 'aria-label': 'Panel' });
+  const bienvenida = el('section');
   const veredicto = el('section');
   const leyenda = el('section');
   const resumenLayout = el('section');
@@ -73,7 +75,7 @@ function armarDom() {
   const resumenElemento = el('section');
   const criterios = el('section');
   const valoresDelCursor = el('section');
-  const panelResultados = el('div', { class: 'panel-resultados' }, veredicto, leyenda, resumenLayout, valoresDelCursor, elementos, resumenElemento, criterios);
+  const panelResultados = el('div', { class: 'panel-resultados' }, bienvenida, veredicto, leyenda, resumenLayout, valoresDelCursor, elementos, resumenElemento, criterios);
   const diseno = el('section');
   const parametros = el('section');
   const panelDiseno = el('div', { class: 'panel-diseno', hidden: true }, diseno, parametros);
@@ -101,6 +103,7 @@ function armarDom() {
     cabecera,
     selectorDeCaso,
     selectorDePanel,
+    bienvenida,
     veredicto,
     leyenda,
     resumenLayout,
@@ -399,6 +402,70 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     }, 12000);
     return true;
   }
+
+  // Recorridos de la bienvenida (fase 4.7): cargan un ejemplo y muestran algo
+  // concreto. Todos pasan por el mismo estado que usa el resto de la app.
+  /** Carga un golden (si no es el que esta en pantalla) y despues corre fn. */
+  function conCaso(caso: string, fn: () => void): void {
+    const e = estado.get();
+    if (e.fuente === 'golden' && e.caso === caso && e.layout && !e.cargando) {
+      fn();
+      return;
+    }
+    const cancelar = estado.suscribir((nuevo, anterior) => {
+      if (nuevo.caso !== caso) return cancelar();
+      if (anterior.cargando && !nuevo.cargando) {
+        cancelar();
+        if (nuevo.layout && !nuevo.error) fn();
+      }
+    });
+    estado.set({ caso, elemento: null, fuente: 'golden', diseno: null, disenoCalculado: null, instancia: null, error: null });
+  }
+  /** Abre un diseno a partir del golden, le aplica un cambio y lo genera, con los graficos de G a la vista. */
+  function probarCambio(caso: string, cambiar: (d: EntradaDeDiseno) => EntradaDeDiseno, explicacion: string): void {
+    conCaso(caso, () => {
+      abrirDiseno();
+      const diseno = estado.get().diseno;
+      if (!diseno) return;
+      estado.set({ diseno: cambiar(diseno), vista: 'ambos', pestana: 'g', ejeX: 'arco', panel: 'resultados' });
+      generar();
+      aviso.mostrar(explicacion);
+    });
+  }
+  const bienvenidaMontada = montarBienvenida(dom.bienvenida, [
+    {
+      clave: 'dive-loop',
+      titulo: 'Mirá el dive loop',
+      detalle: 'El circuito de ejemplo, con la cámara sobre el dive loop.',
+      hacer: () =>
+        conCaso('circuito-demolayout', () => {
+          const indice = estado.get().layout?.elementos.findIndex((e) => e.tipo === 'DiveLoop') ?? -1;
+          estado.set({ elemento: indice >= 0 ? indice : null, panel: 'resultados', vista: estado.get().vista === 'graficos' ? 'via3d' : estado.get().vista });
+        }),
+    },
+    {
+      clave: 'radio-del-loop',
+      titulo: 'Subí el radio del loop y mirá cómo cae la Gz',
+      detalle: 'El loop de 30 a 45 cm a la misma velocidad: v²/R es menor.',
+      hacer: () =>
+        probarCambio(
+          'loop-clotoide',
+          (d) => ({ ...d, parametros: { ...d.parametros, RadioDelLoop: d.parametros.RadioDelLoop * 1.5 } }),
+          'Radio del loop × 1,5: la Gz máxima baja (veredicto y gráfico de Gz). Deshacer (Ctrl+Z) vuelve al radio original.',
+        ),
+    },
+    {
+      clave: 'g-constante',
+      titulo: 'Cambiá el modo de curvatura a G constante',
+      detalle: 'El mismo loop, con la curvatura que mantiene la G fija.',
+      hacer: () =>
+        probarCambio(
+          'loop-clotoide',
+          (d) => ({ ...d, parametros: { ...d.parametros, ModoCurvatura: 'FuerzaGConstante' } }),
+          'Modo FuerzaGConstante: la curvatura se ajusta para que la G quede fija; mirá la meseta en el gráfico de Gz.',
+        ),
+    },
+  ]);
 
   // Precedencia al arrancar: hash de la URL > ?caso= > localStorage > primer golden del indice.
   async function arrancar(): Promise<void> {

@@ -932,3 +932,34 @@ summary { cursor: pointer; font-size: var(--texto-sm); color: var(--texto-1); pa
 @media (max-width: 900px) {
   .reproductor { flex-wrap: wrap; }
 }
+
+/* ---------- bienvenida (fase 4.7) ---------- */
+.bienvenida {
+  padding: var(--esp-3) var(--esp-4) var(--esp-4);
+  background: var(--acento-suave);
+  border: 1px solid var(--acento);
+  border-radius: var(--radio-grande);
+}
+.bienvenida-cabecera { display: flex; align-items: center; justify-content: space-between; gap: var(--esp-2); }
+.bienvenida-cabecera h2 { margin: 0; color: var(--texto-1); }
+.bienvenida-texto { margin: var(--esp-2) 0 var(--esp-3); font-size: var(--texto-sm); line-height: 1.5; color: var(--texto-1); }
+.bienvenida-recorridos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--esp-2); }
+.recorrido {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: var(--esp-2) var(--esp-3);
+  background: var(--superficie-1);
+  color: var(--texto-1);
+  border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-rapida) var(--curva);
+}
+.recorrido:hover { border-color: var(--acento); }
+.recorrido-titulo { font-weight: 600; font-size: var(--texto-sm); }
+.recorrido-titulo::after { content: " →"; color: var(--acento); }
+.recorrido-detalle { font-size: var(--texto-xs); color: var(--texto-2); }
