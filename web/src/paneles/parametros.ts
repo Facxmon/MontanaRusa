@@ -13,6 +13,11 @@
 //
 // Edita estado.diseno (los Parametros del nucleo, en PascalCase, y los
 // ajustes de cada instancia).
+//
+// Lo que se VE no es el nombre del nucleo: cada campo se dibuja con el
+// nombre humano y la unidad de presentacion de etiquetas.ts, y con un "?"
+// que abre el popover de ayuda.ts. El valor que se guarda sigue siendo el
+// del nucleo, en SI y radianes.
 
 import type { DeclaracionDeParametro } from '../contrato/tipos';
 import type { Diagnostico } from '../diagnostico';
@@ -30,7 +35,9 @@ import {
   ParametrosPorDefecto,
 } from '../nucleo/parametros';
 import type { Declaracion, ModoCurvatura, NombreDeParametro, Parametros } from '../nucleo/tipos';
+import { ayudaDeCampo } from './ayuda';
 import { el } from './dom';
+import { elementosQueLoConsumen, etiquetaDe, modosQueLoConsumen, textoConUnidad, textoDeEntrada, type Etiqueta } from './etiquetas';
 
 const RAD_A_GRADOS = 180 / Math.PI;
 
@@ -64,10 +71,65 @@ function entradaNumerica(valor: number, unidad: string, alCambiar: (v: number) =
   return entrada;
 }
 
+/** Los defaults se leen una vez: el popover de cada campo muestra el suyo. */
+const DEFECTOS = ParametrosPorDefecto();
+
+/** El valor por defecto de un parametro, ya en unidad de presentacion, para el popover. */
+function textoDelDefecto(nombre: NombreDeParametro, etiqueta: Etiqueta): string {
+  const valor = (DEFECTOS as unknown as Record<string, unknown>)[nombre];
+  const unidad = etiqueta.unidadDePresentacion;
+  if (valor === null || valor === undefined) return 'vacío (derivar)';
+  if (typeof valor === 'boolean') return valor ? 'sí' : 'no';
+  if (typeof valor === 'number') return textoConUnidad(valor, unidad);
+  if (Array.isArray(valor)) {
+    const uno = (v: unknown): string => (Array.isArray(v) ? `[${v.map(uno).join(', ')}]` : typeof v === 'number' ? textoDeEntrada(v, unidad) : String(v));
+    const lista = valor.map(uno).join(', ');
+    return unidad && unidad.simbolo !== '-' ? `${lista} ${unidad.simbolo}` : lista;
+  }
+  return String(valor);
+}
+
+function textoDelRango(etiqueta: Etiqueta): string | undefined {
+  const rango = etiqueta.rangoSugerido;
+  if (!rango) return undefined;
+  const simbolo = etiqueta.unidadDePresentacion?.simbolo;
+  const sufijo = !simbolo || simbolo === '-' ? '' : simbolo === '°' ? '°' : ` ${simbolo}`;
+  return `${rango[0]} a ${rango[1]}${sufijo}`;
+}
+
+/**
+ * La etiqueta visible de un campo: nombre humano, unidad de presentacion
+ * entre corchetes y el "?" que abre el popover. Nunca el camelCase del
+ * nucleo, que ahora solo aparece dentro del popover ("En el JSON").
+ */
+function etiquetaVisible(nombre: NombreDeParametro, descripcion: string, clave: string) {
+  const etiqueta = etiquetaDe(nombre);
+  const simbolo = etiqueta.unidadDePresentacion?.simbolo ?? '-';
+  const ayuda = ayudaDeCampo({
+    titulo: etiqueta.nombre,
+    // Gana la descripcion del contexto (la del elemento concreto, que para
+    // SentidoDelGiro no dice lo mismo en el dive loop que en la helice).
+    ayuda: descripcion || etiqueta.ayuda,
+    unidad: simbolo,
+    porDefecto: textoDelDefecto(nombre, etiqueta),
+    rango: textoDelRango(etiqueta),
+    modos: modosQueLoConsumen(nombre),
+    elementos: elementosQueLoConsumen(nombre),
+    clave,
+  });
+  const texto = el(
+    'span',
+    { class: 'campo-etiqueta' },
+    etiqueta.nombre,
+    simbolo !== '-' ? el('small', {}, ` [${simbolo}]`) : null,
+    ayuda.boton,
+  );
+  return { texto, ayuda, etiqueta };
+}
+
 function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: Actualizar, diagnostico?: Diagnostico | null): HTMLElement {
   const nombre = pascal(declaracion.clave);
-  const unidad = declaracion.unidad === 'rad' ? '°' : declaracion.unidad;
-  const etiqueta = el('span', { class: 'campo-etiqueta', title: declaracion.descripcion }, declaracion.clave, unidad !== '-' ? el('small', {}, ` [${unidad}]`) : null);
+  const { texto: etiqueta, ayuda } = etiquetaVisible(nombre, declaracion.descripcion, declaracion.clave);
   let control: HTMLElement;
 
   const opciones = nombre === 'ModoCurvatura' ? undefined : OPCIONES_DE_PARAMETRO[nombre];
@@ -117,7 +179,14 @@ function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: 
   } else {
     control = el('span', { class: 'ayuda' }, String(valor));
   }
-  return marcarSiTieneError(el('label', { class: 'campo' }, etiqueta, control), nombre, diagnostico);
+  describir(control, ayuda.id);
+  return marcarSiTieneError(el('label', { class: 'campo' }, etiqueta, control, ayuda.popover), nombre, diagnostico);
+}
+
+/** aria-describedby del popover sobre el control (o sobre cada input, si son varios). */
+function describir(control: HTMLElement, id: string): void {
+  const controles = control.matches('input, select') ? [control] : Array.from(control.querySelectorAll('input, select'));
+  for (const c of controles) c.setAttribute('aria-describedby', id);
 }
 
 /**
@@ -251,6 +320,13 @@ function ficha(inst: InstanciaDeElemento, orden: number, diseno: EntradaDeDiseno
   );
 }
 
+/** El selector de modo, con la misma etiqueta humana y el mismo "?" que los demas campos. */
+function campoDelModo(selector: HTMLElement, diagnostico: Diagnostico | null): HTMLElement {
+  const { texto, ayuda } = etiquetaVisible('ModoCurvatura', '', 'modoCurvatura');
+  describir(selector, ayuda.id);
+  return marcarSiTieneError(el('label', { class: 'campo' }, texto, selector, ayuda.popover), 'ModoCurvatura', diagnostico);
+}
+
 export function montarParametros(contenedor: HTMLElement, estado: Estado): void {
   // Los cambios que salen de este formulario no lo redibujan (se perderia el
   // foco), salvo el modo de curvatura, que cambia que parametros se muestran,
@@ -307,7 +383,7 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
       el('details', { open: true },
         el('summary', {}, 'Modo de curvatura'),
         el('div', { class: 'campos' },
-          marcarSiTieneError(el('label', { class: 'campo' }, el('span', { class: 'campo-etiqueta' }, 'modoCurvatura'), selectorDeModo), 'ModoCurvatura', diagnostico),
+          campoDelModo(selectorDeModo, diagnostico),
           modo.Nota ? el('p', { class: 'ayuda' }, modo.Nota) : null,
           declaraciones(modo.Lista).map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizarGlobal, diagnostico)),
         ),

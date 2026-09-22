@@ -473,6 +473,67 @@ summary { cursor: pointer; font-size: var(--texto-sm); color: var(--texto-1); pa
 .campo-anulable { display: inline-flex; flex-direction: column; gap: var(--esp-1); align-items: flex-end; }
 .campo-vacio { font-size: var(--texto-xs); color: var(--texto-2); }
 
+/* El "?" de cada etiqueta y su popover (paneles/ayuda.ts). El popover va al
+   top layer, asi que el scroll del panel no lo puede recortar; la posicion
+   la calcula ayuda.ts y llega como left/top en linea. */
+.campo-ayuda {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--esp-4);
+  height: var(--esp-4);
+  margin-left: var(--esp-1);
+  padding: 0;
+  vertical-align: middle;
+  background: transparent;
+  color: var(--texto-2);
+  border: 1px solid var(--borde-sutil);
+  border-radius: 50%;
+  font-family: var(--fuente);
+  font-size: var(--texto-xs);
+  line-height: 1;
+  cursor: help;
+}
+.campo-ayuda:hover,
+.campo-ayuda:focus-visible {
+  color: var(--acento);
+  border-color: var(--acento);
+  outline: none;
+}
+.ayuda-popover {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: var(--ancho-popover);
+  max-width: calc(100vw - var(--esp-4));
+  padding: var(--esp-3);
+  background: var(--superficie-2);
+  color: var(--texto-1);
+  border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra-flotante);
+  font-size: var(--texto-sm);
+  line-height: 1.45;
+}
+.ayuda-popover[hidden] { display: none; }
+.ayuda-titulo { margin: 0 0 var(--esp-1); font-weight: 600; }
+.ayuda-texto { margin: 0; color: var(--texto-2); }
+.ayuda-datos {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--esp-1) var(--esp-2);
+  margin: var(--esp-2) 0 0;
+  font-size: var(--texto-xs);
+}
+.ayuda-datos dt { color: var(--texto-3); }
+.ayuda-datos dd {
+  margin: 0;
+  color: var(--texto-1);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
 .parametros-cabecera { display: flex; align-items: center; justify-content: space-between; gap: var(--esp-2); }
 .parametros-cabecera h2 { margin: 0; }
 
