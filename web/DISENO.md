@@ -546,8 +546,34 @@ llegar ahí, en el build el CSS de la portada va **dentro** del HTML (`plugins/c
 aparte eran dos viajes antes de pintar) y la portada usa solo Plex Sans 400 y 600, precargadas. El evento
 `load` llega a 1,4 s porque espera las dos fuentes (43 kB), que entran con `swap` sobre un texto ya pintado.
 
+## Modo de curvatura por instancia
+
+Pedido del autor al cerrar la fase: el modo de curvatura era global (la fase 1 dejó por instancia solo los
+parámetros geométricos) y no hay razón física para eso: un loop en clotoide y una hélice en G normativa en
+el mismo circuito es un diseño válido. El núcleo ya lo admitía: `AjustarParametros` (en MATLAB y en TS)
+aplica cualquier ajuste, incluido `ModoCurvatura`, y calcula los inertes contra el modo ya pisado; cada
+elemento se construye con sus propios `Parametros`. Lo que faltaba era la interfaz:
+
+- La ficha de cada instancia tiene una sección **Modo de curvatura**: el selector (heredado del global o
+  pisado, con ↺) y debajo los parámetros de ese modo, también heredados o pisados. Cambiar el modo de la
+  instancia redibuja la ficha, porque cambia qué parámetros consume.
+- El modo global queda como el de todas las instancias que no lo pisan, y su tarjeta dice cuántas tienen
+  modo propio.
+- `contrato/modo.ts` (puro): `modoEfectivo` para el diseño y `modoDelElemento` para un layout del
+  contrato. El resumen del layout, el del elemento (fila "Modo de curvatura") y los avisos de inertes leen
+  el modo **del elemento**, no el global.
+- **Sin cambio de contrato.** `modoCurvatura` está en `parametros.defaults`, así que viaja en
+  `elementos[].ajustes` (opcional desde 1.1.0); la regla `ajustes.modoCurvatura ??
+  parametros.valores.modoCurvatura` quedó escrita en `CONTRATO_VISUALIZADOR.md` §6. Un campo nuevo
+  habría duplicado el dato y, emitido siempre, habría roto la igualdad byte a byte con MATLAB sin ajustes.
+- `test/modo.test.ts`: pisar el modo en la instancia da exactamente lo mismo que ponerlo global; dos
+  modos en un circuito quedan en el layout y vuelven por `disenoDesdeLayout`; los inertes se evalúan
+  contra el modo pisado; la serialización lo conserva y rechaza un modo inexistente.
+
 ## Invariantes nuevos
 
+- **El modo de un elemento es `ajustes.modoCurvatura ?? parametros.valores.modoCurvatura`**
+  (`contrato/modo.ts`); nada de la interfaz lee el modo global para describir un elemento.
 - **La escena 3D no depende del tema**: sus tokens viven en `:root`, fuera de los bloques de tema
   (`preferenciaDeTema.test.ts`).
 - **Toda animación se apaga con `prefers-reduced-motion`**, incluida la cámara (`movimientoReducido()`).

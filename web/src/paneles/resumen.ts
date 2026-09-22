@@ -7,6 +7,7 @@ import { esRecalculo, type Estado } from '../estado';
 import { destellarCambios, el, fila, tarjeta, vaciar, valoresPorClave } from './dom';
 import { decimalesDeUnidad, formatear, formatearNumero } from './formato';
 import { textoDeInerte } from './parametros';
+import { elementosConModoPropio, modoDelElemento } from '../contrato/modo';
 import type { NombreDeParametro } from '../nucleo/tipos';
 
 function tablaDelLayout(resumen: ResumenLayout, layout: Layout): HTMLElement {
@@ -28,8 +29,9 @@ function tablaDelLayout(resumen: ResumenLayout, layout: Layout): HTMLElement {
   return el('table', { class: 'tabla' }, el('tbody', {}, filas));
 }
 
-function tablaDelElemento(resumen: ResumenElemento): HTMLElement {
+function tablaDelElemento(resumen: ResumenElemento, modo: string): HTMLElement {
   const filas = [
+    fila('Modo de curvatura', modo),
     fila('Método', resumen.metodo ?? '—'),
     fila('Longitud recorrida', formatear(resumen.longitudRecorrida, 'm')),
     fila('Altura sobre la entrada', formatear(resumen.alturaMaxima, 'm')),
@@ -82,7 +84,7 @@ export function montarResumenLayout(contenedor: HTMLElement, estado: Estado): vo
       el(
         'p',
         { class: 'ayuda' },
-        `${caso ?? ''} · modo ${layout.parametros.valores.modoCurvatura} · método ${layout.parametros.valores.metodoDeAcoplamiento} · generado ${layout.meta.generadoEn ?? '?'} (${layout.meta.versionGenerador ?? '?'})`,
+        `${caso ?? ''} · modo ${layout.parametros.valores.modoCurvatura}${elementosConModoPropio(layout) ? ` (global; ${elementosConModoPropio(layout)} con modo propio)` : ''} · método ${layout.parametros.valores.metodoDeAcoplamiento} · generado ${layout.meta.generadoEn ?? '?'} (${layout.meta.versionGenerador ?? '?'})`,
       ),
       tablaDelLayout(r, layout),
     ));
@@ -113,14 +115,14 @@ export function montarResumenElemento(contenedor: HTMLElement, estado: Estado): 
         { class: 'ayuda' },
         `${e.nodos.numeroDeNodos} nodos · ${e.subtramos.map((s) => `${s.nombre} ${s.indiceInicio}–${s.indiceFin}`).join(' · ')}`,
       ),
-      tablaDelElemento(e.resumen),
+      tablaDelElemento(e.resumen, modoDelElemento(layout, elemento)),
       // Los inertes viajan en el layout desde la fase 1: ajustes que se
       // aplicaron y que ni el modo ni el tipo de este elemento consumen.
       ...(e.inertes ?? []).map((nombre) =>
         el(
           'p',
           { class: 'advertencia' },
-          textoDeInerte((nombre[0]!.toUpperCase() + nombre.slice(1)) as NombreDeParametro, layout.parametros.valores.modoCurvatura as never, e.tipo as never),
+          textoDeInerte((nombre[0]!.toUpperCase() + nombre.slice(1)) as NombreDeParametro, modoDelElemento(layout, elemento), e.tipo as never),
         ),
       ),
     ));

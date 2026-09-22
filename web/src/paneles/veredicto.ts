@@ -14,6 +14,7 @@ import { esRecalculo, type Estado } from '../estado';
 import { destellarCambios, el, vaciar, valoresPorClave } from './dom';
 import { formatear } from './formato';
 import { textoDeInerte } from './parametros';
+import { modoDelElemento } from '../contrato/modo';
 import type { NombreDeParametro } from '../nucleo/tipos';
 
 /** "3. Helice · ArcoPrincipal · arco 7.158 m" */
@@ -98,7 +99,7 @@ export function montarVeredicto(contenedor: HTMLElement, estado: Estado): void {
             { class: 'advertencia' },
             `${i.elemento + 1}. ${i.tipo}: `,
             i.nombres
-              .map((nombre) => textoDeInerte((nombre[0]!.toUpperCase() + nombre.slice(1)) as NombreDeParametro, layout.parametros.valores.modoCurvatura as never, i.tipo as never))
+              .map((nombre) => textoDeInerte((nombre[0]!.toUpperCase() + nombre.slice(1)) as NombreDeParametro, modoDelElemento(layout, i.elemento), i.tipo as never))
               .join('; '),
           ),
         ),

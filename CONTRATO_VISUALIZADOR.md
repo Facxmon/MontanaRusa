@@ -300,6 +300,18 @@ aplicaron pero no tuvieron efecto. Un elemento sin `ajustes` se construyó con l
 **MATLAB no emite ninguno de los dos y eso es válido** (§3, historial): el consumidor los trata como
 ausentes y no depende de ellos para dibujar.
 
+**El modo de curvatura de cada elemento.** `modoCurvatura` es una clave de `parametros.defaults` como
+cualquier otra, así que una instancia puede pisarlo en sus `ajustes` (la web lo permite desde su fase 4).
+El modo con que se construyó un elemento es entonces
+
+    ajustes.modoCurvatura ?? parametros.valores.modoCurvatura
+
+`parametros.valores.modoCurvatura` y `esquema.modo` describen el modo **global**, que es el de todos los
+elementos que no lo pisan; un consumidor que muestre el modo de un elemento tiene que aplicar esa regla.
+No hace falta un campo nuevo (ni un cambio de versión): el dato ya viaja en `ajustes`, que es opcional
+desde 1.1.0, y los `inertes` de esa instancia se evalúan contra el modo ya pisado, igual que en
+`AjustarParametros.m`.
+
 ### 6.1 `nodos` — arrays columnares de igual largo
 
 Todos los arrays de este bloque tienen exactamente `numeroDeNodos` elementos.

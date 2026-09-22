@@ -35,6 +35,7 @@ import {
   ParametrosPorDefecto,
 } from '../nucleo/parametros';
 import type { Declaracion, ModoCurvatura, NombreDeParametro, Parametros } from '../nucleo/tipos';
+import { modoEfectivo } from '../contrato/modo';
 import { EscalasDeFroude } from '../nucleo/basicos';
 import { ayudaDeCampo } from './ayuda';
 import { el, tarjeta } from './dom';
@@ -322,7 +323,18 @@ function sinAjuste(ajustes: Partial<Parametros>, nombre: NombreDeParametro): Par
   return resto;
 }
 
-/** La ficha de la instancia elegida: sus parametros geometricos, heredados o pisados, y los inertes. */
+/**
+ * La ficha de la instancia elegida: su modo de curvatura y los parametros
+ * de ese modo, y sus parametros geometricos, cada uno heredado del global o
+ * pisado por la instancia, y los inertes.
+ *
+ * El modo es por instancia desde la fase 4 (despues de la 4.10): un loop en
+ * clotoide y una helice en G normativa en el mismo circuito. El nucleo ya lo
+ * admitia (AjustarParametros aplica cualquier ajuste y calcula los inertes
+ * contra el modo YA pisado, igual que AjustarParametros.m); lo que faltaba
+ * era la interfaz. Cambiar el modo de la instancia redibuja la ficha,
+ * porque cambia que parametros consume.
+ */
 function ficha(inst: InstanciaDeElemento, orden: number, diseno: EntradaDeDiseno, ajustar: Ajustar, diagnostico: Diagnostico | null): HTMLElement {
   // El diagnostico se aplica a la ficha solo si el calculo fallo en ESTA instancia (o no se sabe en cual).
   const propio = diagnostico && (diagnostico.instancia === null || diagnostico.instancia === inst.id) ? diagnostico : null;
@@ -345,7 +357,8 @@ function ficha(inst: InstanciaDeElemento, orden: number, diseno: EntradaDeDiseno
     marcar(nombre, true);
   };
 
-  const campos = DECLARACIONES_DE_ELEMENTOS[inst.tipo].map((d) => {
+  const modo = modoEfectivo(globales, inst.ajustes);
+  const filaDe = (d: Declaracion) => {
     const nombre = d.Nombre;
     const pisado = nombre in inst.ajustes;
     const valor = pisado ? inst.ajustes[nombre] : globales[nombre];
@@ -360,12 +373,36 @@ function ficha(inst: InstanciaDeElemento, orden: number, diseno: EntradaDeDiseno
     estados.set(nombre, { fila, origen, volver });
     marcar(nombre, pisado);
     return fila;
+  };
+  const campos = DECLARACIONES_DE_ELEMENTOS[inst.tipo].map(filaDe);
+
+  // --- modo de curvatura de la instancia ---
+  const modoPisado = 'ModoCurvatura' in inst.ajustes;
+  const selectorDeModo = el('select', {
+    // Cambia que parametros consume la instancia: se redibuja la ficha.
+    onChange: (e: Event) => ajustar((ajustes) => ({ ...ajustes, ModoCurvatura: (e.target as HTMLSelectElement).value as ModoCurvatura }), false),
   });
+  for (const opcion of MODOS_DE_CURVATURA) {
+    const o = el('option', { value: opcion }, opcion === globales.ModoCurvatura ? `${opcion} (global)` : opcion);
+    if (opcion === modo) o.selected = true;
+    selectorDeModo.append(o);
+  }
+  const filaDelModo = campoDelModo(selectorDeModo, propio);
+  const origenDelModo = el('span', { class: 'campo-origen' }, modoPisado ? 'pisado' : 'heredado');
+  origenDelModo.title = modoPisado ? 'Modo propio de esta instancia' : 'Modo de los parámetros globales';
+  const volverDelModo = el('button', {
+    type: 'button', class: 'boton chico', title: 'Volver al modo global', hidden: !modoPisado,
+    onClick: () => ajustar((ajustes) => sinAjuste(ajustes, 'ModoCurvatura'), false),
+  }, '↺');
+  filaDelModo.classList.add(modoPisado ? 'pisado' : 'heredado');
+  filaDelModo.append(el('span', { class: 'campo-estado' }, origenDelModo, volverDelModo));
+  const delModo = ParametrosDelModo(modo);
+  const camposDelModo = delModo.Lista.map(filaDe);
 
   const { Inertes } = AjustarParametros(globales, inst.ajustes, inst.tipo);
   const advertencias = Inertes.map((nombre) =>
     el('p', { class: 'advertencia' },
-      textoDeInerte(nombre, globales.ModoCurvatura, inst.tipo),
+      textoDeInerte(nombre, modo, inst.tipo),
       ' ',
       el('button', {
         type: 'button', class: 'boton chico', title: `Quitar el ajuste de ${nombre}`,
@@ -379,13 +416,16 @@ function ficha(inst: InstanciaDeElemento, orden: number, diseno: EntradaDeDiseno
     {
       clave: 'ficha',
       titulo: `${orden}. ${inst.tipo}`,
-      resumen: cantidad === 0 ? 'todo heredado' : `${cantidad} ajuste${cantidad === 1 ? '' : 's'}`,
+      resumen: `${modo}${modoPisado ? ' (propio)' : ''} · ${cantidad === 0 ? 'todo heredado' : `${cantidad} ajuste${cantidad === 1 ? '' : 's'}`}`,
       clase: 'ficha',
       accion: cantidad > 0
         ? el('button', { type: 'button', class: 'boton chico', title: 'Quitar todos los ajustes de esta instancia', onClick: () => ajustar(() => ({}), false) }, 'Todo al global')
         : null,
     },
     el('p', { class: 'ayuda' }, cantidad === 0 ? 'Hereda todos sus parámetros de los globales; editar uno lo pisa solo para esta instancia.' : `${cantidad} parámetro${cantidad === 1 ? '' : 's'} pisado${cantidad === 1 ? '' : 's'}; ↺ vuelve al global.`),
+    el('h3', { class: 'ficha-subtitulo' }, 'Modo de curvatura'),
+    el('div', { class: 'campos' }, filaDelModo, delModo.Nota ? el('p', { class: 'ayuda' }, delModo.Nota) : null, camposDelModo),
+    el('h3', { class: 'ficha-subtitulo' }, 'Geometría'),
     el('div', { class: 'campos' }, campos),
     advertencias,
   );
@@ -458,13 +498,14 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
       {
         clave: 'globales',
         titulo: 'Parámetros globales',
-        resumen: `modo ${parametros.ModoCurvatura}`,
+        resumen: `modo ${parametros.ModoCurvatura}${(() => { const propios = diseno.secuencia.filter((i) => modoEfectivo(parametros, i.ajustes) !== parametros.ModoCurvatura).length; return propios ? ` · ${propios} con modo propio` : ''; })()}`,
         accion: el('button', { type: 'button', class: 'boton chico', title: 'Los globales vuelven a ParametrosPorDefecto(); los ajustes de las instancias se conservan', onClick: () => restablecer(estado) }, 'Resetear a default'),
       },
       el('details', { open: true },
         el('summary', {}, 'Modo de curvatura'),
         el('div', { class: 'campos' },
           campoDelModo(selectorDeModo, diagnostico),
+          el('p', { class: 'ayuda' }, 'Es el modo de todas las instancias que no lo pisan; cada una puede elegir el suyo en su ficha.'),
           modo.Nota ? el('p', { class: 'ayuda' }, modo.Nota) : null,
           declaraciones(modo.Lista).map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizarGlobal, diagnostico)),
         ),

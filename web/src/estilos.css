@@ -1103,3 +1103,13 @@ kbd {
   font-size: var(--texto-xs);
   text-align: center;
 }
+
+/* Ficha de la instancia: modo de curvatura y geometria, cada uno con su subtitulo. */
+.ficha-subtitulo {
+  margin: var(--esp-3) 0 0;
+  font-size: var(--texto-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--texto-3);
+}
