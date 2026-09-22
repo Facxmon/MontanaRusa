@@ -465,6 +465,8 @@ summary { cursor: pointer; font-size: var(--texto-sm); color: var(--texto-1); pa
   text-align: right;
 }
 .campo select { width: auto; padding: var(--esp-1) var(--esp-2); font-size: var(--texto-sm); }
+/* Fuera del rango sugerido: aviso, nunca bloqueo (lo dicen los criterios). */
+.campo input[type="number"].fuera-de-rango { border-color: var(--alerta); color: var(--alerta); }
 .campo-vector { display: inline-flex; gap: var(--esp-1); }
 .campo-vector input[type="number"] { width: var(--ancho-campo-chico); }
 .campo-caja { display: inline-flex; flex-direction: column; gap: var(--esp-1); }

@@ -37,9 +37,16 @@ import {
 import type { Declaracion, ModoCurvatura, NombreDeParametro, Parametros } from '../nucleo/tipos';
 import { ayudaDeCampo } from './ayuda';
 import { el } from './dom';
-import { elementosQueLoConsumen, etiquetaDe, modosQueLoConsumen, textoConUnidad, textoDeEntrada, type Etiqueta } from './etiquetas';
-
-const RAD_A_GRADOS = 180 / Math.PI;
+import {
+  aSI,
+  elementosQueLoConsumen,
+  etiquetaDe,
+  fueraDelRango,
+  modosQueLoConsumen,
+  textoConUnidad,
+  textoDeEntrada,
+  type Etiqueta,
+} from './etiquetas';
 
 function pascal(clave: string): NombreDeParametro {
   return (clave[0]!.toUpperCase() + clave.slice(1)) as NombreDeParametro;
@@ -52,12 +59,22 @@ function declaraciones(lista: Declaracion[]): DeclaracionDeParametro[] {
 
 type Actualizar = (nombre: NombreDeParametro, valor: unknown) => void;
 
-function entradaNumerica(valor: number, unidad: string, alCambiar: (v: number) => void): HTMLInputElement {
-  const enGrados = unidad === 'rad';
+/**
+ * Input de un numero en UNIDAD DE PRESENTACION. Lo que entra y lo que sale
+ * de aca es SI: `etiquetas.ts` hace las dos conversiones y decide los
+ * decimales y el `step`. El `step` es el de la unidad (0,5 cm, 0,1 mm, 1°)
+ * y no `any`, que dejaba las flechitas del teclado sin ningun efecto util.
+ *
+ * Salirse del rango sugerido es un AVISO, nunca un bloqueo: si el valor
+ * rompe algo, el que se tiene que quejar es el criterio de aceptacion.
+ */
+function entradaNumerica(valorSI: number, etiqueta: Etiqueta, alCambiar: (v: number) => void): HTMLInputElement {
+  const unidad = etiqueta.unidadDePresentacion;
+  const mostrado = textoDeEntrada(valorSI, unidad);
   const entrada = el('input', {
     type: 'number',
-    step: 'any',
-    value: String(enGrados ? Number((valor * RAD_A_GRADOS).toPrecision(10)) : Number(valor.toPrecision(10))),
+    step: unidad ? String(unidad.paso) : 'any',
+    value: mostrado,
     onChange: (evento: Event) => {
       const campo = evento.target as HTMLInputElement;
       const texto = campo.value;
@@ -65,10 +82,20 @@ function entradaNumerica(valor: number, unidad: string, alCambiar: (v: number) =
       if (texto.trim() === '' || !Number.isFinite(numero)) return;
       // Confirmado: defaultValue marca lo que ya esta en el diseno (atajos.ts decide con eso a quien va Ctrl+Z).
       campo.defaultValue = texto;
-      alCambiar(enGrados ? numero / RAD_A_GRADOS : numero);
+      avisarDelRango(campo, numero, etiqueta);
+      alCambiar(aSI(numero, unidad));
     },
   });
+  avisarDelRango(entrada, Number(mostrado), etiqueta);
   return entrada;
+}
+
+/** Marca (no bloquea) el input cuyo valor se fue del rango sugerido. */
+function avisarDelRango(entrada: HTMLInputElement, valorMostrado: number, etiqueta: Etiqueta): void {
+  const fuera = fueraDelRango(valorMostrado, etiqueta);
+  entrada.classList.toggle('fuera-de-rango', fuera);
+  const rango = etiqueta.rangoSugerido;
+  entrada.title = fuera && rango ? `Fuera del rango sugerido (${rango[0]} a ${rango[1]}): se calcula igual, lo van a decir los criterios de aceptación.` : '';
 }
 
 /** Los defaults se leen una vez: el popover de cada campo muestra el suyo. */
@@ -146,13 +173,13 @@ function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: 
     casilla.checked = valor;
     control = casilla;
   } else if (PARAMETROS_ANULABLES.includes(nombre)) {
-    control = campoAnulable(nombre, declaracion, valor, actualizar);
+    control = campoAnulable(nombre, valor, actualizar);
   } else if (typeof valor === 'number') {
-    control = entradaNumerica(valor, declaracion.unidad, (v) => actualizar(nombre, v));
+    control = entradaNumerica(valor, etiquetaDe(nombre), (v) => actualizar(nombre, v));
   } else if (Array.isArray(valor) && valor.length === 3 && valor.every((v) => typeof v === 'number')) {
     const vector = [...(valor as number[])];
     control = el('span', { class: 'campo-vector' }, vector.map((v, i) =>
-      entradaNumerica(v, declaracion.unidad, (nuevo) => {
+      entradaNumerica(v, etiquetaDe(nombre), (nuevo) => {
         vector[i] = nuevo;
         actualizar(nombre, [...vector]);
       }),
@@ -161,7 +188,7 @@ function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: 
     const caja = (valor as number[][]).map((fila) => [...fila]);
     control = el('span', { class: 'campo-caja' }, ['x', 'y', 'z'].map((eje, i) =>
       el('span', { class: 'campo-fila' }, `${eje}: `, ...caja[i]!.map((v, j) =>
-        entradaNumerica(v, declaracion.unidad, (nuevo) => {
+        entradaNumerica(v, etiquetaDe(nombre), (nuevo) => {
           caja[i]![j] = nuevo;
           actualizar(nombre, caja.map((f) => [...f]));
         }),
@@ -202,7 +229,7 @@ function marcarSiTieneError(fila: HTMLElement, nombre: NombreDeParametro, diagno
   return fila;
 }
 
-function campoAnulable(nombre: NombreDeParametro, declaracion: DeclaracionDeParametro, valor: unknown, actualizar: Actualizar): HTMLElement {
+function campoAnulable(nombre: NombreDeParametro, valor: unknown, actualizar: Actualizar): HTMLElement {
   const vacio = valor === null || valor === undefined || (Array.isArray(valor) && valor.length === 0);
   const esVector = nombre === 'OnsetMaximoModelo';
   const contenedor = el('span', { class: 'campo-anulable' });
@@ -212,7 +239,7 @@ function campoAnulable(nombre: NombreDeParametro, declaracion: DeclaracionDePara
   const valores: number[] = vacio ? (esVector ? [0, 0, 0] : [0]) : esVector ? [...(valor as number[])] : [valor as number];
   const emitir = () => actualizar(nombre, casilla.checked ? null : esVector ? [...valores] : valores[0]);
   valores.forEach((v, i) => {
-    const entrada = entradaNumerica(v, declaracion.unidad, (nuevo) => {
+    const entrada = entradaNumerica(v, etiquetaDe(nombre), (nuevo) => {
       valores[i] = nuevo;
       emitir();
     });
@@ -226,6 +253,17 @@ function campoAnulable(nombre: NombreDeParametro, declaracion: DeclaracionDePara
   contenedor.append(el('span', { class: 'campo-vacio' }, casilla, ' vacío (derivar)'), entradas);
   return contenedor;
 }
+
+/**
+ * Las tolerancias, los topes de iteracion y los pasos de dibujo no son
+ * decisiones de diseno sino del solver, y mezclarlos con los radios es parte
+ * de por que el panel abrumaba: van a un desplegable propio, cerrado.
+ */
+function esDelSolver(declaracion: DeclaracionDeParametro): boolean {
+  return etiquetaDe(pascal(declaracion.clave)).grupo === 'solver';
+}
+const deDiseno = (lista: DeclaracionDeParametro[]) => lista.filter((d) => !esDelSolver(d));
+const deSolver = (lista: DeclaracionDeParametro[]) => lista.filter(esDelSolver);
 
 function grupo(titulo: string, lista: DeclaracionDeParametro[], parametros: Parametros, actualizar: Actualizar, abierto: boolean, diagnostico: Diagnostico | null): HTMLElement {
   const conError = lista.some((d) => diagnostico?.parametros.includes(pascal(d.clave)));
@@ -374,6 +412,8 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
       selectorDeModo.append(o);
     }
     const modo = ParametrosDelModo(parametros.ModoCurvatura);
+    const aceptacion = declaraciones(ParametrosDeAceptacion());
+    const generales = declaraciones(ParametrosGenerales());
 
     contenedor.append(
       el('div', { class: 'parametros-cabecera' },
@@ -388,8 +428,9 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
           declaraciones(modo.Lista).map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizarGlobal, diagnostico)),
         ),
       ),
-      grupo('Criterios de aceptación', declaraciones(ParametrosDeAceptacion()), parametros, actualizarGlobal, false, diagnostico),
-      grupo('Generales', declaraciones(ParametrosGenerales()), parametros, actualizarGlobal, false, diagnostico),
+      grupo('Criterios de aceptación', deDiseno(aceptacion), parametros, actualizarGlobal, false, diagnostico),
+      grupo('Generales', deDiseno(generales), parametros, actualizarGlobal, false, diagnostico),
+      grupo('Avanzado — numérico', [...deSolver(aceptacion), ...deSolver(generales)], parametros, actualizarGlobal, false, diagnostico),
     );
   };
   dibujar();
