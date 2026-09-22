@@ -1,8 +1,9 @@
 // Lo que rodea a la via en la escena y sirve para LEERLA, no para adornarla:
 //
 //  - El piso con una grilla de escala legible: lineas finas cada 10 cm,
-//    mayores cada 0,5 m y rotuladas en dos bordes. Antes era un
+//    mayores cada 0,5 m, y rotulos en dos bordes. Antes era un
 //    GridHelper(4, 40) fijo de 4 m sin rotulos: no se podia leer una medida.
+//    Los rotulos van cada metro y con tamano fijo en pantalla.
 //    Ahora cubre la via y la caja disponible, redondeado a 0,5 m.
 //  - La caja disponible (BoundingBoxDisponible) en wireframe, en verde si la
 //    via entra y en rojo si se sale: conecta la vista con un criterio de
@@ -22,8 +23,16 @@ type Caja = [[number, number], [number, number], [number, number]];
 /** Paso de las lineas finas y de las mayores (rotuladas), en m. */
 const PASO_FINO = 0.1;
 const PASO_MAYOR = 0.5;
-/** Alto de los rotulos, en m: una fraccion del lado mayor del piso, con un piso minimo. */
-function altoDeRotulo(extremos: { x: [number, number]; y: [number, number] }): number {
+/**
+ * Alto de los rotulos EN PANTALLA (fraccion del alto del viewport): los
+ * sprites no se achican con la distancia (sizeAttenuation: false), asi un
+ * "2 m" cerca de la camara no tapa la vista y uno lejano se sigue leyendo.
+ */
+const ALTO_DEL_ROTULO_EN_PANTALLA = 0.018;
+/** Cada cuanto se rotula: las lineas mayores van cada 0,5 m, los rotulos cada metro (a 0,5 m se amontonan en la vista general). */
+const PASO_DEL_ROTULO = 1;
+/** Separacion de un rotulo respecto de su linea, en m: una fraccion del piso. */
+function separacionDeRotulo(extremos: { x: [number, number]; y: [number, number] }): number {
   return Math.max(0.04, Math.max(extremos.x[1] - extremos.x[0], extremos.y[1] - extremos.y[0]) / 45);
 }
 /** La proyeccion va apenas sobre el piso para que no parpadee con la grilla. */
@@ -64,7 +73,7 @@ function segmentos(puntos: number[], color: string, opacidad = 1): THREE.LineSeg
 }
 
 /** Un texto como sprite: siempre de frente a la camara. */
-function rotulo(texto: string, color: string, altoEnMetros: number): THREE.Sprite {
+function rotulo(texto: string, color: string): THREE.Sprite {
   const t = tema();
   const escala = 4;
   const lienzo = document.createElement('canvas');
@@ -81,8 +90,8 @@ function rotulo(texto: string, color: string, altoEnMetros: number): THREE.Sprit
   contexto.fillText(texto, 2 * escala, alto / 2);
   const textura = new THREE.CanvasTexture(lienzo);
   textura.colorSpace = THREE.SRGBColorSpace;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: textura, transparent: true, depthWrite: false }));
-  sprite.scale.set((altoEnMetros * ancho) / alto, altoEnMetros, 1);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: textura, transparent: true, depthWrite: false, sizeAttenuation: false }));
+  sprite.scale.set((ALTO_DEL_ROTULO_EN_PANTALLA * ancho) / alto, ALTO_DEL_ROTULO_EN_PANTALLA, 1);
   return sprite;
 }
 
@@ -106,7 +115,7 @@ export class Entorno {
     const disponible = (layout?.parametros.valores.boundingBoxDisponible as Caja | undefined) ?? null;
     const delLayout = layout?.resumenLayout.boundingBox ?? null;
     const extremos = extremosDeGrilla([delLayout, disponible].filter((c): c is Caja => c !== null));
-    const alto = altoDeRotulo(extremos);
+    const alto = separacionDeRotulo(extremos);
     this.grilla(extremos, alto, t.escenaGrilla, t.escenaGrillaFuerte, t.escenaRotulo);
 
     if (layout && disponible) {
@@ -120,7 +129,7 @@ export class Entorno {
       (aristas.material as THREE.LineBasicMaterial).transparent = true;
       (aristas.material as THREE.LineBasicMaterial).opacity = 0.7;
       this.grupo.add(aristas);
-      const nombre = rotulo(entra ? 'caja disponible' : 'caja disponible: la vía se sale', color, alto);
+      const nombre = rotulo(entra ? 'caja disponible' : 'caja disponible: la vía se sale', color);
       nombre.position.set(disponible[0][0], disponible[1][1], disponible[2][1] + alto / 2);
       nombre.center.set(0, 0);
       this.grupo.add(nombre);
@@ -152,15 +161,16 @@ export class Entorno {
     this.grupo.add(segmentos(finas, fina));
     this.grupo.add(segmentos(mayores, mayor));
 
-    // Rotulos de las lineas mayores sobre el borde de y minimo (las x) y el de x minimo (las y).
-    for (const vx of pasos(x[0], x[1]).filter(esMayor)) {
-      const r = rotulo(rotuloDeMetros(vx), colorDeRotulo, alto);
+    // Rotulos cada metro sobre el borde de y minimo (las x) y el de x minimo (las y).
+    const rotulada = (v: number) => Math.abs(v / PASO_DEL_ROTULO - Math.round(v / PASO_DEL_ROTULO)) < 1e-6;
+    for (const vx of pasos(x[0], x[1]).filter(rotulada)) {
+      const r = rotulo(rotuloDeMetros(vx), colorDeRotulo);
       r.position.set(vx, y[0] - alto, 0);
       this.grupo.add(r);
     }
-    for (const vy of pasos(y[0], y[1]).filter(esMayor)) {
+    for (const vy of pasos(y[0], y[1]).filter(rotulada)) {
       if (Math.abs(vy - y[0]) < 1e-9) continue; // la esquina ya tiene el rotulo de x
-      const r = rotulo(rotuloDeMetros(vy), colorDeRotulo, alto);
+      const r = rotulo(rotuloDeMetros(vy), colorDeRotulo);
       r.position.set(x[0] - alto / 2, vy, 0);
       r.center.set(1, 0.5);
       this.grupo.add(r);
