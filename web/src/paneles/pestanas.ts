@@ -69,8 +69,7 @@ export function montarPestanas<T extends string>(
   const ubicarIndicador = () => {
     const boton = botones[opciones.findIndex((o) => o.clave === actual)];
     if (!boton || boton.offsetWidth === 0) return;
-    indicador.style.width = `${boton.offsetWidth}px`;
-    indicador.style.transform = `translateX(${boton.offsetLeft}px)`;
+    indicador.style.transform = `translateX(${boton.offsetLeft}px) scaleX(${boton.offsetWidth})`;
   };
   const activar = (clave: T) => {
     actual = clave;

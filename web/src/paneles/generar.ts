@@ -64,7 +64,7 @@ export function montarGenerar(contenedor: HTMLElement, estado: Estado, acciones:
     if (e.calculando) {
       const p = e.progreso;
       const fraccion = p && p.total > 0 ? p.hecho / p.total : 0;
-      relleno.style.width = `${Math.round(fraccion * 100)}%`;
+      relleno.style.setProperty('--avance', String(fraccion));
       progreso.hidden = false;
       progreso.style.setProperty('--avance', String(fraccion));
       progreso.setAttribute('aria-valuenow', String(Math.round(fraccion * 100)));
@@ -75,7 +75,7 @@ export function montarGenerar(contenedor: HTMLElement, estado: Estado, acciones:
       boton.setAttribute('aria-label', 'Detener el cálculo');
       ponerTooltip(boton, p ? `Detener: ${p.hecho} de ${p.total} elementos calculados` : 'Detener el cálculo', 'Esc');
     } else {
-      relleno.style.width = '0%';
+      relleno.style.setProperty('--avance', '0');
       progreso.hidden = true;
       progreso.style.setProperty('--avance', '0');
       texto.textContent = 'Generar';

@@ -99,10 +99,11 @@ html, body {
 .boton-generar > * { position: relative; }
 .generar-progreso {
   position: absolute !important;
-  inset: 0 auto 0 0;
-  width: 0;
+  inset: 0;
+  transform-origin: left;
+  transform: scaleX(var(--avance, 0));
   background: var(--acento-suave);
-  transition: width var(--dur-media) var(--curva);
+  transition: transform var(--dur-media) var(--curva);
 }
 .generar-icono { display: inline-flex; }
 .generar-punto { display: none; width: var(--esp-2); height: var(--esp-2); border-radius: 50%; background: var(--acento); }
@@ -301,11 +302,12 @@ html, body {
   left: 0;
   bottom: -1px;
   height: 2px;
-  width: 0;
-  border-radius: 2px;
+  /* 1 px de ancho escalado al de la pestana: se anima solo transform (sin layout). */
+  width: 1px;
+  transform-origin: left;
   background: var(--acento);
   pointer-events: none;
-  transition: transform var(--dur-media) var(--curva), width var(--dur-media) var(--curva);
+  transition: transform var(--dur-media) var(--curva);
 }
 .pestanas-indicador.sin-transicion { transition: none; }
 
@@ -1036,7 +1038,6 @@ summary { cursor: pointer; font-size: var(--texto-sm); color: var(--texto-1); pa
   margin: 0 0 var(--esp-3);
   padding: var(--esp-2) var(--esp-3);
   border: 1px solid var(--borde-sutil);
-  border-left: 3px solid var(--acento);
   border-radius: var(--radio);
   background: var(--superficie-1);
   font-size: var(--texto-sm);
