@@ -11,6 +11,10 @@ const TOKENS = {
   fuente: '--fuente',
   mono: '--mono',
   textoXs: '--texto-xs',
+  textoSm: '--texto-sm',
+  superficie0: '--superficie-0',
+  texto1: '--texto-1',
+  texto2: '--texto-2',
 
   graficoTexto: '--grafico-texto',
   graficoGrilla: '--grafico-grilla',

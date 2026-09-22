@@ -105,6 +105,66 @@ html, body {
 .generar-contador { font-family: var(--mono); font-weight: 400; font-size: var(--texto-xs); color: var(--texto-2); font-variant-numeric: tabular-nums; }
 .generar-contador[hidden] { display: none; }
 
+/* Menu desplegable de la barra (Guardar): un <details>. */
+.menu-barra { position: relative; }
+.menu-barra > summary { list-style: none; }
+.menu-barra > summary::-webkit-details-marker { display: none; }
+.menu-barra[open] > summary { background: var(--superficie-2); border-color: var(--borde-sutil); }
+.menu-barra > summary.deshabilitado { color: var(--texto-3); pointer-events: none; }
+.menu-lista {
+  position: absolute;
+  top: calc(100% + var(--esp-1));
+  left: 0;
+  z-index: 20;
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--esp-1);
+  background: var(--superficie-1);
+  border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra-flotante);
+}
+.menu-item {
+  display: grid;
+  grid-template-columns: var(--ancho-icono) 1fr;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-2) var(--esp-3);
+  background: transparent;
+  color: var(--texto-1);
+  border: none;
+  border-radius: var(--radio);
+  font: inherit;
+  font-size: var(--texto-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.menu-item:hover:not(:disabled), .menu-item:focus-visible { background: var(--superficie-2); outline: none; }
+.menu-item:disabled { color: var(--texto-3); cursor: default; }
+.menu-item-texto { display: block; }
+.menu-item-ayuda { display: block; font-size: var(--texto-xs); color: var(--texto-2); }
+
+/* Aviso discreto sobre el area principal. */
+.aviso {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--esp-8) + var(--esp-3));
+  transform: translateX(-50%);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-3);
+  max-width: min(90%, 640px);
+  padding: var(--esp-2) var(--esp-3);
+  background: var(--superficie-flotante);
+  border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio-grande);
+  font-size: var(--texto-sm);
+  box-shadow: var(--sombra-flotante);
+}
+.aviso[hidden] { display: none; }
+
 /* Mientras calcula, el layout anterior sigue visible, atenuado. */
 .principal.calculando .vista3d, .principal.calculando .graficos { opacity: 0.6; }
 .vista3d, .graficos { transition: opacity var(--dur-media) var(--curva); }

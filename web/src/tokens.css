@@ -106,8 +106,9 @@
   --superficie-1: var(--gris-900);
   --superficie-2: var(--gris-800);
   --superficie-3: var(--gris-700);
-  /* Barras que flotan sobre la vista 3D. */
+  /* Barras que flotan sobre la vista 3D, y la sombra de menus y avisos. */
   --superficie-flotante: rgba(var(--gris-950-rgb), 0.85);
+  --sombra-flotante: 0 8px 24px rgba(var(--gris-950-rgb), 0.45);
 
   --texto-1: var(--gris-100);
   --texto-2: var(--gris-400);
@@ -161,6 +162,7 @@
   --superficie-2: var(--gris-100);
   --superficie-3: var(--gris-200);
   --superficie-flotante: rgba(var(--blanco-rgb), 0.85);
+  --sombra-flotante: 0 8px 24px rgba(var(--gris-950-rgb), 0.15);
 
   --texto-1: var(--gris-950);
   --texto-2: var(--gris-600);

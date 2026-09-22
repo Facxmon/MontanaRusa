@@ -10,6 +10,7 @@ import { textoDelLayout } from '../nucleo/descargar';
 import { CATALOGO_DE_ELEMENTOS } from '../nucleo/parametros';
 import type { NombreDeElemento } from '../nucleo/tipos';
 import { el, vaciar } from './dom';
+import { descargarArchivo } from './guardar';
 
 function contarAjustes(inst: InstanciaDeElemento): number {
   return Object.keys(inst.ajustes).length;
@@ -31,7 +32,7 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
     const { layout, diseno, fuente, caso, instancia } = estado.get();
     vaciar(contenedor);
     lineaDeEstado = null;
-    if (!layout) return;
+    if (!layout && !diseno) return;
 
     const actualizar = (parcial: Partial<EntradaDeDiseno>, extra: { instancia?: string | null } = {}) => {
       const actual = estado.get().diseno;
@@ -50,7 +51,7 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
         : el('div', {},
             (lineaDeEstado = el('p', { class: 'ayuda' }, textoDeEstado(estado.get()))),
             el('div', { class: 'botonera' },
-              el('button', { type: 'button', class: 'boton', onClick: () => descargar(estado) }, 'Descargar JSON'),
+              el('button', { type: 'button', class: 'boton', title: 'Solo el contrato entero (~2 MB); el paquete .zip de la barra trae ademas parámetros, gráficos y CSV', onClick: () => descargar(estado) }, 'Descargar layout.json'),
             ),
           ),
     );
@@ -173,12 +174,5 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
 function descargar(estado: Estado): void {
   const { layout } = estado.get();
   if (!layout) return;
-  const texto = textoDelLayout(layout);
-  const blob = new Blob([texto], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const enlace = el('a', { href: url, download: 'layout.json' });
-  document.body.append(enlace);
-  enlace.click();
-  enlace.remove();
-  URL.revokeObjectURL(url);
+  descargarArchivo('layout.json', new Blob([textoDelLayout(layout)], { type: 'application/json' }));
 }

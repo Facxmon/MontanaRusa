@@ -41,6 +41,8 @@ export interface BandaEntreSeries {
 }
 
 export interface DatosDeFigura {
+  /** Nombre corto para el archivo al exportar (`gx`, `velocidad`); si falta se usa el indice. */
+  clave?: string;
   titulo: string;
   etiquetaX: string;
   etiquetaY: string;
@@ -75,10 +77,93 @@ function colorDeSerie(color: ColorDeSerie): string {
   }
 }
 
+/** Tamano en px CSS de una figura; la exportacion pasa uno fijo. */
+export interface TamanoDeFigura {
+  width: number;
+  height: number;
+}
+
+/**
+ * Opciones de uPlot para unos datos. `escala` multiplica anchos de trazo,
+ * fuentes y tamanos de eje: uPlot dibuja siempre al devicePixelRatio de la
+ * ventana, asi que para exportar a 2x se dibuja la figura al doble de
+ * tamano CSS con todo escalado al doble (exportarFigura.ts).
+ */
+export function opcionesDeFigura(datos: DatosDeFigura, tamano: TamanoDeFigura, claveDeSincronizacion: string | null, escala = 1): uPlot.Options {
+  const t = tema();
+  const fuente = fuenteDeCanvas(escala);
+  const grilla = { stroke: t.graficoGrilla, width: escala };
+  const ejeComun = {
+    stroke: t.graficoTexto,
+    labelFont: fuente,
+    font: fuente,
+    grid: grilla,
+    ticks: { ...grilla, size: 10 * escala },
+    labelSize: 30 * escala,
+    labelGap: 0,
+    gap: 5 * escala,
+  };
+  return {
+    ...tamano,
+    title: datos.titulo,
+    cursor: claveDeSincronizacion
+      ? { sync: { key: claveDeSincronizacion, setSeries: false }, points: { size: 6 } }
+      : { show: false },
+    legend: { show: claveDeSincronizacion !== null, live: true },
+    scales: { x: { time: false } },
+    axes: [
+      { ...ejeComun, label: datos.etiquetaX, size: 50 * escala },
+      { ...ejeComun, label: datos.etiquetaY, size: 60 * escala },
+    ],
+    series: [
+      { label: datos.etiquetaX, value: (_u: uPlot, v: number | null) => (v === null ? SIN_DATO : formatearNumero(v, datos.decimalesX)) },
+      ...datos.series.map((s) => ({
+        label: s.etiqueta,
+        stroke: colorDeSerie(s.color),
+        width: (s.ancho ?? 1.6) * escala,
+        dash: s.trazos?.map((d) => d * escala),
+        spanGaps: false,
+        points: { show: false },
+        value: (_u: uPlot, v: number | null) => (v === null ? SIN_DATO : formatearNumero(v, datos.decimales, datos.notacion)),
+      })),
+    ],
+    bands: (datos.bandas ?? []).map((b) => ({ series: [b.superior + 1, b.inferior + 1] as [number, number], fill: colorDeSerie(b.color) })),
+    hooks: {
+      drawClear: [(u) => dibujarFranjas(u, datos.franjas, escala)],
+    },
+  };
+}
+
+/** Franjas verticales alternadas con su etiqueta (subtramos o elementos), debajo de las series. */
+export function dibujarFranjas(u: uPlot, franjas: Franja[], escala = 1): void {
+  if (franjas.length === 0) return;
+  const { ctx, bbox } = u;
+  const t = tema();
+  const fondos = [t.graficoFranjaA, t.graficoFranjaB];
+  const razon = devicePixelRatio * escala;
+  ctx.save();
+  ctx.font = fuenteDeCanvas(razon);
+  ctx.textBaseline = 'top';
+  franjas.forEach((franja, i) => {
+    const x0 = u.valToPos(franja.desde, 'x', true);
+    const x1 = u.valToPos(franja.hasta, 'x', true);
+    const izquierda = Math.max(bbox.left, Math.min(x0, x1));
+    const derecha = Math.min(bbox.left + bbox.width, Math.max(x0, x1));
+    if (derecha <= izquierda) return;
+    ctx.fillStyle = fondos[i % 2]!;
+    ctx.fillRect(izquierda, bbox.top, derecha - izquierda, bbox.height);
+    ctx.fillStyle = t.graficoTexto;
+    const texto = franja.etiqueta;
+    if (ctx.measureText(texto).width < derecha - izquierda - 6 * razon) {
+      ctx.fillText(texto, izquierda + 3 * razon, bbox.top + 3 * razon);
+    }
+  });
+  ctx.restore();
+}
+
 export class Figura {
   private grafico: uPlot | null = null;
   private readonly contenedor: HTMLElement;
-  private franjas: Franja[] = [];
   private readonly claveDeSincronizacion: string;
   private readonly observador: ResizeObserver;
 
@@ -89,7 +174,7 @@ export class Figura {
     this.observador.observe(contenedor);
   }
 
-  private tamano(): { width: number; height: number } {
+  private tamano(): TamanoDeFigura {
     return { width: Math.max(320, this.contenedor.clientWidth), height: 240 };
   }
 
@@ -100,57 +185,7 @@ export class Figura {
   /** Reemplaza el contenido entero (las series pueden cambiar de cantidad). */
   mostrar(datos: DatosDeFigura): void {
     this.destruir();
-    this.franjas = datos.franjas;
-    const t = tema();
-    const fuente = fuenteDeCanvas();
-    const grilla = { stroke: t.graficoGrilla, width: 1 };
-
-    const opciones: uPlot.Options = {
-      ...this.tamano(),
-      title: datos.titulo,
-      cursor: {
-        sync: { key: this.claveDeSincronizacion, setSeries: false },
-        points: { size: 6 },
-      },
-      legend: { show: true, live: true },
-      scales: { x: { time: false } },
-      axes: [
-        {
-          label: datos.etiquetaX,
-          stroke: t.graficoTexto,
-          labelFont: fuente,
-          font: fuente,
-          grid: grilla,
-          ticks: grilla,
-        },
-        {
-          label: datos.etiquetaY,
-          stroke: t.graficoTexto,
-          labelFont: fuente,
-          font: fuente,
-          size: 60,
-          grid: grilla,
-          ticks: grilla,
-        },
-      ],
-      series: [
-        { label: datos.etiquetaX, value: (_u: uPlot, v: number | null) => (v === null ? SIN_DATO : formatearNumero(v, datos.decimalesX)) },
-        ...datos.series.map((s) => ({
-          label: s.etiqueta,
-          stroke: colorDeSerie(s.color),
-          width: s.ancho ?? 1.6,
-          dash: s.trazos,
-          spanGaps: false,
-          points: { show: false },
-          value: (_u: uPlot, v: number | null) => (v === null ? SIN_DATO : formatearNumero(v, datos.decimales, datos.notacion)),
-        })),
-      ],
-      bands: (datos.bandas ?? []).map((b) => ({ series: [b.superior + 1, b.inferior + 1] as [number, number], fill: colorDeSerie(b.color) })),
-      hooks: {
-        drawClear: [(u) => this.dibujarFranjas(u)],
-      },
-    };
-
+    const opciones = opcionesDeFigura(datos, this.tamano(), this.claveDeSincronizacion);
     this.grafico = new uPlot(opciones, [datos.x, ...datos.series.map((s) => s.valores)], this.contenedor);
 
     // Leyenda: las series marcadas como ocultas no se listan.
@@ -159,31 +194,6 @@ export class Figura {
       const fila = filas[i + 1];
       if (fila && s.ocultarEnLeyenda) fila.style.display = 'none';
     });
-  }
-
-  private dibujarFranjas(u: uPlot): void {
-    if (this.franjas.length === 0) return;
-    const { ctx, bbox } = u;
-    const t = tema();
-    const fondos = [t.graficoFranjaA, t.graficoFranjaB];
-    ctx.save();
-    ctx.font = fuenteDeCanvas(devicePixelRatio);
-    ctx.textBaseline = 'top';
-    this.franjas.forEach((franja, i) => {
-      const x0 = u.valToPos(franja.desde, 'x', true);
-      const x1 = u.valToPos(franja.hasta, 'x', true);
-      const izquierda = Math.max(bbox.left, Math.min(x0, x1));
-      const derecha = Math.min(bbox.left + bbox.width, Math.max(x0, x1));
-      if (derecha <= izquierda) return;
-      ctx.fillStyle = fondos[i % 2]!;
-      ctx.fillRect(izquierda, bbox.top, derecha - izquierda, bbox.height);
-      ctx.fillStyle = t.graficoTexto;
-      const texto = franja.etiqueta;
-      if (ctx.measureText(texto).width < derecha - izquierda - 6) {
-        ctx.fillText(texto, izquierda + 3 * devicePixelRatio, bbox.top + 3 * devicePixelRatio);
-      }
-    });
-    ctx.restore();
   }
 
   /** Destruye el uPlot y vacia el contenedor; el ResizeObserver sigue hasta destruirDelTodo. */

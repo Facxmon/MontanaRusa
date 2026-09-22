@@ -94,6 +94,36 @@ export class Escena {
     };
   }
 
+  /**
+   * La vista (la camara donde este) como PNG de 2560 x 1440. Sin
+   * preserveDrawingBuffer, que costaria rendimiento en cada cuadro: se hace
+   * render() y toDataURL() en el mismo tick, antes de que el navegador
+   * limpie el buffer. El tamano es fijo y no el del contenedor para que la
+   * imagen sirva impresa aunque la ventana este chica o la vista 3D
+   * escondida (con la pestana de graficos al frente el contenedor mide 0);
+   * despues se restaura el tamano de pantalla.
+   */
+  async capturar(ancho = 1280, alto = 720, escala = 2): Promise<Blob> {
+    const ratioDePantalla = this.renderer.getPixelRatio();
+    const aspectoDePantalla = this.camara.aspect;
+    let datos: string;
+    try {
+      this.renderer.setPixelRatio(escala);
+      this.renderer.setSize(ancho, alto, false);
+      this.camara.aspect = ancho / alto;
+      this.camara.updateProjectionMatrix();
+      this.renderer.render(this.scene, this.camara);
+      datos = this.renderer.domElement.toDataURL('image/png');
+    } finally {
+      this.renderer.setPixelRatio(ratioDePantalla);
+      this.camara.aspect = aspectoDePantalla;
+      this.ajustarTamano();
+      this.renderer.render(this.scene, this.camara);
+    }
+    const respuesta = await fetch(datos);
+    return respuesta.blob();
+  }
+
   /** Mueve el centro de la orbita a un punto conservando la posicion relativa de la camara. */
   centrarEn(punto: THREE.Vector3): void {
     const desplazamiento = new THREE.Vector3().subVectors(this.camara.position, this.controles.target);

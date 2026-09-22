@@ -227,6 +227,7 @@ function figuraDeG(
   );
   const bandas: BandaEntreSeries[] = [{ superior: inicio, inferior: inicio + 1, color: ADMISIBLE_RELLENO }];
   return {
+    clave,
     titulo,
     etiquetaX: ETIQUETA_DE_EJE[ejeX],
     etiquetaY: `${nombre} [G]`,
@@ -265,6 +266,7 @@ export function figurasDeJerk(columnas: Columnas, ejeX: EjeX): DatosDeFigura[] {
       ? `Jerk de ${nombre} del prototipo — límite de la norma`
       : `Jerk de ${nombre} del modelo — presupuesto √λ × norma`;
     return {
+      clave,
       titulo,
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: `d${nombre}/dt [G/s]`,
@@ -285,6 +287,7 @@ export function figurasDeCinematica(columnas: Columnas, ejeX: EjeX): DatosDeFigu
   const x = columnas.x[ejeX] as number[];
   return [
     {
+      clave: 'velocidad',
       titulo: 'Velocidad',
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: 'v [m/s]',
@@ -298,6 +301,7 @@ export function figurasDeCinematica(columnas: Columnas, ejeX: EjeX): DatosDeFigu
       franjas: columnas.franjas[ejeX],
     },
     {
+      clave: 'aceleracion',
       titulo: 'Aceleración tangencial del centro de masa',
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: 'a_t [m/s²]',
@@ -311,6 +315,7 @@ export function figurasDeCinematica(columnas: Columnas, ejeX: EjeX): DatosDeFigu
       franjas: columnas.franjas[ejeX],
     },
     {
+      clave: 'energia',
       titulo: 'Energía mecánica total del centro de masa',
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: 'E [J]',
@@ -327,6 +332,7 @@ export function figurasDeCinematica(columnas: Columnas, ejeX: EjeX): DatosDeFigu
 export function figurasDeRoll(columnas: Columnas, ejeX: EjeX): DatosDeFigura[] {
   return [
     {
+      clave: 'roll',
       titulo: 'Roll contra el marco de transporte y |peralte| contra la vertical',
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: 'ángulo [°]',
@@ -351,6 +357,7 @@ export function figurasDeCurvatura(columnas: Columnas, ejeX: EjeX): DatosDeFigur
   const limite = columnas.radioMinimoFabricable && columnas.radioMinimoFabricable > 0 ? 1 / columnas.radioMinimoFabricable : NaN;
   return [
     {
+      clave: 'curvatura',
       titulo: 'Curvatura del riel y de la heartline — el riel es el que limita la impresora',
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
       etiquetaY: 'κ [1/m]',

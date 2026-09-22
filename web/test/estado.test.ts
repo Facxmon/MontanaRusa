@@ -15,6 +15,7 @@ const inicial: DatosDeEstado = {
   fuente: 'golden',
   diseno: null,
   instancia: null,
+  origen: null,
   disenoCalculado: null,
   calculando: false,
   progreso: null,

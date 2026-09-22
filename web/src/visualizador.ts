@@ -15,8 +15,11 @@ import { Via } from './escena/via';
 import { crearEstado } from './estado';
 import { Historial, type EntradaDeHistorial } from './historial';
 import { montarPanelDeGraficos } from './graficos/panelDeGraficos';
+import type { EntradaDeDiseno } from './nucleo/calcular';
 import { CalculoAbortado, ClienteDeCalculo, PedidoSuperado } from './nucleo/cliente';
+import { deserializarDiseno, desdeTextoCompacto } from './nucleo/serializar';
 import { montarAtajos } from './paneles/atajos';
+import { montarAviso } from './paneles/aviso';
 import { montarCriterios } from './paneles/criterios';
 import { montarDeshacer } from './paneles/deshacer';
 import { montarDiseno } from './paneles/diseno';
@@ -25,6 +28,7 @@ import { montarElementos } from './paneles/elementos';
 import { montarBarra } from './paneles/barra';
 import { montarErrores } from './paneles/errores';
 import { leerAutoGenerar, montarGenerar } from './paneles/generar';
+import { montarGuardar } from './paneles/guardar';
 import { montarLeyenda } from './paneles/leyenda';
 import { montarReproductor } from './paneles/reproductor';
 import { montarParametros } from './paneles/parametros';
@@ -48,7 +52,8 @@ function armarDom() {
   const vista3d = el('div', { class: 'vista3d', 'aria-label': 'Vista 3D de la vía' });
   const reproductor = el('div', { class: 'reproductor', 'aria-label': 'Reproducción', hidden: true });
   const graficos = el('div', { class: 'graficos', 'aria-label': 'Gráficos', hidden: true });
-  const principal = el('main', { class: 'principal' }, vista3d, reproductor, graficos);
+  const aviso = el('div', { class: 'aviso', role: 'status', hidden: true });
+  const principal = el('main', { class: 'principal' }, vista3d, reproductor, graficos, aviso);
 
   const selectorDeCaso = el('section');
   const selectorDePanel = el('nav', { class: 'pestanas pestanas-panel', role: 'tablist', 'aria-label': 'Panel' });
@@ -83,6 +88,7 @@ function armarDom() {
     errores,
     barra,
     principal,
+    aviso,
     selectorDeVista,
     vista3d,
     reproductor,
@@ -124,6 +130,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     fuente: 'golden',
     diseno: null,
     instancia: null,
+    origen: null,
     disenoCalculado: null,
     calculando: false,
     progreso: null,
@@ -138,6 +145,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
 
   const zonas = montarBarra(dom.barra);
   zonas.centro.append(dom.selectorDeVista);
+  const aviso = montarAviso(dom.aviso);
 
   montarErrores(dom.errores, estado);
   montarSelectorDeCaso(dom.selectorDeCaso, estado);
@@ -172,7 +180,12 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     if (!layout) return;
     const diseno = disenoDesdeLayout(layout);
     // El layout en pantalla ya es el de este diseno: Generar arranca sin cambios pendientes.
-    estado.set({ diseno, disenoCalculado: diseno, instancia: diseno.secuencia[0]?.id ?? null, fuente: 'diseno', caso: null, panel: 'diseno' });
+    estado.set({ diseno, disenoCalculado: diseno, instancia: diseno.secuencia[0]?.id ?? null, origen: estado.get().caso, fuente: 'diseno', caso: null, panel: 'diseno' });
+  }
+  /** Un diseno que llega de afuera (link, archivo): se abre como borrador y se calcula enseguida. */
+  function abrirDisenoExterno(diseno: EntradaDeDiseno, origen: string): void {
+    estado.set({ diseno, disenoCalculado: null, instancia: diseno.secuencia[0]?.id ?? null, origen, fuente: 'diseno', caso: null, panel: 'diseno', error: null });
+    generar();
   }
 
   // Cada Generar lleva un numero: la promesa de un pedido viejo (superado o
@@ -248,6 +261,8 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     if (diseno) aplicarPaso(historial.rehacer(diseno));
   }
 
+  zonas.izquierda.append(el('span', { class: 'barra-separador', 'aria-hidden': 'true' }));
+  const destruirGuardar = montarGuardar(zonas.izquierda, estado, { escena, aviso });
   montarGenerar(zonas.derecha, estado, { generar, detener });
   const destruirAtajos = montarAtajos({ generar, detener, deshacer, rehacer });
 
@@ -310,14 +325,36 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     if (nuevo.caso !== null && nuevo.caso !== anterior.caso) void cargarCaso(nuevo.caso);
   });
 
+  // Un diseno en el hash de la URL (#d=..., lo que arma "Copiar link"). Se
+  // abre y se saca el hash con replaceState: si no, al editar y recargar
+  // volveria a abrirse el del link y no el ultimo borrador.
+  function abrirDesdeElHash(): boolean {
+    const hash = location.hash;
+    if (!hash.startsWith('#d=')) return false;
+    try {
+      const diseno = deserializarDiseno(desdeTextoCompacto(hash.slice(3)));
+      history.replaceState(null, '', location.pathname + location.search);
+      abrirDisenoExterno(diseno, 'link');
+      return true;
+    } catch (error) {
+      estado.set({ error: `El link no se pudo abrir: ${(error as Error).message}` });
+      return false;
+    }
+  }
+  const alCambiarElHash = () => void abrirDesdeElHash();
+  window.addEventListener('hashchange', alCambiarElHash);
+
+  // Precedencia al arrancar: hash de la URL > ?caso= > primer golden del indice.
   async function arrancar(): Promise<void> {
     try {
       const indice = await cargarIndice(urlDelIndice);
       if (destruido) return;
       if (indice.casos.length === 0) throw new Error('El índice de casos está vacío: correr GenerarGoldenFiles.m.');
+      estado.set({ casos: indice.casos });
+      if (abrirDesdeElHash()) return;
       const casoInicial = new URLSearchParams(location.search).get('caso');
       const caso = casoInicial && indice.casos.includes(casoInicial) ? casoInicial : indice.casos[0]!;
-      estado.set({ casos: indice.casos, caso });
+      estado.set({ caso });
     } catch (error) {
       if (destruido) return;
       estado.set({ error: (error as Error).message });
@@ -331,7 +368,9 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
       if (destruido) return;
       destruido = true;
       if (temporizador) clearTimeout(temporizador);
+      window.removeEventListener('hashchange', alCambiarElHash);
       destruirAtajos();
+      destruirGuardar();
       cliente.terminar();
       destruirReproductor();
       destruirGraficos();
