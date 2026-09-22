@@ -3,8 +3,8 @@
 // contrato; formatear() pasa los radianes a grados.
 
 import type { Layout, ResumenElemento, ResumenLayout } from '../contrato/tipos';
-import type { Estado } from '../estado';
-import { el, fila, tarjeta, vaciar } from './dom';
+import { esRecalculo, type Estado } from '../estado';
+import { destellarCambios, el, fila, tarjeta, vaciar, valoresPorClave } from './dom';
 import { decimalesDeUnidad, formatear, formatearNumero } from './formato';
 import { textoDeInerte } from './parametros';
 import type { NombreDeParametro } from '../nucleo/tipos';
@@ -67,7 +67,8 @@ function formatearSalto(valor: number | null | undefined, unidad: string): strin
 }
 
 export function montarResumenLayout(contenedor: HTMLElement, estado: Estado): void {
-  const dibujar = () => {
+  const dibujar = (destellar = false) => {
+    const antes = destellar ? valoresPorClave(contenedor) : null;
     const { layout, caso } = estado.get();
     vaciar(contenedor);
     if (!layout) return;
@@ -85,15 +86,17 @@ export function montarResumenLayout(contenedor: HTMLElement, estado: Estado): vo
       ),
       tablaDelLayout(r, layout),
     ));
+    if (antes) destellarCambios(contenedor, antes);
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {
-    if (nuevo.layout !== anterior.layout) dibujar();
+    if (nuevo.layout !== anterior.layout) dibujar(esRecalculo(nuevo, anterior));
   });
 }
 
 export function montarResumenElemento(contenedor: HTMLElement, estado: Estado): void {
-  const dibujar = () => {
+  const dibujar = (destellar = false) => {
+    const antes = destellar ? valoresPorClave(contenedor) : null;
     const { layout, elemento } = estado.get();
     vaciar(contenedor);
     if (!layout || elemento === null) return;
@@ -121,9 +124,10 @@ export function montarResumenElemento(contenedor: HTMLElement, estado: Estado): 
         ),
       ),
     ));
+    if (antes) destellarCambios(contenedor, antes);
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {
-    if (nuevo.layout !== anterior.layout || nuevo.elemento !== anterior.elemento) dibujar();
+    if (nuevo.layout !== anterior.layout || nuevo.elemento !== anterior.elemento) dibujar(nuevo.elemento === anterior.elemento && esRecalculo(nuevo, anterior));
   });
 }

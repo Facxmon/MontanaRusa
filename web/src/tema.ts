@@ -16,6 +16,10 @@ const TOKENS = {
   texto1: '--texto-1',
   texto2: '--texto-2',
 
+  // Movimiento: la escena anima el encuadre con los mismos tokens que el CSS.
+  durLenta: '--dur-lenta',
+  curva: '--curva',
+
   graficoTexto: '--grafico-texto',
   graficoGrilla: '--grafico-grilla',
   graficoFranjaA: '--grafico-franja-a',
@@ -43,6 +47,52 @@ const TOKENS = {
 } as const;
 
 export type Tema = { readonly [K in keyof typeof TOKENS]: string };
+
+/** Milisegundos de un token de duracion ("400ms" o "0.4s"). */
+export function milisegundos(valor: string): number {
+  const numero = parseFloat(valor);
+  return valor.trim().endsWith('ms') ? numero : numero * 1000;
+}
+
+/**
+ * La funcion de easing de un cubic-bezier(x1, y1, x2, y2) de CSS: dado el
+ * avance en tiempo (0..1) devuelve el avance del valor. Se resuelve x(s) = t
+ * por Newton con biseccion de respaldo, como hacen los navegadores. Un
+ * token que no sea cubic-bezier cae a lineal.
+ */
+export function curvaCubica(token: string): (t: number) => number {
+  const m = /cubic-bezier\(([^)]+)\)/.exec(token);
+  const p = m ? m[1]!.split(',').map(Number) : [];
+  if (p.length !== 4 || p.some((v) => !Number.isFinite(v))) return (t) => t;
+  const [x1, y1, x2, y2] = p as [number, number, number, number];
+  const bezier = (a: number, b: number, s: number) => 3 * a * s * (1 - s) ** 2 + 3 * b * s * s * (1 - s) + s ** 3;
+  const derivada = (a: number, b: number, s: number) => 3 * a * (1 - s) ** 2 + 6 * (b - a) * s * (1 - s) + 3 * (1 - b) * s * s;
+  return (t) => {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    let s = t;
+    for (let i = 0; i < 8; i++) {
+      const error = bezier(x1, x2, s) - t;
+      const d = derivada(x1, x2, s);
+      if (Math.abs(error) < 1e-6) break;
+      if (Math.abs(d) < 1e-6) break;
+      s = Math.min(1, Math.max(0, s - error / d));
+    }
+    let bajo = 0;
+    let alto = 1;
+    for (let i = 0; i < 30 && Math.abs(bezier(x1, x2, s) - t) > 1e-6; i++) {
+      if (bezier(x1, x2, s) < t) bajo = s;
+      else alto = s;
+      s = (bajo + alto) / 2;
+    }
+    return bezier(y1, y2, s);
+  };
+}
+
+/** true si el sistema pide movimiento reducido: no se anima nada (fase 4.3). */
+export function movimientoReducido(): boolean {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 
 let cache: Tema | null = null;
 const suscriptores = new Set<(tema: Tema) => void>();

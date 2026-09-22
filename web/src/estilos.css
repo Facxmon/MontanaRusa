@@ -188,6 +188,50 @@ html, body {
   box-shadow: var(--sombra-flotante);
 }
 
+/* Progreso del calculo a lo ancho de la barra (determinado: elementos hechos / total). */
+.barra { position: relative; }
+.barra-progreso { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; z-index: 5; overflow: hidden; }
+.barra-progreso[hidden] { display: none; }
+.barra-progreso-relleno {
+  display: block;
+  height: 100%;
+  background: var(--acento);
+  transform-origin: left;
+  transform: scaleX(var(--avance, 0));
+  transition: transform var(--dur-media) var(--curva);
+}
+
+/* ---------- movimiento (fase 4.3) ---------- */
+/* Acordeones: la altura se anima con interpolate-size donde existe (Chromium);
+   en el resto abren sin animar, que es el comportamiento nativo. */
+@supports (interpolate-size: allow-keywords) {
+  :root { interpolate-size: allow-keywords; }
+  details::details-content {
+    block-size: 0;
+    overflow-y: clip;
+    transition: block-size var(--dur-media) var(--curva), content-visibility var(--dur-media) var(--curva) allow-discrete;
+  }
+  details[open]::details-content { block-size: auto; }
+}
+
+/* Destello de un valor que cambio despues de un recalculo: se tine el fondo
+   de la celda, nunca se mueve el numero. */
+@keyframes destello {
+  from { background-color: var(--destello); }
+  to { background-color: transparent; }
+}
+.destello { animation: destello var(--dur-lenta) var(--curva); }
+
+/* Con movimiento reducido no se anima NADA: ni acordeones, ni subrayados,
+   ni destellos, ni transiciones de color (la camara lo chequea en JS). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after, ::details-content {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Mientras calcula, el layout anterior sigue visible, atenuado. */
 .principal.calculando .vista3d, .principal.calculando .graficos { opacity: 0.6; }
 .vista3d, .graficos { transition: opacity var(--dur-media) var(--curva); }
@@ -220,25 +264,39 @@ html, body {
   padding: var(--esp-3) var(--esp-4) var(--esp-4);
 }
 
+/* Pestanas: texto y un subrayado que se DESLIZA a la activa (paneles/pestanas.ts
+   lo ubica con transform; un solo elemento que se mueve, no un borde por boton). */
 .pestanas {
+  position: relative;
   display: inline-flex;
   gap: var(--esp-1);
-  background: var(--superficie-flotante);
-  padding: var(--esp-1);
-  border-radius: var(--radio-grande);
-  border: 1px solid var(--borde-sutil);
+  border-bottom: 1px solid var(--borde-sutil);
 }
 .pestana {
-  padding: var(--esp-1) var(--esp-3);
+  padding: var(--esp-2) var(--esp-3);
   background: transparent;
   color: var(--texto-2);
   border: none;
-  border-radius: var(--radio);
+  border-radius: var(--radio) var(--radio) 0 0;
   font: inherit;
+  font-weight: 500;
   cursor: pointer;
+  transition: color var(--dur-rapida) var(--curva), background var(--dur-rapida) var(--curva);
 }
-.pestana:hover { color: var(--texto-1); }
-.pestana.activa { background: var(--superficie-3); color: var(--texto-1); }
+.pestana:hover { color: var(--texto-1); background: var(--superficie-2); }
+.pestana.activa { color: var(--texto-1); }
+.pestanas-indicador {
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  height: 2px;
+  width: 0;
+  border-radius: 2px;
+  background: var(--acento);
+  pointer-events: none;
+  transition: transform var(--dur-media) var(--curva), width var(--dur-media) var(--curva);
+}
+.pestanas-indicador.sin-transicion { transition: none; }
 
 .graficos-barra { display: flex; align-items: center; justify-content: space-between; gap: var(--esp-3); flex-wrap: wrap; margin-bottom: var(--esp-2); }
 .graficos-opciones { display: flex; align-items: center; gap: var(--esp-3); flex-wrap: wrap; }
@@ -400,7 +458,7 @@ html, body {
 }
 .tarjeta > summary {
   display: grid;
-  grid-template-columns: var(--esp-3) minmax(0, 1fr);
+  grid-template-columns: var(--esp-3) minmax(0, 1fr) auto;
   align-items: baseline;
   column-gap: var(--esp-2);
   padding: var(--esp-3);
@@ -426,6 +484,7 @@ html, body {
 /* La linea de resumen solo con la tarjeta cerrada: abierta, lo dice el cuerpo. */
 .tarjeta-resumen {
   grid-column: 2;
+  grid-row: 2;
   margin-top: 2px;
   font-size: var(--texto-xs);
   color: var(--texto-2);
@@ -437,8 +496,7 @@ html, body {
 }
 .tarjeta-resumen:empty, .tarjeta[open] > summary .tarjeta-resumen { display: none; }
 .tarjeta-cuerpo { padding: 0 var(--esp-3) var(--esp-3); }
-.tarjeta-accion { position: absolute; top: var(--esp-2); right: var(--esp-2); }
-.tarjeta:has(> .tarjeta-accion) > summary { padding-right: calc(var(--esp-8) + var(--esp-6)); }
+.tarjeta-accion { grid-column: 3; grid-row: 1 / span 2; align-self: center; }
 .tarjeta.tarjeta-falla { border-left: 3px solid var(--falla); }
 .tarjeta.tarjeta-falla > summary .tarjeta-resumen { color: var(--falla); }
 .tarjeta.vacia { padding: var(--esp-3); }

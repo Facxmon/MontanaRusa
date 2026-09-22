@@ -15,6 +15,7 @@
 import type { Estado } from '../estado';
 import { leerAlmacen, escribirAlmacen } from '../paneles/almacen';
 import { el, vaciar } from '../paneles/dom';
+import { montarPestanas } from '../paneles/pestanas';
 import { formatearNumero } from '../paneles/formato';
 import { descargarArchivo, slug } from '../paneles/archivo';
 import { csvDeFigura } from '../nucleo/descargar';
@@ -57,26 +58,12 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
   // true mientras el cursor lo mueve otro panel: no se reenvia al estado.
   let aplicandoCursor = false;
 
-  const dibujarBarra = () => {
+  // La barra se arma una sola vez: las pestanas y los <select> siguen al
+  // estado sin redibujarse (el subrayado se desliza y el foco no se pierde).
+  const armarBarra = () => {
     const { pestana, ejeX } = estado.get();
-    vaciar(barra);
-    const pestanas = el(
-      'div',
-      { class: 'pestanas', role: 'tablist' },
-      PESTANAS.map((p) =>
-        el(
-          'button',
-          {
-            type: 'button',
-            role: 'tab',
-            class: p.clave === pestana ? 'pestana activa' : 'pestana',
-            'aria-selected': p.clave === pestana ? 'true' : 'false',
-            onClick: () => estado.set({ pestana: p.clave }),
-          },
-          p.etiqueta,
-        ),
-      ),
-    );
+    const contenedorDePestanas = el('div', { 'aria-label': 'Gráficos' });
+    const pestanas = montarPestanas(contenedorDePestanas, PESTANAS, pestana as Pestana, (clave) => estado.set({ pestana: clave }));
     const selector = el(
       'select',
       { onChange: (evento: Event) => estado.set({ ejeX: (evento.target as HTMLSelectElement).value as EjeX }) },
@@ -103,7 +90,7 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
       }),
     );
     barra.append(
-      pestanas,
+      contenedorDePestanas,
       el(
         'div',
         { class: 'graficos-opciones' },
@@ -111,6 +98,10 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
         el('label', { class: 'graficos-eje' }, 'Alto ', selectorDeAlto),
       ),
     );
+    return (e: { pestana: string; ejeX: EjeX }) => {
+      pestanas.activar(e.pestana as Pestana);
+      if (selector.value !== e.ejeX) selector.value = e.ejeX;
+    };
   };
 
   /** El cartel que cuenta como se navega; se muestra una sola vez. */
@@ -277,10 +268,10 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
     contenedorDeRango.hidden = false;
   }
 
-  dibujarBarra();
+  const actualizarBarra = armarBarra();
   dibujarFiguras();
   const cancelar = estado.suscribir((nuevo, anterior) => {
-    if (nuevo.pestana !== anterior.pestana || nuevo.ejeX !== anterior.ejeX) dibujarBarra();
+    if (nuevo.pestana !== anterior.pestana || nuevo.ejeX !== anterior.ejeX) actualizarBarra(nuevo);
     if (
       nuevo.layout !== anterior.layout ||
       nuevo.elemento !== anterior.elemento ||

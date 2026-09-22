@@ -92,3 +92,12 @@ export function crearEstado(inicial: DatosDeEstado): Estado {
     },
   };
 }
+
+/**
+ * true si el cambio de layout es un RECALCULO del diseno propio (y no abrir
+ * otro caso o el primer layout): es cuando los paneles destellan los
+ * valores que cambiaron (fase 4.3).
+ */
+export function esRecalculo(nuevo: DatosDeEstado, anterior: DatosDeEstado): boolean {
+  return nuevo.layout !== anterior.layout && nuevo.layout !== null && anterior.layout !== null && nuevo.fuente === 'diseno' && anterior.fuente === 'diseno';
+}

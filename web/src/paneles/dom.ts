@@ -76,9 +76,10 @@ export function tarjeta(opciones: OpcionesDeTarjeta, ...hijos: (Hijo | Hijo[])[]
     ),
     el('div', { class: 'tarjeta-cuerpo' }, ...hijos),
   );
-  // Un boton dentro del <summary> abriria y cerraria la tarjeta al tocarlo:
-  // va al lado, en el <details>, y el CSS lo sube a la altura del titulo.
-  if (opciones.accion) detalles.append(el('span', { class: 'tarjeta-accion' }, opciones.accion));
+  // El boton va dentro del <summary>, a la derecha del titulo: la activacion
+  // de un control interactivo no abre ni cierra el <details> (la toma el
+  // boton), y afuera quedaria recortado por la animacion de apertura.
+  if (opciones.accion) detalles.querySelector('summary')!.append(el('span', { class: 'tarjeta-accion' }, opciones.accion));
   detalles.addEventListener('toggle', () => tarjetasAbiertas.set(opciones.clave, detalles.open));
   return detalles;
 }
@@ -87,4 +88,30 @@ export function tarjeta(opciones: OpcionesDeTarjeta, ...hijos: (Hijo | Hijo[])[]
 export function resumirTarjeta(detalles: HTMLDetailsElement, resumen: string): void {
   const linea = detalles.querySelector<HTMLElement>(':scope > summary .tarjeta-resumen');
   if (linea) linea.textContent = resumen;
+}
+
+// ---------------------------------------------------------------- destello
+// Despues de un recalculo, las celdas cuyo valor cambio se tinen 400 ms:
+// se ve de un vistazo QUE cambio al tocar un parametro. Nunca se mueve el
+// numero (fase 0), solo el fondo de la celda.
+
+/** Texto de cada [data-clave] del contenedor, para comparar despues de redibujar. */
+export function valoresPorClave(contenedor: HTMLElement): Map<string, string> {
+  const valores = new Map<string, string>();
+  for (const nodo of contenedor.querySelectorAll<HTMLElement>('[data-clave]')) valores.set(nodo.dataset.clave!, nodo.textContent ?? '');
+  return valores;
+}
+
+/** Destella las [data-clave] cuyo texto difiere del de antes; las nuevas no. */
+export function destellarCambios(contenedor: HTMLElement, antes: Map<string, string>): void {
+  if (antes.size === 0) return;
+  for (const nodo of contenedor.querySelectorAll<HTMLElement>('[data-clave]')) {
+    const previo = antes.get(nodo.dataset.clave!);
+    if (previo === undefined || previo === nodo.textContent) continue;
+    nodo.classList.remove('destello');
+    // Forzar el reflow reinicia la animacion si el valor cambia dos veces seguidas.
+    void nodo.offsetWidth;
+    nodo.classList.add('destello');
+    nodo.addEventListener('animationend', () => nodo.classList.remove('destello'), { once: true });
+  }
 }

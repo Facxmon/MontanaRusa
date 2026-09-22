@@ -2,7 +2,7 @@
 // (lo que se edita para recalcularlo).
 
 import type { Estado, PanelLateral } from '../estado';
-import { el, vaciar } from './dom';
+import { montarPestanas } from './pestanas';
 
 const PANELES: { clave: PanelLateral; etiqueta: string }[] = [
   { clave: 'resultados', etiqueta: 'Resultados' },
@@ -10,20 +10,8 @@ const PANELES: { clave: PanelLateral; etiqueta: string }[] = [
 ];
 
 export function montarSelectorDePanel(contenedor: HTMLElement, estado: Estado): void {
-  const dibujar = () => {
-    const { panel } = estado.get();
-    vaciar(contenedor);
-    contenedor.append(
-      ...PANELES.map((p) =>
-        el('button', {
-          type: 'button', role: 'tab', class: p.clave === panel ? 'pestana activa' : 'pestana',
-          'aria-selected': p.clave === panel ? 'true' : 'false', onClick: () => estado.set({ panel: p.clave }),
-        }, p.etiqueta),
-      ),
-    );
-  };
-  dibujar();
+  const pestanas = montarPestanas(contenedor, PANELES, estado.get().panel, (panel) => estado.set({ panel }));
   estado.suscribir((nuevo, anterior) => {
-    if (nuevo.panel !== anterior.panel) dibujar();
+    if (nuevo.panel !== anterior.panel) pestanas.activar(nuevo.panel);
   });
 }

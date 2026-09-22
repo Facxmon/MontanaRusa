@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { tema } from '../tema';
+import { curvaCubica, milisegundos, movimientoReducido, tema } from '../tema';
 
 export type BoundingBox = [[number, number], [number, number], [number, number]];
 
@@ -21,6 +21,17 @@ export class Escena {
   private readonly reloj = new THREE.Clock();
   private readonly porCuadro: ((dt: number) => void)[] = [];
   private readonly observador: ResizeObserver;
+  /** Encuadre en curso: la camara vuela de una vista a otra en vez de saltar. */
+  private vuelo: {
+    desdePosicion: THREE.Vector3;
+    desdeObjetivo: THREE.Vector3;
+    haciaPosicion: THREE.Vector3;
+    haciaObjetivo: THREE.Vector3;
+    inicio: number;
+    duracion: number;
+    curva: (t: number) => number;
+  } | null = null;
+  private yaEncuadro = false;
 
   constructor(contenedor: HTMLElement) {
     this.contenedor = contenedor;
@@ -38,6 +49,8 @@ export class Escena {
     this.controles = new OrbitControls(this.camara, this.renderer.domElement);
     this.controles.enableDamping = true;
     this.controles.dampingFactor = 0.08;
+    // Si el usuario agarra la camara a mitad de un vuelo, gana el usuario.
+    this.controles.addEventListener('start', () => (this.vuelo = null));
 
     this.scene.add(new THREE.HemisphereLight(new THREE.Color(t.escenaCielo), new THREE.Color(t.escenaSuelo), 1.1));
     const sol = new THREE.DirectionalLight(new THREE.Color(t.escenaSol), 1.4);
@@ -77,6 +90,7 @@ export class Escena {
       this.renderer.setAnimationLoop(() => {
         const dt = this.reloj.getDelta();
         for (const fn of this.porCuadro) fn(dt);
+        this.avanzarVuelo();
         this.controles.update();
         this.renderer.render(this.scene, this.camara);
       });
@@ -141,7 +155,13 @@ export class Escena {
     this.camara.updateProjectionMatrix();
   }
 
-  /** Encuadra la caja [[xmin,xmax],[ymin,ymax],[zmin,zmax]] desde una diagonal. */
+  /**
+   * Encuadra la caja [[xmin,xmax],[ymin,ymax],[zmin,zmax]] desde una
+   * diagonal. Salvo la primera vez (no hay de donde venir) o con movimiento
+   * reducido, la camara interpola posicion y centro de la orbita en
+   * --dur-lenta con --curva: el salto instantaneo desorientaba al elegir un
+   * elemento, y es la mejora de calidad percibida mas barata de la fase 4.
+   */
   encuadrar(caja: BoundingBox): void {
     const centro = new THREE.Vector3(
       (caja[0][0] + caja[0][1]) / 2,
@@ -152,11 +172,47 @@ export class Escena {
     const radio = Math.max(diagonal / 2, 0.2);
     const distancia = radio / Math.sin(THREE.MathUtils.degToRad(this.camara.fov / 2));
     const direccion = new THREE.Vector3(1, -1.2, 0.7).normalize();
-    this.camara.position.copy(centro).addScaledVector(direccion, distancia * 1.1);
-    this.camara.near = distancia / 100;
-    this.camara.far = distancia * 20;
+    const posicion = centro.clone().addScaledVector(direccion, distancia * 1.1);
+    // near/far cubren las dos vistas durante el vuelo: nada se recorta en el camino.
+    const distanciaActual = this.camara.position.distanceTo(this.controles.target);
+    const animar = this.yaEncuadro && !movimientoReducido();
+    this.camara.near = (animar ? Math.min(distancia, distanciaActual) : distancia) / 100;
+    this.camara.far = (animar ? Math.max(distancia, distanciaActual) : distancia) * 20;
     this.camara.updateProjectionMatrix();
-    this.controles.target.copy(centro);
-    this.controles.update();
+    this.yaEncuadro = true;
+    if (!animar) {
+      this.vuelo = null;
+      this.camara.position.copy(posicion);
+      this.controles.target.copy(centro);
+      this.controles.update();
+      return;
+    }
+    const t = tema();
+    this.vuelo = {
+      desdePosicion: this.camara.position.clone(),
+      desdeObjetivo: this.controles.target.clone(),
+      haciaPosicion: posicion,
+      haciaObjetivo: centro,
+      inicio: performance.now(),
+      duracion: milisegundos(t.durLenta),
+      curva: curvaCubica(t.curva),
+    };
+  }
+
+  private avanzarVuelo(): void {
+    const v = this.vuelo;
+    if (!v) return;
+    const avance = Math.min(1, (performance.now() - v.inicio) / v.duracion);
+    const f = v.curva(avance);
+    this.camara.position.lerpVectors(v.desdePosicion, v.haciaPosicion, f);
+    this.controles.target.lerpVectors(v.desdeObjetivo, v.haciaObjetivo, f);
+    if (avance >= 1) {
+      this.vuelo = null;
+      // Terminado el vuelo, near/far vuelven a los de la vista final.
+      const distancia = v.haciaPosicion.distanceTo(v.haciaObjetivo) / 1.1;
+      this.camara.near = distancia / 100;
+      this.camara.far = distancia * 20;
+      this.camara.updateProjectionMatrix();
+    }
   }
 }

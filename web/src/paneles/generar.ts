@@ -49,6 +49,12 @@ export function montarGenerar(contenedor: HTMLElement, estado: Estado, acciones:
   const opcion = el('label', { class: 'barra-opcion', title: 'Recalcular solo con cada edición, como antes; apagado, se calcula con Generar' }, casilla, ' auto-generar');
 
   contenedor.append(opcion, boton);
+  // La misma fraccion, en una linea fina a lo ancho de la barra: se ve desde
+  // cualquier lado de la pantalla, no solo mirando el boton. Es determinada
+  // (elementos hechos / total), nunca un spinner.
+  const progreso = el('div', { class: 'barra-progreso', role: 'progressbar', 'aria-label': 'Progreso del cálculo', 'aria-valuemin': '0', 'aria-valuemax': '100', hidden: true },
+    el('span', { class: 'barra-progreso-relleno' }));
+  contenedor.closest('.barra')?.append(progreso);
 
   const dibujar = (e: DatosDeEstado) => {
     const pendiente = e.diseno !== null && e.diseno !== e.disenoCalculado;
@@ -59,6 +65,9 @@ export function montarGenerar(contenedor: HTMLElement, estado: Estado, acciones:
       const p = e.progreso;
       const fraccion = p && p.total > 0 ? p.hecho / p.total : 0;
       relleno.style.width = `${Math.round(fraccion * 100)}%`;
+      progreso.hidden = false;
+      progreso.style.setProperty('--avance', String(fraccion));
+      progreso.setAttribute('aria-valuenow', String(Math.round(fraccion * 100)));
       texto.textContent = 'Detener';
       contador.textContent = p ? `${p.hecho}/${p.total}` : '';
       contador.hidden = !p;
@@ -67,6 +76,8 @@ export function montarGenerar(contenedor: HTMLElement, estado: Estado, acciones:
       ponerTooltip(boton, p ? `Detener: ${p.hecho} de ${p.total} elementos calculados` : 'Detener el cálculo', 'Esc');
     } else {
       relleno.style.width = '0%';
+      progreso.hidden = true;
+      progreso.style.setProperty('--avance', '0');
       texto.textContent = 'Generar';
       contador.textContent = '';
       contador.hidden = true;

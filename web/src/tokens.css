@@ -130,6 +130,7 @@
   --acento: var(--azul-400);
   --acento-hover: var(--azul-300);
   --acento-suave: rgba(var(--azul-400-rgb), 0.15);
+  --destello: rgba(var(--azul-400-rgb), 0.35);
   --texto-sobre-acento: var(--gris-950);
   /* Botones: un escalon mas claro que la tarjeta, con borde propio. */
   --superficie-boton-hover: var(--gris-600);
@@ -193,6 +194,7 @@
   --acento: var(--azul-500);
   --acento-hover: var(--azul-600);
   --acento-suave: rgba(var(--azul-400-rgb), 0.2);
+  --destello: rgba(var(--azul-400-rgb), 0.45);
   --texto-sobre-acento: var(--blanco);
   --superficie-boton-hover: var(--gris-200);
   --borde-boton: var(--gris-300);

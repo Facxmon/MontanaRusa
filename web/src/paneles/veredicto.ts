@@ -10,8 +10,8 @@
 
 import type { UbicacionDeExtremo } from '../contrato/veredicto';
 import { veredictoDelLayout } from '../contrato/veredicto';
-import type { Estado } from '../estado';
-import { el, vaciar } from './dom';
+import { esRecalculo, type Estado } from '../estado';
+import { destellarCambios, el, vaciar, valoresPorClave } from './dom';
 import { formatear } from './formato';
 import { textoDeInerte } from './parametros';
 import type { NombreDeParametro } from '../nucleo/tipos';
@@ -30,13 +30,14 @@ function cifra(etiqueta: string, valor: string, donde: string): HTMLElement {
     'div',
     { class: 'veredicto-cifra' },
     el('span', { class: 'veredicto-cifra-etiqueta' }, etiqueta),
-    el('span', { class: 'veredicto-cifra-valor' }, valor),
+    el('span', { class: 'veredicto-cifra-valor', 'data-clave': etiqueta }, valor),
     el('span', { class: 'veredicto-cifra-donde' }, donde),
   );
 }
 
 export function montarVeredicto(contenedor: HTMLElement, estado: Estado): void {
-  const dibujar = () => {
+  const dibujar = (destellar = false) => {
+    const antes = destellar ? valoresPorClave(contenedor) : null;
     const { layout } = estado.get();
     vaciar(contenedor);
     if (!layout) return;
@@ -91,9 +92,10 @@ export function montarVeredicto(contenedor: HTMLElement, estado: Estado): void {
         ),
       ),
     );
+    if (antes) destellarCambios(contenedor, antes);
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {
-    if (nuevo.layout !== anterior.layout) dibujar();
+    if (nuevo.layout !== anterior.layout) dibujar(esRecalculo(nuevo, anterior));
   });
 }
