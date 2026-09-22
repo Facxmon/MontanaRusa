@@ -18,6 +18,7 @@
 :root {
   /* ---------- paleta cruda ---------- */
   --gris-950: #0f1115;
+  --gris-925: #1c212b;
   --gris-900: #171a21;
   --gris-850: #1a1d24;
   --gris-800: #232833;
@@ -42,6 +43,7 @@
   --verde-norma-600: #0ca30c;
 
   --rojo-100: #ffd7d7;
+  --rojo-400: #e66767;
   --rojo-500: #ff5c5c;
   --rojo-600: #d03b3b;
   --rojo-800: #551111;
@@ -171,6 +173,16 @@
   --escena-pasajero-brillo: var(--rojo-800);
   /* Marcador del nodo bajo el cursor de los graficos. */
   --escena-marcador: var(--azul-400);
+  /* Fondo en gradiente (arriba mas claro), rotulos de la grilla, caja
+     disponible (entra / se sale), proyeccion al piso y gizmo de ejes. */
+  --escena-fondo-arriba: var(--gris-925);
+  --escena-rotulo: var(--gris-500);
+  --escena-caja: var(--verde-600);
+  --escena-caja-fuera: var(--rojo-500);
+  --escena-proyeccion: var(--azul-gris-500);
+  --escena-eje-x: var(--rojo-400);
+  --escena-eje-y: var(--verde-500);
+  --escena-eje-z: var(--azul-400);
 }
 
 /* ---------- tema claro: estructura lista, valores provisorios (fase 4) ---------- */
@@ -231,4 +243,14 @@
   --escena-pasajero: var(--rojo-600);
   --escena-pasajero-brillo: var(--rojo-800);
   --escena-marcador: var(--azul-500);
+  /* Fondo en gradiente (arriba mas claro), rotulos de la grilla, caja
+     disponible (entra / se sale), proyeccion al piso y gizmo de ejes. */
+  --escena-fondo-arriba: var(--gris-925);
+  --escena-rotulo: var(--gris-500);
+  --escena-caja: var(--verde-600);
+  --escena-caja-fuera: var(--rojo-500);
+  --escena-proyeccion: var(--azul-gris-500);
+  --escena-eje-x: var(--rojo-400);
+  --escena-eje-y: var(--verde-500);
+  --escena-eje-z: var(--azul-400);
 }

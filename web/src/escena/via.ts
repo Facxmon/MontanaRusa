@@ -7,7 +7,7 @@ import type { ClaveDeMagnitud } from '../contrato/magnitudes';
 import { magnitudPorClave } from '../contrato/magnitudes';
 import type { Layout } from '../contrato/tipos';
 import { tema } from '../tema';
-import { rangoDeMagnitud } from './colores';
+import { bufferALineal, rangoDeMagnitud } from './colores';
 import {
   aplanarNodos,
   coloresPorVertice,
@@ -143,14 +143,14 @@ export class Via {
     const atenuar =
       elementoResaltado === null ? undefined : (nodo: number) => nodos.elemento[nodo] !== elementoResaltado;
 
-    const coloresTubo = coloresPorVertice(valores, this.geometriaDelTubo.nodoDeVertice, rango, escala, atenuar);
+    const coloresTubo = bufferALineal(coloresPorVertice(valores, this.geometriaDelTubo.nodoDeVertice, rango, escala, atenuar));
     const atributoTubo = this.tuboMesh.geometry.getAttribute('color') as THREE.BufferAttribute;
     (atributoTubo.array as Float32Array).set(coloresTubo);
     atributoTubo.needsUpdate = true;
 
     const identidad = new Uint32Array(nodos.cantidad);
     for (let k = 0; k < nodos.cantidad; k++) identidad[k] = k;
-    const coloresHeartline = coloresPorVertice(valores, identidad, rango, escala, atenuar);
+    const coloresHeartline = bufferALineal(coloresPorVertice(valores, identidad, rango, escala, atenuar));
     const atributoHeartline = this.heartline.geometry.getAttribute('color') as THREE.BufferAttribute;
     (atributoHeartline.array as Float32Array).set(coloresHeartline);
     atributoHeartline.needsUpdate = true;

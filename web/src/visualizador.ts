@@ -10,6 +10,7 @@ import { cargarIndice, cargarLayout } from './contrato/cargar';
 import { disenoDesdeLayout } from './contrato/disenoDesdeLayout';
 import { MAGNITUD_INICIAL } from './contrato/magnitudes';
 import { Carro } from './escena/carro';
+import { Entorno } from './escena/entorno';
 import { Escena } from './escena/escena';
 import { Via } from './escena/via';
 import { diagnosticar } from './diagnostico';
@@ -147,6 +148,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   });
 
   const escena = new Escena(dom.vista3d);
+  const entorno = new Entorno(escena.scene);
   const via = new Via(escena.scene);
   const carro = new Carro(escena.scene);
 
@@ -322,6 +324,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   estado.suscribir((nuevo, anterior) => {
     if (nuevo.layout !== anterior.layout) {
       if (nuevo.layout) {
+        entorno.construir(nuevo.layout);
         via.construir(nuevo.layout, nuevo.magnitud, nuevo.elemento);
         escena.encuadrar(nuevo.layout.resumenLayout.boundingBox);
       }
@@ -430,6 +433,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
       destruirGraficos();
       carro.destruir();
       via.destruir();
+      entorno.destruir();
       escena.destruir();
       dom.app.remove();
     },

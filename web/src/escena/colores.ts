@@ -117,3 +117,19 @@ export function gradienteCss(escala: TipoDeEscala, paradas: ParadasDeEscalas = E
   });
   return `linear-gradient(to right, ${partes.join(', ')})`;
 }
+
+/**
+ * Del sRGB de las paradas (el mismo que dibuja la barra de la leyenda en
+ * CSS) al espacio lineal en que Three.js interpreta un atributo de color de
+ * vertice. Sin esto, con la salida en sRGB (fase 4.4) el tubo se veia mas
+ * lavado que la leyenda: el mismo numero significaba dos colores.
+ */
+export function aLineal(canal: number): number {
+  return canal <= 0.04045 ? canal / 12.92 : ((canal + 0.055) / 1.055) ** 2.4;
+}
+
+/** Pasa en el lugar un buffer r,g,b sRGB a lineal. */
+export function bufferALineal(colores: Float32Array): Float32Array {
+  for (let i = 0; i < colores.length; i++) colores[i] = aLineal(colores[i]!);
+  return colores;
+}

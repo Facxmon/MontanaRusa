@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { curvaCubica, milisegundos, movimientoReducido, tema } from '../tema';
+import { curvaCubica, milisegundos, movimientoReducido, tema, type Tema } from '../tema';
 
 export type BoundingBox = [[number, number], [number, number], [number, number]];
 
@@ -17,7 +17,9 @@ export class Escena {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly controles: OrbitControls;
   private readonly contenedor: HTMLElement;
-  private readonly grilla: THREE.GridHelper;
+  /** Gizmo de ejes: una escena y una camara propias, dibujadas en una esquina. */
+  private readonly gizmo = new THREE.Scene();
+  private readonly camaraDelGizmo = new THREE.OrthographicCamera(-1.4, 1.4, 1.4, -1.4, 0.1, 10);
   private readonly reloj = new THREE.Clock();
   private readonly porCuadro: ((dt: number) => void)[] = [];
   private readonly observador: ResizeObserver;
@@ -36,10 +38,18 @@ export class Escena {
   constructor(contenedor: HTMLElement) {
     this.contenedor = contenedor;
     const t = tema();
-    this.scene.background = new THREE.Color(t.escenaFondo);
+    this.scene.background = fondoEnGradiente(t.escenaFondoArriba, t.escenaFondo);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // ACES + salida sRGB: el tubo coloreado por magnitud se lee mejor que con
+    // los defaults (los extremos de la escala no se queman). Los colores de
+    // vertice van en lineal (colores.bufferALineal) para que coincidan con la
+    // barra de la leyenda.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.autoClear = false;
     contenedor.appendChild(this.renderer.domElement);
 
     this.camara = new THREE.PerspectiveCamera(45, 1, 0.01, 100);
@@ -60,11 +70,8 @@ export class Escena {
     contraluz.position.set(-3, 2, 1);
     this.scene.add(contraluz);
 
-    // Piso en z = 0: cuadricula de 10 cm sobre 4 x 4 m. Si la via lo cruza, se ve.
-    this.grilla = new THREE.GridHelper(4, 40, new THREE.Color(t.escenaGrillaFuerte), new THREE.Color(t.escenaGrilla));
-    this.grilla.rotation.x = Math.PI / 2;
-    this.scene.add(this.grilla);
-    this.scene.add(new THREE.AxesHelper(0.25));
+    // El piso, la grilla rotulada y la caja disponible los dibuja Entorno.
+    armarGizmo(this.gizmo, t);
 
     this.ajustarTamano();
     this.observador = new ResizeObserver(() => this.ajustarTamano());
@@ -92,7 +99,7 @@ export class Escena {
         for (const fn of this.porCuadro) fn(dt);
         this.avanzarVuelo();
         this.controles.update();
-        this.renderer.render(this.scene, this.camara);
+        this.dibujar();
       });
     } else {
       this.renderer.setAnimationLoop(null);
@@ -126,16 +133,41 @@ export class Escena {
       this.renderer.setSize(ancho, alto, false);
       this.camara.aspect = ancho / alto;
       this.camara.updateProjectionMatrix();
-      this.renderer.render(this.scene, this.camara);
+      this.dibujar();
       datos = this.renderer.domElement.toDataURL('image/png');
     } finally {
       this.renderer.setPixelRatio(ratioDePantalla);
       this.camara.aspect = aspectoDePantalla;
       this.ajustarTamano();
-      this.renderer.render(this.scene, this.camara);
+      this.dibujar();
     }
     const respuesta = await fetch(datos);
     return respuesta.blob();
+  }
+
+  /**
+   * Un cuadro: la escena y, encima, el gizmo de ejes en la esquina superior
+   * izquierda (abajo esta el reproductor), con la orientacion de la camara.
+   */
+  private dibujar(): void {
+    const r = this.renderer;
+    const tamano = r.getSize(new THREE.Vector2());
+    r.setViewport(0, 0, tamano.x, tamano.y);
+    r.setScissorTest(false);
+    r.clear();
+    r.render(this.scene, this.camara);
+    const lado = Math.round(Math.min(96, tamano.x / 5, tamano.y / 4));
+    if (lado < 40) return;
+    const margen = 8;
+    this.camaraDelGizmo.position.set(0, 0, 4).applyQuaternion(this.camara.quaternion);
+    this.camaraDelGizmo.quaternion.copy(this.camara.quaternion);
+    r.setViewport(margen, tamano.y - lado - margen, lado, lado);
+    r.setScissor(margen, tamano.y - lado - margen, lado, lado);
+    r.setScissorTest(true);
+    r.clearDepth();
+    r.render(this.gizmo, this.camaraDelGizmo);
+    r.setScissorTest(false);
+    r.setViewport(0, 0, tamano.x, tamano.y);
   }
 
   /** Mueve el centro de la orbita a un punto conservando la posicion relativa de la camara. */
@@ -214,5 +246,47 @@ export class Escena {
       this.camara.far = distancia * 20;
       this.camara.updateProjectionMatrix();
     }
+  }
+}
+
+/** Fondo con un gradiente vertical suave (arriba mas claro), como textura: sale igual en la captura PNG. */
+function fondoEnGradiente(arriba: string, abajo: string): THREE.Texture {
+  const lienzo = document.createElement('canvas');
+  lienzo.width = 2;
+  lienzo.height = 256;
+  const contexto = lienzo.getContext('2d')!;
+  const gradiente = contexto.createLinearGradient(0, 0, 0, lienzo.height);
+  gradiente.addColorStop(0, arriba);
+  gradiente.addColorStop(1, abajo);
+  contexto.fillStyle = gradiente;
+  contexto.fillRect(0, 0, lienzo.width, lienzo.height);
+  const textura = new THREE.CanvasTexture(lienzo);
+  textura.colorSpace = THREE.SRGBColorSpace;
+  return textura;
+}
+
+/** Tres flechas x, y, z con su letra, en los colores de los tokens (sin iluminacion: siempre legibles). */
+function armarGizmo(escena: THREE.Scene, t: Tema): void {
+  const ejes: [THREE.Vector3, string, string][] = [
+    [new THREE.Vector3(1, 0, 0), t.escenaEjeX, 'x'],
+    [new THREE.Vector3(0, 1, 0), t.escenaEjeY, 'y'],
+    [new THREE.Vector3(0, 0, 1), t.escenaEjeZ, 'z'],
+  ];
+  for (const [direccion, color, letra] of ejes) {
+    escena.add(new THREE.ArrowHelper(direccion, new THREE.Vector3(), 0.85, new THREE.Color(color), 0.25, 0.14));
+    const lienzo = document.createElement('canvas');
+    lienzo.width = lienzo.height = 64;
+    const contexto = lienzo.getContext('2d')!;
+    contexto.font = `600 44px ${t.fuente}`;
+    contexto.fillStyle = color;
+    contexto.textAlign = 'center';
+    contexto.textBaseline = 'middle';
+    contexto.fillText(letra, 32, 34);
+    const textura = new THREE.CanvasTexture(lienzo);
+    textura.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: textura, depthTest: false }));
+    sprite.position.copy(direccion).multiplyScalar(1.15);
+    sprite.scale.set(0.45, 0.45, 1);
+    escena.add(sprite);
   }
 }
