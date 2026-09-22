@@ -9,7 +9,7 @@ import { nuevoIdDeInstancia, type EntradaDeDiseno, type InstanciaDeElemento } fr
 import { textoDelLayout } from '../nucleo/descargar';
 import { CATALOGO_DE_ELEMENTOS } from '../nucleo/parametros';
 import type { NombreDeElemento } from '../nucleo/tipos';
-import { el, vaciar } from './dom';
+import { el, tarjeta, vaciar } from './dom';
 import { descargarArchivo } from './archivo';
 
 function contarAjustes(inst: InstanciaDeElemento): number {
@@ -41,8 +41,7 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
     };
 
     // --- fuente ---
-    const origen = el('section', {},
-      el('h2', {}, 'Origen del layout'),
+    const origen = tarjeta({ clave: 'origen', titulo: 'Origen del layout', resumen: fuente === 'golden' ? `golden ${caso ?? ''}` : 'diseño propio' },
       fuente === 'golden'
         ? el('div', {},
             el('p', { class: 'ayuda' }, `Golden file ${caso ?? ''}, calculado por MATLAB. Editar sus parámetros crea un diseño propio que se recalcula en el navegador.`),
@@ -74,8 +73,7 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
       });
     const posicion = [...diseno.posicion] as [number, number, number];
     contenedor.append(
-      el('section', {},
-        el('h2', {}, 'Estado inicial'),
+      tarjeta({ clave: 'estado-inicial', titulo: 'Estado inicial', resumen: `posición [${diseno.posicion.join(', ')}] m · ${diseno.velocidad} m/s` },
         el('div', { class: 'campos' },
           el('label', { class: 'campo' }, el('span', { class: 'campo-etiqueta', title: 'Posicion del RIEL al arrancar; el pasajero va DistanciaHeartline mas arriba.' }, 'posición [m]'),
             el('span', { class: 'campo-vector' }, posicion.map((v, i) => numero(v, (nuevo) => { posicion[i] = nuevo; actualizar({ posicion: [...posicion] }); }))),
@@ -146,8 +144,7 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
       );
     });
     contenedor.append(
-      el('section', {},
-        el('h2', {}, 'Secuencia de elementos'),
+      tarjeta({ clave: 'secuencia', titulo: 'Secuencia de elementos', resumen: secuencia.map((inst) => inst.tipo).join(' → ') },
         el('p', { class: 'ayuda' }, 'Cada instancia hereda los parámetros globales y puede pisar los suyos: elegí una fila para editarlos.'),
         el('div', { class: 'secuencia' }, filas),
         el('button', {

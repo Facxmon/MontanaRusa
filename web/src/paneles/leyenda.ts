@@ -1,20 +1,36 @@
-// Barra de color con el rango de la magnitud elegida sobre el layout cargado.
+// Tarjeta "Color de la vía": el selector de la magnitud con la que se
+// colorea la via y la barra de color con su rango sobre el layout cargado.
+// La tarjeta y el <select> se arman una vez (redibujarlos al elegir una
+// magnitud le sacaria el foco al teclado); lo que cambia es la barra, las
+// paradas y la linea de resumen.
 
 import { magnitudPorClave } from '../contrato/magnitudes';
 import { gradienteCss, paradasDeLeyenda, rangoDeMagnitud } from '../escena/colores';
 import type { Estado } from '../estado';
-import { el, vaciar } from './dom';
+import { el, resumirTarjeta, tarjeta, vaciar } from './dom';
 import { formatearMagnitud } from './formato';
+import { selectorDeMagnitud } from './selectorDeMagnitud';
 
 export function montarLeyenda(contenedor: HTMLElement, estado: Estado): void {
+  const cuerpo = el('div', { class: 'leyenda' });
+  const caja = tarjeta(
+    { clave: 'color', titulo: 'Color de la vía' },
+    el('label', {}, el('span', { class: 'etiqueta' }, 'Colorear por'), selectorDeMagnitud(estado)),
+    cuerpo,
+  );
+
   const dibujar = () => {
     const { layout, magnitud } = estado.get();
-    vaciar(contenedor);
-    if (!layout) return;
+    vaciar(cuerpo);
+    if (!layout) {
+      contenedor.replaceChildren();
+      return;
+    }
+    if (!caja.isConnected) contenedor.replaceChildren(caja);
     const m = magnitudPorClave(magnitud);
     const rango = rangoDeMagnitud(layout, magnitud);
     const paradas = paradasDeLeyenda(rango, 5);
-    contenedor.append(
+    cuerpo.append(
       el('div', { class: 'leyenda-barra', style: `background: ${gradienteCss(m.escala)}` }),
       el(
         'div',
@@ -23,6 +39,7 @@ export function montarLeyenda(contenedor: HTMLElement, estado: Estado): void {
       ),
       el('p', { class: 'ayuda' }, 'Gris: nodo sin dato (null en el JSON). El rango es el del layout entero.'),
     );
+    resumirTarjeta(caja, `${m.etiqueta} · ${formatearMagnitud(rango.minimo, magnitud)} a ${formatearMagnitud(rango.maximo, magnitud)}`);
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {

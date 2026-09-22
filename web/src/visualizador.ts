@@ -28,6 +28,7 @@ import { montarDiseno } from './paneles/diseno';
 import { el } from './paneles/dom';
 import { montarElementos } from './paneles/elementos';
 import { montarBarra } from './paneles/barra';
+import { montarCabecera } from './paneles/cabecera';
 import { montarErrores } from './paneles/errores';
 import { leerAutoGenerar, montarGenerar } from './paneles/generar';
 import { guardadorDeDiseno, haceCuanto, olvidarDiseno, restaurarDiseno } from './paneles/persistencia';
@@ -38,7 +39,6 @@ import { montarReproductor } from './paneles/reproductor';
 import { montarParametros } from './paneles/parametros';
 import { montarResumenElemento, montarResumenLayout } from './paneles/resumen';
 import { montarSelectorDeCaso } from './paneles/selectorDeCaso';
-import { montarSelectorDeMagnitud } from './paneles/selectorDeMagnitud';
 import { montarSelectorDePanel } from './paneles/selectorDePanel';
 import { montarSelectorDeVista } from './paneles/selectorDeVista';
 import { montarVeredicto } from './paneles/veredicto';
@@ -65,30 +65,24 @@ function armarDom() {
   const selectorDeCaso = el('section');
   const selectorDePanel = el('nav', { class: 'pestanas pestanas-panel', role: 'tablist', 'aria-label': 'Panel' });
   const veredicto = el('section');
-  const selectorDeMagnitud = el('section');
   const leyenda = el('section');
   const resumenLayout = el('section');
   const elementos = el('section');
   const resumenElemento = el('section');
   const criterios = el('section');
   const valoresDelCursor = el('section');
-  const panelResultados = el('div', { class: 'panel-resultados' }, veredicto, selectorDeMagnitud, leyenda, resumenLayout, valoresDelCursor, elementos, resumenElemento, criterios);
+  const panelResultados = el('div', { class: 'panel-resultados' }, veredicto, leyenda, resumenLayout, valoresDelCursor, elementos, resumenElemento, criterios);
   const diseno = el('section');
   const parametros = el('section');
   const panelDiseno = el('div', { class: 'panel-diseno', hidden: true }, diseno, parametros);
+  // La cabecera (que se mira y en que estado) y las pestanas quedan fijas
+  // arriba; lo demas scrollea debajo.
+  const cabecera = el('div', { class: 'cabecera-estado' });
   const panel = el(
     'aside',
     { class: 'panel', 'aria-label': 'Datos del layout' },
-    el(
-      'header',
-      { class: 'panel-cabecera' },
-      el('h1', {}, 'Montaña rusa en miniatura'),
-      el('p', { class: 'subtitulo' }, 'Vía generada en MATLAB, leída del contrato JSON v1'),
-    ),
-    selectorDeCaso,
-    selectorDePanel,
-    panelResultados,
-    panelDiseno,
+    el('header', { class: 'panel-cabecera' }, cabecera, selectorDePanel),
+    el('div', { class: 'panel-cuerpo' }, selectorDeCaso, panelResultados, panelDiseno),
   );
 
   const app = el('div', { class: 'visualizador' }, errores, barra, principal, panel);
@@ -102,10 +96,10 @@ function armarDom() {
     vista3d,
     reproductor,
     graficos,
+    cabecera,
     selectorDeCaso,
     selectorDePanel,
     veredicto,
-    selectorDeMagnitud,
     leyenda,
     resumenLayout,
     elementos,
@@ -161,9 +155,9 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   const aviso = montarAviso(dom.aviso);
 
   montarErrores(dom.errores, estado);
+  montarCabecera(dom.cabecera, estado);
   montarSelectorDeCaso(dom.selectorDeCaso, estado);
   montarVeredicto(dom.veredicto, estado);
-  montarSelectorDeMagnitud(dom.selectorDeMagnitud, estado);
   montarLeyenda(dom.leyenda, estado);
   montarResumenLayout(dom.resumenLayout, estado);
   montarElementos(dom.elementos, estado);

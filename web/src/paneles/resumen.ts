@@ -4,7 +4,7 @@
 
 import type { Layout, ResumenElemento, ResumenLayout } from '../contrato/tipos';
 import type { Estado } from '../estado';
-import { el, fila, vaciar } from './dom';
+import { el, fila, tarjeta, vaciar } from './dom';
 import { decimalesDeUnidad, formatear, formatearNumero } from './formato';
 import { textoDeInerte } from './parametros';
 import type { NombreDeParametro } from '../nucleo/tipos';
@@ -71,15 +71,20 @@ export function montarResumenLayout(contenedor: HTMLElement, estado: Estado): vo
     const { layout, caso } = estado.get();
     vaciar(contenedor);
     if (!layout) return;
-    contenedor.append(
-      el('h2', {}, 'Layout'),
+    const r = layout.resumenLayout;
+    contenedor.append(tarjeta(
+      {
+        clave: 'layout',
+        titulo: 'Layout',
+        resumen: `${r.numeroDeElementos} elementos · ${formatear(r.longitudTotal, 'm')} · ${formatear(r.tiempoTotal, 's')}`,
+      },
       el(
         'p',
         { class: 'ayuda' },
         `${caso ?? ''} · modo ${layout.parametros.valores.modoCurvatura} · método ${layout.parametros.valores.metodoDeAcoplamiento} · generado ${layout.meta.generadoEn ?? '?'} (${layout.meta.versionGenerador ?? '?'})`,
       ),
-      tablaDelLayout(layout.resumenLayout, layout),
-    );
+      tablaDelLayout(r, layout),
+    ));
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {
@@ -94,8 +99,12 @@ export function montarResumenElemento(contenedor: HTMLElement, estado: Estado): 
     if (!layout || elemento === null) return;
     const e = layout.elementos[elemento];
     if (!e) return;
-    contenedor.append(
-      el('h2', {}, `Elemento ${elemento + 1}: ${e.tipo}`),
+    contenedor.append(tarjeta(
+      {
+        clave: 'elemento',
+        titulo: `Elemento ${elemento + 1}: ${e.tipo}`,
+        resumen: `Gz ${formatear(e.resumen.gzMaxima, 'G')} / ${formatear(e.resumen.gzMinima, 'G')} · |Gy| ${formatear(e.resumen.gyMaximaAbsoluta, 'G')}`,
+      },
       el(
         'p',
         { class: 'ayuda' },
@@ -111,7 +120,7 @@ export function montarResumenElemento(contenedor: HTMLElement, estado: Estado): 
           textoDeInerte((nombre[0]!.toUpperCase() + nombre.slice(1)) as NombreDeParametro, layout.parametros.valores.modoCurvatura as never, e.tipo as never),
         ),
       ),
-    );
+    ));
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {

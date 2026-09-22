@@ -36,7 +36,7 @@ import {
 } from '../nucleo/parametros';
 import type { Declaracion, ModoCurvatura, NombreDeParametro, Parametros } from '../nucleo/tipos';
 import { ayudaDeCampo } from './ayuda';
-import { el } from './dom';
+import { el, tarjeta } from './dom';
 import {
   aSI,
   digitosDeEntrada,
@@ -360,13 +360,16 @@ function ficha(inst: InstanciaDeElemento, orden: number, diseno: EntradaDeDiseno
   );
 
   const cantidad = Object.keys(inst.ajustes).length;
-  return el('section', { class: 'ficha' },
-    el('div', { class: 'parametros-cabecera' },
-      el('h2', {}, `${orden}. ${inst.tipo}`),
-      cantidad > 0
+  return tarjeta(
+    {
+      clave: 'ficha',
+      titulo: `${orden}. ${inst.tipo}`,
+      resumen: cantidad === 0 ? 'todo heredado' : `${cantidad} ajuste${cantidad === 1 ? '' : 's'}`,
+      clase: 'ficha',
+      accion: cantidad > 0
         ? el('button', { type: 'button', class: 'boton chico', title: 'Quitar todos los ajustes de esta instancia', onClick: () => ajustar(() => ({}), false) }, 'Todo al global')
         : null,
-    ),
+    },
     el('p', { class: 'ayuda' }, cantidad === 0 ? 'Hereda todos sus parámetros de los globales; editar uno lo pisa solo para esta instancia.' : `${cantidad} parámetro${cantidad === 1 ? '' : 's'} pisado${cantidad === 1 ? '' : 's'}; ↺ vuelve al global.`),
     el('div', { class: 'campos' }, campos),
     advertencias,
@@ -414,7 +417,7 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
       };
       contenedor.append(ficha(inst, indice + 1, diseno, ajustar, diagnostico));
     } else {
-      contenedor.append(el('section', { class: 'ficha' }, el('p', { class: 'ayuda' }, 'Elegí un elemento de la secuencia para editar sus parámetros.')));
+      contenedor.append(el('section', { class: 'tarjeta ficha vacia' }, el('p', { class: 'ayuda' }, 'Elegí un elemento de la secuencia para editar sus parámetros.')));
     }
 
     // --- globales ---
@@ -430,11 +433,13 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
     const aceptacion = declaraciones(ParametrosDeAceptacion());
     const generales = declaraciones(ParametrosGenerales());
 
-    contenedor.append(
-      el('div', { class: 'parametros-cabecera' },
-        el('h2', {}, 'Parámetros globales'),
-        el('button', { type: 'button', class: 'boton', title: 'Los globales vuelven a ParametrosPorDefecto(); los ajustes de las instancias se conservan', onClick: () => restablecer(estado) }, 'Resetear a default'),
-      ),
+    contenedor.append(tarjeta(
+      {
+        clave: 'globales',
+        titulo: 'Parámetros globales',
+        resumen: `modo ${parametros.ModoCurvatura}`,
+        accion: el('button', { type: 'button', class: 'boton chico', title: 'Los globales vuelven a ParametrosPorDefecto(); los ajustes de las instancias se conservan', onClick: () => restablecer(estado) }, 'Resetear a default'),
+      },
       el('details', { open: true },
         el('summary', {}, 'Modo de curvatura'),
         el('div', { class: 'campos' },
@@ -446,7 +451,7 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
       grupo('Criterios de aceptación', deDiseno(aceptacion), parametros, actualizarGlobal, false, diagnostico),
       grupo('Generales', deDiseno(generales), parametros, actualizarGlobal, false, diagnostico),
       grupo('Avanzado — numérico', [...deSolver(aceptacion), ...deSolver(generales)], parametros, actualizarGlobal, false, diagnostico),
-    );
+    ));
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {

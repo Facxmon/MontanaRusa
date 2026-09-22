@@ -3,7 +3,7 @@
 // a la vista completa.
 
 import type { Estado } from '../estado';
-import { el, vaciar } from './dom';
+import { el, tarjeta, vaciar } from './dom';
 import { formatear } from './formato';
 
 export function montarElementos(contenedor: HTMLElement, estado: Estado): void {
@@ -41,7 +41,15 @@ export function montarElementos(contenedor: HTMLElement, estado: Estado): void {
       ),
     );
 
-    contenedor.append(el('h2', {}, 'Elementos'), el('div', { class: 'lista' }, botonTodo, botones));
+    const noPasan = layout.elementos.filter((e) => !e.criterios.todosPasan).length;
+    contenedor.append(tarjeta(
+      {
+        clave: 'elementos',
+        titulo: 'Elementos',
+        resumen: `${layout.elementos.length} elementos · ${noPasan ? `${noPasan} con criterios que no pasan` : 'todos pasan'}${elemento === null ? '' : ` · elegido: ${elemento + 1}`}`,
+      },
+      el('div', { class: 'lista' }, botonTodo, botones),
+    ));
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {

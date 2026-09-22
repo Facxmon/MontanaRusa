@@ -11,12 +11,13 @@
 import { MAGNITUDES } from '../contrato/magnitudes';
 import type { Estado } from '../estado';
 import { ubicacionDeNodo } from '../graficos/series';
-import { el, vaciar } from './dom';
+import { el, resumirTarjeta, tarjeta, vaciar } from './dom';
 import { formatearMagnitud, SIN_DATO } from './formato';
 
 export function montarValoresDelCursor(contenedor: HTMLElement, estado: Estado): void {
   let celdas: HTMLElement[] = [];
   let donde: HTMLElement | null = null;
+  let caja: HTMLDetailsElement | null = null;
 
   const armar = () => {
     const { layout } = estado.get();
@@ -24,13 +25,15 @@ export function montarValoresDelCursor(contenedor: HTMLElement, estado: Estado):
     celdas = [];
     donde = null;
     if (!layout) return;
-    donde = el('p', { class: 'ayuda cursor-donde' }, 'Pasá el mouse por un gráfico o movés el carro.');
+    donde = el('p', { class: 'ayuda cursor-donde' }, 'Pasá el mouse por un gráfico o mové el carro.');
     const filas = MAGNITUDES.map((magnitud) => {
       const celda = el('td', {}, SIN_DATO);
       celdas.push(celda);
       return el('tr', {}, el('th', { scope: 'row' }, magnitud.etiqueta), celda);
     });
-    contenedor.append(el('h2', {}, 'Valores en el cursor'), donde, el('table', { class: 'tabla' }, el('tbody', {}, filas)));
+    // Cerrada por defecto: es una tabla larga que se consulta, no se lee de corrido.
+    caja = tarjeta({ clave: 'cursor', titulo: 'Valores en el cursor', abierta: false }, donde, el('table', { class: 'tabla' }, el('tbody', {}, filas)));
+    contenedor.append(caja);
     escribir();
   };
 
@@ -43,7 +46,8 @@ export function montarValoresDelCursor(contenedor: HTMLElement, estado: Estado):
       donde.textContent =
         ubicacion && elemento
           ? `Elemento ${ubicacion.elemento + 1}: ${elemento.tipo} · ${ubicacion.subtramo ?? 'sin subtramo'} · nodo ${ubicacion.nodoLocal} de ${elemento.nodos.numeroDeNodos - 1}`
-          : 'Pasá el mouse por un gráfico o movés el carro.';
+          : 'Pasá el mouse por un gráfico o mové el carro.';
+      if (caja) resumirTarjeta(caja, ubicacion && elemento ? `${ubicacion.elemento + 1}. ${elemento.tipo} · nodo ${ubicacion.nodoLocal}` : 'sin cursor');
     }
     MAGNITUDES.forEach((magnitud, i) => {
       const columna = elemento?.nodos[magnitud.clave] as (number | null)[] | undefined;

@@ -25,13 +25,16 @@
   --gris-600: #3a4150;
   --gris-500: #8a94a6;
   --gris-400: #9aa3b2;
+  --gris-300: #c9d0dc;
   --gris-200: #dfe6f2;
   --gris-100: #e6e8ee;
   --gris-050: #f5f6f8;
   --blanco: #ffffff;
 
+  --azul-300: #9ccdff;
   --azul-400: #6cb6ff;
   --azul-500: #3987e5;
+  --azul-600: #256abf;
   --azul-gris-500: #8aa4c8;
 
   --verde-500: #3ddc84;
@@ -53,6 +56,8 @@
   --blanco-rgb: 255, 255, 255;
   --azul-400-rgb: 108, 182, 255;
   --verde-norma-600-rgb: 12, 163, 12;
+  --rojo-500-rgb: 255, 92, 92;
+  --rojo-600-rgb: 208, 59, 59;
 
   /* ---------- espaciado ---------- */
   --esp-1: 4px;
@@ -123,12 +128,19 @@
   --borde-fuerte: var(--gris-400);
 
   --acento: var(--azul-400);
+  --acento-hover: var(--azul-300);
   --acento-suave: rgba(var(--azul-400-rgb), 0.15);
+  --texto-sobre-acento: var(--gris-950);
+  /* Botones: un escalon mas claro que la tarjeta, con borde propio. */
+  --superficie-boton-hover: var(--gris-600);
+  --borde-boton: var(--gris-600);
+  --sombra-boton: 0 1px 0 rgba(var(--gris-950-rgb), 0.5);
   --exito: var(--verde-500);
   --alerta: var(--ambar-500);
   --falla: var(--rojo-500);
   --falla-fondo: var(--rojo-900);
   --falla-texto: var(--rojo-100);
+  --falla-tenue: rgba(var(--rojo-500-rgb), 0.08);
   --informativo: var(--gris-400);
 
   /* Graficos (uPlot y el canvas de las franjas). */
@@ -179,12 +191,18 @@
   --borde-fuerte: var(--gris-500);
 
   --acento: var(--azul-500);
+  --acento-hover: var(--azul-600);
   --acento-suave: rgba(var(--azul-400-rgb), 0.2);
+  --texto-sobre-acento: var(--blanco);
+  --superficie-boton-hover: var(--gris-200);
+  --borde-boton: var(--gris-300);
+  --sombra-boton: 0 1px 0 rgba(var(--gris-950-rgb), 0.06);
   --exito: var(--verde-600);
   --alerta: var(--ambar-500);
   --falla: var(--rojo-600);
   --falla-fondo: var(--rojo-100);
   --falla-texto: var(--rojo-900);
+  --falla-tenue: rgba(var(--rojo-600-rgb), 0.07);
   --informativo: var(--gris-500);
 
   --grafico-texto: var(--gris-600);
