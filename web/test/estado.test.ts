@@ -8,6 +8,7 @@ const inicial: DatosDeEstado = {
   magnitud: 'gz',
   elemento: null,
   error: null,
+  diagnostico: null,
   cargando: false,
   vista: 'via3d',
   pestana: 'g',

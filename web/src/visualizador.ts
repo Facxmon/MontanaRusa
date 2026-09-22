@@ -12,11 +12,12 @@ import { MAGNITUD_INICIAL } from './contrato/magnitudes';
 import { Carro } from './escena/carro';
 import { Escena } from './escena/escena';
 import { Via } from './escena/via';
+import { diagnosticar } from './diagnostico';
 import { crearEstado } from './estado';
 import { Historial, type EntradaDeHistorial } from './historial';
 import { montarPanelDeGraficos } from './graficos/panelDeGraficos';
 import type { EntradaDeDiseno } from './nucleo/calcular';
-import { CalculoAbortado, ClienteDeCalculo, PedidoSuperado } from './nucleo/cliente';
+import { CalculoAbortado, ClienteDeCalculo, ErrorDeCalculo, PedidoSuperado } from './nucleo/cliente';
 import { deserializarDiseno, desdeTextoCompacto } from './nucleo/serializar';
 import { montarAtajos } from './paneles/atajos';
 import { montarAviso } from './paneles/aviso';
@@ -28,6 +29,7 @@ import { montarElementos } from './paneles/elementos';
 import { montarBarra } from './paneles/barra';
 import { montarErrores } from './paneles/errores';
 import { leerAutoGenerar, montarGenerar } from './paneles/generar';
+import { guardadorDeDiseno, haceCuanto, olvidarDiseno, restaurarDiseno } from './paneles/persistencia';
 import { montarGuardar } from './paneles/guardar';
 import { montarImportar } from './paneles/importar';
 import { montarLeyenda } from './paneles/leyenda';
@@ -124,6 +126,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     magnitud: MAGNITUD_INICIAL,
     elemento: null,
     error: null,
+    diagnostico: null,
     cargando: false,
     vista: 'via3d',
     pestana: 'g',
@@ -197,7 +200,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     if (!diseno || diseno === disenoCalculado) return;
     if (calculando) cliente.abortar(); // el worker estaba ocupado con el diseno anterior: no vale la pena esperarlo
     const pedido = ++pedidoDeCalculo;
-    estado.set({ calculando: true, progreso: { hecho: 0, total: diseno.secuencia.length, tipo: '' }, error: null });
+    estado.set({ calculando: true, progreso: { hecho: 0, total: diseno.secuencia.length, tipo: '' }, error: null, diagnostico: null });
     cliente
       .calcular(diseno, (progreso) => {
         if (pedido === pedidoDeCalculo) estado.set({ progreso });
@@ -213,7 +216,10 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
           estado.set({ calculando: false, progreso: null });
           return;
         }
-        estado.set({ calculando: false, progreso: null, error: `Diseño: ${error.message}` });
+        // El elemento que fallo (si se sabe) y los parametros que nombra el
+        // mensaje se resaltan en el formulario, ademas del banner.
+        const instancia = error instanceof ErrorDeCalculo && error.elemento !== null ? diseno.secuencia[error.elemento]?.id ?? null : null;
+        estado.set({ calculando: false, progreso: null, error: `Diseño: ${error.message}`, diagnostico: diagnosticar(error.message, instancia) });
       });
   }
   function detener(): void {
@@ -268,6 +274,12 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     aviso.mostrar(importado.formato === 'layout' ? `${nombre}: layout del contrato, se reconstruyó el diseño y se está calculando.` : `${nombre}: diseño importado, calculando.`);
   });
   const destruirGuardar = montarGuardar(zonas.izquierda, estado, { escena, aviso });
+  // El diseno se guarda en localStorage (debounce de 1 s) en cada cambio.
+  const guardador = guardadorDeDiseno();
+  estado.suscribir((nuevo, anterior) => {
+    if (nuevo.diseno && nuevo.diseno !== anterior.diseno) guardador.guardar(nuevo.diseno, nuevo.origen);
+  });
+
   montarGenerar(zonas.derecha, estado, { generar, detener });
   const destruirAtajos = montarAtajos({ generar, detener, deshacer, rehacer });
 
@@ -349,7 +361,23 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   const alCambiarElHash = () => void abrirDesdeElHash();
   window.addEventListener('hashchange', alCambiarElHash);
 
-  // Precedencia al arrancar: hash de la URL > ?caso= > primer golden del indice.
+  /** Restaura el ultimo diseno de localStorage, con un aviso para descartarlo y volver al golden. */
+  function restaurar(casoPorDefecto: string): boolean {
+    const guardado = restaurarDiseno();
+    if (!guardado) return false;
+    abrirDisenoExterno(guardado.diseno, guardado.origen ?? 'restaurado');
+    aviso.mostrar(`Se restauró tu último diseño${haceCuanto(guardado.fecha)}.`, {
+      etiqueta: 'Descartar',
+      alHacer: () => {
+        olvidarDiseno();
+        guardador.cancelar();
+        estado.set({ diseno: null, disenoCalculado: null, instancia: null, origen: null, fuente: 'golden', panel: 'resultados', error: null, diagnostico: null, caso: casoPorDefecto });
+      },
+    }, 12000);
+    return true;
+  }
+
+  // Precedencia al arrancar: hash de la URL > ?caso= > localStorage > primer golden del indice.
   async function arrancar(): Promise<void> {
     try {
       const indice = await cargarIndice(urlDelIndice);
@@ -357,9 +385,10 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
       if (indice.casos.length === 0) throw new Error('El índice de casos está vacío: correr GenerarGoldenFiles.m.');
       estado.set({ casos: indice.casos });
       if (abrirDesdeElHash()) return;
-      const casoInicial = new URLSearchParams(location.search).get('caso');
-      const caso = casoInicial && indice.casos.includes(casoInicial) ? casoInicial : indice.casos[0]!;
-      estado.set({ caso });
+      const pedido = new URLSearchParams(location.search).get('caso');
+      const casoPedido = pedido && indice.casos.includes(pedido) ? pedido : null;
+      if (!casoPedido && restaurar(indice.casos[0]!)) return;
+      estado.set({ caso: casoPedido ?? indice.casos[0]! });
     } catch (error) {
       if (destruido) return;
       estado.set({ error: (error as Error).message });
@@ -373,6 +402,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
       if (destruido) return;
       destruido = true;
       if (temporizador) clearTimeout(temporizador);
+      guardador.cancelar();
       window.removeEventListener('hashchange', alCambiarElHash);
       destruirAtajos();
       destruirImportar();

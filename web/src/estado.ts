@@ -2,6 +2,7 @@
 // suscribe y se vuelve a dibujar cuando cambia lo que le importa.
 
 import type { ClaveDeMagnitud } from './contrato/magnitudes';
+import type { Diagnostico } from './diagnostico';
 import type { Layout } from './contrato/tipos';
 import type { EjeX, Pestana } from './graficos/series';
 import type { EntradaDeDiseno } from './nucleo/calcular';
@@ -23,6 +24,8 @@ export interface DatosDeEstado {
   elemento: number | null;
   /** Mensaje de error a mostrar, o null. */
   error: string | null;
+  /** Detalle del ultimo error del calculo: que campos nombra y en que instancia fallo, para resaltarlos en el formulario. */
+  diagnostico: Diagnostico | null;
   /** true mientras se carga un caso. */
   cargando: boolean;
   /** Que ocupa el area principal: la via en 3D o los graficos. */

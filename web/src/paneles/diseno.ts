@@ -29,7 +29,7 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
       : `Diseño propio calculado en el navegador${ultimoCalculoMs !== null ? ` en ${(ultimoCalculoMs / 1000).toFixed(2)} s` : ''}. ${autoGenerar ? 'Cada cambio recalcula (auto-generar).' : 'Generar (Ctrl+Enter) calcula los cambios.'}`;
 
   const dibujar = () => {
-    const { layout, diseno, fuente, caso, instancia } = estado.get();
+    const { layout, diseno, fuente, caso, instancia, diagnostico } = estado.get();
     vaciar(contenedor);
     lineaDeEstado = null;
     if (!layout && !diseno) return;
@@ -122,8 +122,9 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
         actualizar({ secuencia: nueva }, { instancia: siguiente });
       };
       const ajustes = contarAjustes(inst);
+      const conError = diagnostico?.instancia === inst.id;
       return el('div', {
-          class: `secuencia-fila${inst.id === instancia ? ' elegida' : ''}`,
+          class: `secuencia-fila${inst.id === instancia ? ' elegida' : ''}${conError ? ' con-error' : ''}`,
           role: 'button',
           'aria-pressed': inst.id === instancia ? 'true' : 'false',
           title: 'Elegir para editar sus parámetros',
@@ -134,6 +135,7 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
           },
         },
         el('span', { class: 'secuencia-numero' }, `${i + 1}.`),
+        conError ? el('span', { class: 'secuencia-error', title: `El cálculo falló en este elemento: ${diagnostico!.mensaje}` }, '⚠') : null,
         selector,
         el('span', { class: 'secuencia-ajustes', title: ajustes === 0 ? 'Todos los parámetros heredados de los globales' : 'Parámetros pisados por esta instancia' },
           ajustes === 0 ? '' : `${ajustes} ajuste${ajustes === 1 ? '' : 's'}`),
@@ -166,7 +168,7 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
     if (cambioPropio) return;
     if (
       (nuevo.layout === null) !== (anterior.layout === null) || nuevo.diseno !== anterior.diseno || nuevo.fuente !== anterior.fuente ||
-      nuevo.caso !== anterior.caso || nuevo.instancia !== anterior.instancia
+      nuevo.caso !== anterior.caso || nuevo.instancia !== anterior.instancia || nuevo.diagnostico !== anterior.diagnostico
     ) dibujar();
   });
 }

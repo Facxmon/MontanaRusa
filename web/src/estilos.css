@@ -502,6 +502,25 @@ summary { cursor: pointer; font-size: var(--texto-sm); color: var(--texto-1); pa
 .campo-estado .boton[hidden] { display: none; }
 .advertencia { margin: var(--esp-2) 0 0; font-size: var(--texto-sm); color: var(--alerta); }
 
+/* Campo y fila con el error del ultimo calculo (ademas del banner). */
+.campo.con-error { grid-template-columns: minmax(0, 1fr) auto; }
+.ficha .campo.con-error { grid-template-columns: minmax(0, 1fr) auto auto; }
+.campo.con-error .campo-etiqueta { color: var(--falla); }
+.campo.con-error input, .campo.con-error select { border-color: var(--falla); }
+.campo-error {
+  grid-column: 1 / -1;
+  color: var(--falla-texto);
+  background: var(--falla-fondo);
+  border-left: 2px solid var(--falla);
+  padding: var(--esp-1) var(--esp-2);
+  border-radius: var(--radio-chico);
+  font-size: var(--texto-xs);
+  line-height: 1.4;
+}
+.summary-error { color: var(--falla); }
+.secuencia-fila.con-error { border-color: var(--falla); }
+.secuencia-error { color: var(--falla); cursor: help; }
+
 /* ---------- reproductor ---------- */
 .reproductor {
   position: absolute;

@@ -15,6 +15,7 @@
 // ajustes de cada instancia).
 
 import type { DeclaracionDeParametro } from '../contrato/tipos';
+import type { Diagnostico } from '../diagnostico';
 import type { Estado } from '../estado';
 import type { EntradaDeDiseno, InstanciaDeElemento } from '../nucleo/calcular';
 import {
@@ -63,7 +64,7 @@ function entradaNumerica(valor: number, unidad: string, alCambiar: (v: number) =
   return entrada;
 }
 
-function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: Actualizar): HTMLElement {
+function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: Actualizar, diagnostico?: Diagnostico | null): HTMLElement {
   const nombre = pascal(declaracion.clave);
   const unidad = declaracion.unidad === 'rad' ? '°' : declaracion.unidad;
   const etiqueta = el('span', { class: 'campo-etiqueta', title: declaracion.descripcion }, declaracion.clave, unidad !== '-' ? el('small', {}, ` [${unidad}]`) : null);
@@ -116,7 +117,20 @@ function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: 
   } else {
     control = el('span', { class: 'ayuda' }, String(valor));
   }
-  return el('label', { class: 'campo' }, etiqueta, control);
+  return marcarSiTieneError(el('label', { class: 'campo' }, etiqueta, control), nombre, diagnostico);
+}
+
+/**
+ * Si el ultimo error del nucleo nombra este parametro, se resalta el campo y
+ * el mensaje va debajo, ademas del banner: que se vea que campo hay que
+ * tocar y no solo que algo fallo.
+ */
+function marcarSiTieneError(fila: HTMLElement, nombre: NombreDeParametro, diagnostico?: Diagnostico | null): HTMLElement {
+  if (diagnostico && diagnostico.parametros.includes(nombre)) {
+    fila.classList.add('con-error');
+    fila.append(el('span', { class: 'campo-error', role: 'alert' }, diagnostico.mensaje));
+  }
+  return fila;
 }
 
 function campoAnulable(nombre: NombreDeParametro, declaracion: DeclaracionDeParametro, valor: unknown, actualizar: Actualizar): HTMLElement {
@@ -144,12 +158,14 @@ function campoAnulable(nombre: NombreDeParametro, declaracion: DeclaracionDePara
   return contenedor;
 }
 
-function grupo(titulo: string, lista: DeclaracionDeParametro[], parametros: Parametros, actualizar: Actualizar, abierto: boolean): HTMLElement {
+function grupo(titulo: string, lista: DeclaracionDeParametro[], parametros: Parametros, actualizar: Actualizar, abierto: boolean, diagnostico: Diagnostico | null): HTMLElement {
+  const conError = lista.some((d) => diagnostico?.parametros.includes(pascal(d.clave)));
   return el(
     'details',
-    { open: abierto },
-    el('summary', {}, `${titulo} (${lista.length})`),
-    el('div', { class: 'campos' }, lista.map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizar))),
+    // Un grupo cerrado que esconde el campo con error se abre solo.
+    { open: abierto || conError },
+    el('summary', {}, `${titulo} (${lista.length})`, conError ? el('span', { class: 'summary-error', title: 'Hay un campo con error en este grupo' }, ' ⚠') : null),
+    el('div', { class: 'campos' }, lista.map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizar, diagnostico))),
   );
 }
 
@@ -170,7 +186,9 @@ function sinAjuste(ajustes: Partial<Parametros>, nombre: NombreDeParametro): Par
 }
 
 /** La ficha de la instancia elegida: sus parametros geometricos, heredados o pisados, y los inertes. */
-function ficha(inst: InstanciaDeElemento, orden: number, diseno: EntradaDeDiseno, ajustar: Ajustar): HTMLElement {
+function ficha(inst: InstanciaDeElemento, orden: number, diseno: EntradaDeDiseno, ajustar: Ajustar, diagnostico: Diagnostico | null): HTMLElement {
+  // El diagnostico se aplica a la ficha solo si el calculo fallo en ESTA instancia (o no se sabe en cual).
+  const propio = diagnostico && (diagnostico.instancia === null || diagnostico.instancia === inst.id) ? diagnostico : null;
   const globales = diseno.parametros;
   const estados = new Map<NombreDeParametro, { fila: HTMLElement; origen: HTMLElement; volver: HTMLButtonElement }>();
 
@@ -195,7 +213,7 @@ function ficha(inst: InstanciaDeElemento, orden: number, diseno: EntradaDeDiseno
     const pisado = nombre in inst.ajustes;
     const valor = pisado ? inst.ajustes[nombre] : globales[nombre];
     const [declaracion] = declaraciones([d]);
-    const fila = campo(declaracion!, valor, actualizar);
+    const fila = campo(declaracion!, valor, actualizar, propio);
     const origen = el('span', { class: 'campo-origen' });
     const volver = el('button', {
       type: 'button', class: 'boton chico', title: 'Volver al valor global',
@@ -240,7 +258,7 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
   let cambioPropio = false;
 
   const dibujar = () => {
-    const { diseno, instancia } = estado.get();
+    const { diseno, instancia, diagnostico } = estado.get();
     contenedor.replaceChildren();
     if (!diseno) return;
     const parametros = diseno.parametros;
@@ -265,7 +283,7 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
         estado.set({ diseno: { ...actual, secuencia } });
         cambioPropio = false;
       };
-      contenedor.append(ficha(inst, indice + 1, diseno, ajustar));
+      contenedor.append(ficha(inst, indice + 1, diseno, ajustar, diagnostico));
     } else {
       contenedor.append(el('section', { class: 'ficha' }, el('p', { class: 'ayuda' }, 'Elegí un elemento de la secuencia para editar sus parámetros.')));
     }
@@ -289,20 +307,20 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
       el('details', { open: true },
         el('summary', {}, 'Modo de curvatura'),
         el('div', { class: 'campos' },
-          el('label', { class: 'campo' }, el('span', { class: 'campo-etiqueta' }, 'modoCurvatura'), selectorDeModo),
+          marcarSiTieneError(el('label', { class: 'campo' }, el('span', { class: 'campo-etiqueta' }, 'modoCurvatura'), selectorDeModo), 'ModoCurvatura', diagnostico),
           modo.Nota ? el('p', { class: 'ayuda' }, modo.Nota) : null,
-          declaraciones(modo.Lista).map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizarGlobal)),
+          declaraciones(modo.Lista).map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizarGlobal, diagnostico)),
         ),
       ),
-      grupo('Criterios de aceptación', declaraciones(ParametrosDeAceptacion()), parametros, actualizarGlobal, false),
-      grupo('Generales', declaraciones(ParametrosGenerales()), parametros, actualizarGlobal, false),
+      grupo('Criterios de aceptación', declaraciones(ParametrosDeAceptacion()), parametros, actualizarGlobal, false, diagnostico),
+      grupo('Generales', declaraciones(ParametrosGenerales()), parametros, actualizarGlobal, false, diagnostico),
     );
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {
     if (cambioPropio) return;
-    // Se redibuja cuando cambia el diseno por fuera del formulario (reset, otro caso, secuencia) o la instancia elegida.
-    if (nuevo.diseno !== anterior.diseno || nuevo.instancia !== anterior.instancia) dibujar();
+    // Se redibuja cuando cambia el diseno por fuera del formulario (reset, otro caso, secuencia), la instancia elegida o el diagnostico.
+    if (nuevo.diseno !== anterior.diseno || nuevo.instancia !== anterior.instancia || nuevo.diagnostico !== anterior.diagnostico) dibujar();
   });
 }
 
