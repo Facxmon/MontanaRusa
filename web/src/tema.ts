@@ -39,6 +39,7 @@ const TOKENS = {
   escenaCarro: '--escena-carro',
   escenaPasajero: '--escena-pasajero',
   escenaPasajeroBrillo: '--escena-pasajero-brillo',
+  escenaMarcador: '--escena-marcador',
 } as const;
 
 export type Tema = { readonly [K in keyof typeof TOKENS]: string };

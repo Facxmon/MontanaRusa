@@ -128,6 +128,20 @@ export class Carro {
     };
   }
 
+  /**
+   * Instante en el que el carro pasa por un nodo (elemento + nodo local), o
+   * null si ese nodo no esta en la tabla (despues de un punto de parada). Es
+   * lo que convierte un clic en un grafico en una posicion del reproductor.
+   */
+  tiempoDelNodo(elemento: number, nodoLocal: number): number | null {
+    const tabla = this.tabla;
+    if (!tabla) return null;
+    for (let k = 0; k < tabla.cantidad; k++) {
+      if (tabla.elemento[k] === elemento && tabla.nodoLocal[k] === nodoLocal) return tabla.tiempo[k]!;
+    }
+    return null;
+  }
+
   mostrar(visible: boolean): void {
     this.grupo.visible = visible && this.tabla !== null;
   }

@@ -209,6 +209,8 @@ html, body {
 }
 
 .vista3d[hidden], .graficos[hidden] { display: none; }
+/* Vista "Ambos": la via arriba y los graficos abajo, con una linea en el medio. */
+.principal.partido .graficos { border-top: 1px solid var(--borde-sutil); }
 .vista3d canvas { display: block; }
 
 .graficos {

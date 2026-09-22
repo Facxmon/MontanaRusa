@@ -53,11 +53,13 @@ function armarDom() {
   // vista en el centro, generar a la derecha (cada grupo lo monta su modulo).
   const barra = el('header', { class: 'barra', role: 'toolbar', 'aria-label': 'Barra de aplicación' });
   const selectorDeVista = el('nav', { class: 'pestanas selector-de-vista', role: 'tablist', 'aria-label': 'Vista' });
-  const vista3d = el('div', { class: 'vista3d', 'aria-label': 'Vista 3D de la vía' });
   const reproductor = el('div', { class: 'reproductor', 'aria-label': 'Reproducción', hidden: true });
+  // El reproductor va DENTRO de la vista 3D y no al lado: con las dos vistas
+  // partiendo el area, flotando sobre .principal quedaria sobre los graficos.
+  const vista3d = el('div', { class: 'vista3d', 'aria-label': 'Vista 3D de la vía' }, reproductor);
   const graficos = el('div', { class: 'graficos', 'aria-label': 'Gráficos', hidden: true });
   const aviso = el('div', { class: 'aviso', role: 'status', hidden: true });
-  const principal = el('main', { class: 'principal' }, vista3d, reproductor, graficos, aviso);
+  const principal = el('main', { class: 'principal' }, vista3d, graficos, aviso);
 
   const selectorDeCaso = el('section');
   const selectorDePanel = el('nav', { class: 'pestanas pestanas-panel', role: 'tablist', 'aria-label': 'Panel' });
@@ -165,8 +167,11 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   montarCriterios(dom.criterios, estado);
   montarValoresDelCursor(dom.valoresDelCursor, estado);
   montarSelectorDeVista(dom.selectorDeVista, estado);
-  const destruirReproductor = montarReproductor(dom.reproductor, estado, escena, carro);
-  const destruirGraficos = montarPanelDeGraficos(dom.graficos, estado);
+  // Cursor ligado (fase 3.6): el indice de nodo global es el estado
+  // compartido. Un clic en un grafico lleva el reproductor a ese instante; el
+  // reproductor publica el nodo por el que va y los graficos lo siguen.
+  const reproductor = montarReproductor(dom.reproductor, estado, escena, carro);
+  const destruirGraficos = montarPanelDeGraficos(dom.graficos, estado, (nodo) => reproductor.irANodo(nodo));
   montarSelectorDePanel(dom.selectorDePanel, estado);
   montarDiseno(dom.diseno, estado, abrirDiseno);
   montarParametros(dom.parametros, estado);
@@ -212,7 +217,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
       })
       .then(({ layout, ms }) => {
         if (pedido !== pedidoDeCalculo || destruido) return;
-        estado.set({ layout, disenoCalculado: diseno, calculando: false, progreso: null, ultimoCalculoMs: ms, elemento: null });
+        estado.set({ layout, disenoCalculado: diseno, calculando: false, progreso: null, ultimoCalculoMs: ms, elemento: null, nodo: null });
       })
       .catch((error: Error) => {
         if (pedido !== pedidoDeCalculo || destruido) return;
@@ -296,14 +301,23 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   // El area principal muestra la via o los graficos; la escena se pausa
   // mientras no se ve.
   function aplicarVista(vista: string): void {
-    dom.vista3d.hidden = vista !== 'via3d';
-    dom.reproductor.style.display = vista === 'via3d' ? '' : 'none';
-    dom.graficos.hidden = vista !== 'graficos';
-    escena.activar(vista === 'via3d');
+    const con3d = vista !== 'graficos';
+    const conGraficos = vista !== 'via3d';
+    dom.vista3d.hidden = !con3d;
+    dom.graficos.hidden = !conGraficos;
+    dom.principal.classList.toggle('partido', vista === 'ambos');
+    escena.activar(con3d);
   }
   aplicarVista(estado.get().vista);
   estado.suscribir((nuevo, anterior) => {
     if (nuevo.vista !== anterior.vista) aplicarVista(nuevo.vista);
+  });
+
+  // El marcador del nodo bajo el cursor se mueve en el requestAnimationFrame
+  // de la escena y no en cada evento de mouse: via.marcarNodo solo anota.
+  const sacarMarcadorDelCuadro = escena.enCadaCuadro(() => via.actualizarMarcador());
+  estado.suscribir((nuevo, anterior) => {
+    if (nuevo.nodo !== anterior.nodo) via.marcarNodo(nuevo.nodo);
   });
 
   // La escena reacciona al estado igual que un panel.
@@ -336,7 +350,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     try {
       const layout = await cargarLayout(urlDelCaso(caso));
       if (destruido || pedido !== pedidoActual) return; // el usuario ya eligio otro caso
-      estado.set({ layout, elemento: null, cargando: false });
+      estado.set({ layout, elemento: null, cargando: false, nodo: null });
     } catch (error) {
       if (destruido || pedido !== pedidoActual) return;
       estado.set({ cargando: false, error: `${caso}: ${(error as Error).message}` });
@@ -410,10 +424,11 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
       guardador.cancelar();
       window.removeEventListener('hashchange', alCambiarElHash);
       destruirAtajos();
+      sacarMarcadorDelCuadro();
       destruirImportar();
       destruirGuardar();
       cliente.terminar();
-      destruirReproductor();
+      reproductor.destruir();
       destruirGraficos();
       carro.destruir();
       via.destruir();

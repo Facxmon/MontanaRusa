@@ -156,6 +156,8 @@
   --escena-carro: var(--ambar-500);
   --escena-pasajero: var(--rojo-500);
   --escena-pasajero-brillo: var(--rojo-800);
+  /* Marcador del nodo bajo el cursor de los graficos. */
+  --escena-marcador: var(--azul-400);
 }
 
 /* ---------- tema claro: estructura lista, valores provisorios (fase 4) ---------- */
@@ -208,4 +210,5 @@
   --escena-carro: var(--ambar-500);
   --escena-pasajero: var(--rojo-600);
   --escena-pasajero-brillo: var(--rojo-800);
+  --escena-marcador: var(--azul-500);
 }

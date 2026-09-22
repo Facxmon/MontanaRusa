@@ -41,8 +41,12 @@ function altoGuardado(): number {
   return ALTOS.includes(guardado) ? guardado : ALTOS[0]!;
 }
 
-/** Devuelve la funcion que destruye las figuras (uPlot y sus ResizeObserver). */
-export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado): () => void {
+/**
+ * `alElegirNodo` recibe el clic sobre un punto: lo conecta el visualizador
+ * con el reproductor, para que hacer clic en un pico lleve el carro ahi.
+ * Devuelve la funcion que destruye las figuras (uPlot y sus ResizeObserver).
+ */
+export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, alElegirNodo?: (nodo: number) => void): () => void {
   const barra = el('div', { class: 'graficos-barra' });
   const cuerpo = el('div', { class: 'graficos-cuerpo' });
   contenedor.append(barra, cuerpo);
@@ -170,7 +174,7 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado): 
     expandida = null;
     cuerpo.classList.remove('expandido');
     vaciar(cuerpo);
-    if (vista !== 'graficos' || !layout) return;
+    if (vista === 'via3d' || !layout) return;
     const columnas = extraerColumnas(layout, elemento);
     const datos = figurasDePestana(pestana as Pestana, columnas, ejeX);
     datosDeFiguras = datos;
@@ -213,7 +217,9 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado): 
         },
         alElegirPunto: (punto) => {
           const nodo = d.nodos?.[punto];
-          if (nodo !== undefined) estado.set({ nodo });
+          if (nodo === undefined) return;
+          estado.set({ nodo });
+          alElegirNodo?.(nodo);
         },
         alCambiarRango: (desde, hasta, completo) => mostrarRango(rango, d, desde, hasta, completo),
       });

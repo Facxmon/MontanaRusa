@@ -7,7 +7,8 @@ import type { Layout } from './contrato/tipos';
 import type { EjeX, Pestana } from './graficos/series';
 import type { EntradaDeDiseno } from './nucleo/calcular';
 
-export type Vista = 'via3d' | 'graficos';
+/** 'ambos' parte el area principal: sin eso, el cursor ligado grafico <-> 3D no se puede ver. */
+export type Vista = 'via3d' | 'graficos' | 'ambos';
 export type Fuente = 'golden' | 'diseno';
 export type PanelLateral = 'resultados' | 'diseno';
 

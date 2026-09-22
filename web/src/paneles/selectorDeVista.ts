@@ -1,4 +1,5 @@
-// Pestanas del area principal: via 3D o graficos.
+// Pestanas del area principal: via 3D, graficos, o las dos partiendo el area
+// (que es como se ve el cursor ligado de la fase 3.6).
 
 import type { Estado, Vista } from '../estado';
 import { el, vaciar } from './dom';
@@ -6,6 +7,7 @@ import { el, vaciar } from './dom';
 const VISTAS: { clave: Vista; etiqueta: string }[] = [
   { clave: 'via3d', etiqueta: 'Vía 3D' },
   { clave: 'graficos', etiqueta: 'Gráficos' },
+  { clave: 'ambos', etiqueta: 'Ambos' },
 ];
 
 export function montarSelectorDeVista(contenedor: HTMLElement, estado: Estado): void {
