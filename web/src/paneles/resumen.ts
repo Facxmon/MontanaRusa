@@ -6,6 +6,8 @@ import type { Layout, ResumenElemento, ResumenLayout } from '../contrato/tipos';
 import type { Estado } from '../estado';
 import { el, fila, vaciar } from './dom';
 import { decimalesDeUnidad, formatear, formatearNumero } from './formato';
+import { textoDeInerte } from './parametros';
+import type { NombreDeParametro } from '../nucleo/tipos';
 
 function tablaDelLayout(resumen: ResumenLayout, layout: Layout): HTMLElement {
   const filas = [
@@ -100,6 +102,15 @@ export function montarResumenElemento(contenedor: HTMLElement, estado: Estado): 
         `${e.nodos.numeroDeNodos} nodos · ${e.subtramos.map((s) => `${s.nombre} ${s.indiceInicio}–${s.indiceFin}`).join(' · ')}`,
       ),
       tablaDelElemento(e.resumen),
+      // Los inertes viajan en el layout desde la fase 1: ajustes que se
+      // aplicaron y que ni el modo ni el tipo de este elemento consumen.
+      ...(e.inertes ?? []).map((nombre) =>
+        el(
+          'p',
+          { class: 'advertencia' },
+          textoDeInerte((nombre[0]!.toUpperCase() + nombre.slice(1)) as NombreDeParametro, layout.parametros.valores.modoCurvatura as never, e.tipo as never),
+        ),
+      ),
     );
   };
   dibujar();

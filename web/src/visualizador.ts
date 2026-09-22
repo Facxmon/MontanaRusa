@@ -41,6 +41,7 @@ import { montarSelectorDeCaso } from './paneles/selectorDeCaso';
 import { montarSelectorDeMagnitud } from './paneles/selectorDeMagnitud';
 import { montarSelectorDePanel } from './paneles/selectorDePanel';
 import { montarSelectorDeVista } from './paneles/selectorDeVista';
+import { montarVeredicto } from './paneles/veredicto';
 
 const BASE = import.meta.env.BASE_URL;
 const urlDelIndice = `${BASE}golden/indice.json`;
@@ -63,6 +64,7 @@ function armarDom() {
 
   const selectorDeCaso = el('section');
   const selectorDePanel = el('nav', { class: 'pestanas pestanas-panel', role: 'tablist', 'aria-label': 'Panel' });
+  const veredicto = el('section');
   const selectorDeMagnitud = el('section');
   const leyenda = el('section');
   const resumenLayout = el('section');
@@ -70,7 +72,7 @@ function armarDom() {
   const resumenElemento = el('section');
   const criterios = el('section');
   const valoresDelCursor = el('section');
-  const panelResultados = el('div', { class: 'panel-resultados' }, selectorDeMagnitud, leyenda, resumenLayout, valoresDelCursor, elementos, resumenElemento, criterios);
+  const panelResultados = el('div', { class: 'panel-resultados' }, veredicto, selectorDeMagnitud, leyenda, resumenLayout, valoresDelCursor, elementos, resumenElemento, criterios);
   const diseno = el('section');
   const parametros = el('section');
   const panelDiseno = el('div', { class: 'panel-diseno', hidden: true }, diseno, parametros);
@@ -102,6 +104,7 @@ function armarDom() {
     graficos,
     selectorDeCaso,
     selectorDePanel,
+    veredicto,
     selectorDeMagnitud,
     leyenda,
     resumenLayout,
@@ -159,6 +162,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
 
   montarErrores(dom.errores, estado);
   montarSelectorDeCaso(dom.selectorDeCaso, estado);
+  montarVeredicto(dom.veredicto, estado);
   montarSelectorDeMagnitud(dom.selectorDeMagnitud, estado);
   montarLeyenda(dom.leyenda, estado);
   montarResumenLayout(dom.resumenLayout, estado);

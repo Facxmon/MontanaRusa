@@ -511,6 +511,35 @@ summary { cursor: pointer; font-size: var(--texto-sm); color: var(--texto-1); pa
   color: var(--texto-2);
 }
 
+/* ---------- veredicto (arriba del panel de resultados) ---------- */
+.veredicto {
+  padding: var(--esp-3);
+  border: 1px solid var(--borde-sutil);
+  border-left: 3px solid var(--borde-fuerte);
+  border-radius: var(--radio);
+  background: var(--superficie-1);
+}
+.veredicto.pasa { border-left-color: var(--exito); }
+.veredicto.falla { border-left-color: var(--falla); }
+.veredicto-cabecera { display: flex; align-items: baseline; gap: var(--esp-2); }
+.veredicto-marca { font-size: var(--texto-xl); font-weight: 700; line-height: 1; }
+.veredicto-marca.pasa { color: var(--exito); }
+.veredicto-marca.falla { color: var(--falla); }
+.veredicto-titulo { font-size: var(--texto-lg); font-weight: 600; }
+.veredicto-titulo small { font-size: var(--texto-sm); font-weight: 400; color: var(--texto-2); }
+.veredicto-cifras {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--esp-2);
+  margin-top: var(--esp-3);
+}
+.veredicto-cifra { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.veredicto-cifra-etiqueta { font-size: var(--texto-xs); color: var(--texto-3); }
+.veredicto-cifra-valor { font-family: var(--mono); font-size: var(--texto-lg); font-variant-numeric: tabular-nums; color: var(--texto-1); }
+.veredicto-cifra-donde { font-size: var(--texto-xs); color: var(--texto-2); overflow-wrap: anywhere; }
+.veredicto-peor { margin: var(--esp-3) 0 0; font-size: var(--texto-sm); color: var(--texto-2); }
+.veredicto-peor.falla { color: var(--falla-texto); }
+
 /* ---------- panel de diseno ---------- */
 .pestanas-panel { align-self: flex-start; }
 .panel-resultados, .panel-diseno { display: flex; flex-direction: column; gap: var(--esp-4); }
