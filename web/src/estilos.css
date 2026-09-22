@@ -984,3 +984,59 @@ summary { cursor: pointer; font-size: var(--texto-sm); color: var(--texto-1); pa
 .comparacion-b { background: var(--serie-1); margin-left: var(--esp-2); }
 .comparacion-acciones { display: inline-flex; gap: var(--esp-1); margin-left: auto; }
 .veredicto-cifra-a { font-family: var(--mono); font-size: var(--texto-xs); color: var(--texto-2); font-variant-numeric: tabular-nums; }
+
+/* ---------- accesibilidad (fase 4.9) ---------- */
+/* Foco visible en TODO control: un anillo de acento, solo con teclado. */
+:where(button, a[href], select, input, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+.pestana:focus-visible { outline-offset: -2px; }
+.campo-ayuda:focus-visible, .menu-item:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
+.principal:focus, .panel:focus { outline: none; }
+
+/* Enlaces para saltar: invisibles hasta que el teclado llega a ellos. */
+.saltos { position: fixed; top: var(--esp-2); left: var(--esp-2); z-index: 40; display: flex; gap: var(--esp-2); }
+.saltos a {
+  position: absolute;
+  left: -9999px;
+  padding: var(--esp-2) var(--esp-3);
+  background: var(--superficie-1);
+  color: var(--texto-1);
+  border: 1px solid var(--acento);
+  border-radius: var(--radio);
+  white-space: nowrap;
+}
+.saltos a:focus { position: static; }
+
+.boton-atajos { font-weight: 600; color: var(--texto-2); }
+
+/* Hoja de atajos: <dialog> modal. */
+.hoja-atajos {
+  width: min(560px, calc(100vw - var(--esp-5)));
+  padding: var(--esp-4) var(--esp-5) var(--esp-5);
+  background: var(--superficie-1);
+  color: var(--texto-1);
+  border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio-grande);
+  box-shadow: var(--sombra-flotante);
+}
+.hoja-atajos::backdrop { background: rgba(var(--gris-950-rgb), 0.55); }
+.hoja-atajos-cabecera { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--esp-3); }
+.hoja-atajos-cabecera h2 { margin: 0; color: var(--texto-1); }
+.hoja-atajos-lista { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--esp-2) var(--esp-4); margin: 0 0 var(--esp-3); font-size: var(--texto-sm); }
+.hoja-atajos-lista dt { white-space: nowrap; color: var(--texto-2); }
+.hoja-atajos-lista dd { margin: 0; }
+kbd {
+  display: inline-block;
+  min-width: 2ch;
+  padding: 1px var(--esp-1);
+  border: 1px solid var(--borde-fuerte);
+  border-bottom-width: 2px;
+  border-radius: var(--radio-chico);
+  background: var(--superficie-2);
+  color: var(--texto-1);
+  font-family: var(--mono);
+  font-size: var(--texto-xs);
+  text-align: center;
+}

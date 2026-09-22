@@ -66,7 +66,8 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
   const armarBarra = () => {
     const { pestana, ejeX } = estado.get();
     const contenedorDePestanas = el('div', { 'aria-label': 'Gráficos' });
-    const pestanas = montarPestanas(contenedorDePestanas, PESTANAS, pestana as Pestana, (clave) => estado.set({ pestana: clave }));
+    const pestanas = montarPestanas(contenedorDePestanas, PESTANAS, pestana as Pestana, (clave) => estado.set({ pestana: clave }),
+      Object.fromEntries(PESTANAS.map((p) => [p.clave, [cuerpo]])) as Partial<Record<Pestana, HTMLElement[]>>);
     const selector = el(
       'select',
       { onChange: (evento: Event) => estado.set({ ejeX: (evento.target as HTMLSelectElement).value as EjeX }) },

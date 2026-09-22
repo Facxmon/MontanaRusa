@@ -115,3 +115,10 @@ export function destellarCambios(contenedor: HTMLElement, antes: Map<string, str
     nodo.addEventListener('animationend', () => nodo.classList.remove('destello'), { once: true });
   }
 }
+
+let ultimoId = 0;
+/** Un id unico en el documento (el visualizador se puede montar dos veces: nada de ids fijos). */
+export function idUnico(prefijo: string): string {
+  ultimoId += 1;
+  return `${prefijo}-${ultimoId}`;
+}

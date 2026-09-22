@@ -135,7 +135,12 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
   // La barra espaciadora se escucha en document (el foco puede estar en
   // cualquier lado); se guarda la referencia para poder sacarlo al destruir.
   const alTeclear = (evento: KeyboardEvent) => {
-    if (evento.code !== 'Space' || evento.target instanceof HTMLInputElement || evento.target instanceof HTMLSelectElement) return;
+    if (evento.code !== 'Space') return;
+    // Con el foco en un control, la barra espaciadora es de ese control
+    // (activar un boton, una pestana, abrir un <details>, tildar): play/pausa
+    // solo cuando el foco no esta en nada interactivo (fase 4.9).
+    const objetivo = evento.target as HTMLElement | null;
+    if (objetivo?.closest?.('input, select, textarea, button, a[href], summary, [role="tab"], [role="radio"], [contenteditable="true"], dialog')) return;
     evento.preventDefault();
     alternar();
   };

@@ -10,8 +10,12 @@ const VISTAS: { clave: Vista; etiqueta: string }[] = [
   { clave: 'ambos', etiqueta: 'Ambos' },
 ];
 
-export function montarSelectorDeVista(contenedor: HTMLElement, estado: Estado): void {
-  const pestanas = montarPestanas(contenedor, VISTAS, estado.get().vista, (vista) => estado.set({ vista }));
+export function montarSelectorDeVista(contenedor: HTMLElement, estado: Estado, paneles: { via3d: HTMLElement; graficos: HTMLElement }): void {
+  const pestanas = montarPestanas(contenedor, VISTAS, estado.get().vista, (vista) => estado.set({ vista }), {
+    via3d: [paneles.via3d],
+    graficos: [paneles.graficos],
+    ambos: [paneles.via3d, paneles.graficos],
+  });
   estado.suscribir((nuevo, anterior) => {
     if (nuevo.vista !== anterior.vista) pestanas.activar(nuevo.vista);
   });

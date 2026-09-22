@@ -9,8 +9,11 @@ const PANELES: { clave: PanelLateral; etiqueta: string }[] = [
   { clave: 'diseno', etiqueta: 'Diseño' },
 ];
 
-export function montarSelectorDePanel(contenedor: HTMLElement, estado: Estado): void {
-  const pestanas = montarPestanas(contenedor, PANELES, estado.get().panel, (panel) => estado.set({ panel }));
+export function montarSelectorDePanel(contenedor: HTMLElement, estado: Estado, paneles: Record<PanelLateral, HTMLElement>): void {
+  const pestanas = montarPestanas(contenedor, PANELES, estado.get().panel, (panel) => estado.set({ panel }), {
+    resultados: [paneles.resultados],
+    diseno: [paneles.diseno],
+  });
   estado.suscribir((nuevo, anterior) => {
     if (nuevo.panel !== anterior.panel) pestanas.activar(nuevo.panel);
   });

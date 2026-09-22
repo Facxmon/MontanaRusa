@@ -22,13 +22,14 @@ import { CalculoAbortado, ClienteDeCalculo, ErrorDeCalculo, PedidoSuperado } fro
 import { deserializarDiseno, desdeTextoCompacto } from './nucleo/serializar';
 import { montarAtajos } from './paneles/atajos';
 import { montarBienvenida } from './paneles/bienvenida';
+import { montarHojaDeAtajos } from './paneles/hojaDeAtajos';
 import { fijarComoA, montarBotonComparar } from './paneles/comparar';
 import { montarAviso } from './paneles/aviso';
 import { montarCriterios } from './paneles/criterios';
 import { montarValoresDelCursor } from './paneles/cursor';
 import { montarDeshacer } from './paneles/deshacer';
 import { montarDiseno } from './paneles/diseno';
-import { el } from './paneles/dom';
+import { el, idUnico } from './paneles/dom';
 import { montarElementos } from './paneles/elementos';
 import { montarBarra } from './paneles/barra';
 import { montarCabecera } from './paneles/cabecera';
@@ -90,7 +91,16 @@ function armarDom() {
     el('div', { class: 'panel-cuerpo' }, selectorDeCaso, panelResultados, panelDiseno),
   );
 
-  const app = el('div', { class: 'visualizador' }, errores, barra, principal, panel);
+  // Enlaces para saltar (fase 4.9): la barra tiene una docena de controles;
+  // con Tab, lo primero es poder ir directo al area principal o al panel.
+  principal.id = idUnico('principal');
+  panel.id = idUnico('panel-lateral');
+  principal.tabIndex = -1;
+  panel.tabIndex = -1;
+  const saltos = el('nav', { class: 'saltos', 'aria-label': 'Saltar a' },
+    el('a', { href: `#${principal.id}` }, 'Ir a la vista'),
+    el('a', { href: `#${panel.id}` }, 'Ir al panel'));
+  const app = el('div', { class: 'visualizador' }, saltos, errores, barra, principal, panel);
   return {
     app,
     errores,
@@ -172,13 +182,13 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   montarResumenElemento(dom.resumenElemento, estado);
   montarCriterios(dom.criterios, estado);
   montarValoresDelCursor(dom.valoresDelCursor, estado);
-  montarSelectorDeVista(dom.selectorDeVista, estado);
+  montarSelectorDeVista(dom.selectorDeVista, estado, { via3d: dom.vista3d, graficos: dom.graficos });
   // Cursor ligado (fase 3.6): el indice de nodo global es el estado
   // compartido. Un clic en un grafico lleva el reproductor a ese instante; el
   // reproductor publica el nodo por el que va y los graficos lo siguen.
   const reproductor = montarReproductor(dom.reproductor, estado, escena, carro);
   const destruirGraficos = montarPanelDeGraficos(dom.graficos, estado, (nodo) => reproductor.irANodo(nodo));
-  montarSelectorDePanel(dom.selectorDePanel, estado);
+  montarSelectorDePanel(dom.selectorDePanel, estado, { resultados: dom.panelResultados, diseno: dom.panelDiseno });
   montarDiseno(dom.diseno, estado, abrirDiseno);
   montarParametros(dom.parametros, estado);
 
@@ -298,6 +308,8 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     if (nuevo.diseno && nuevo.diseno !== anterior.diseno) guardador.guardar(nuevo.diseno, nuevo.origen);
   });
 
+  const botonDeAtajos = el('button', { type: 'button', class: 'boton-barra solo-icono boton-atajos', 'aria-label': 'Atajos de teclado', 'aria-keyshortcuts': 'Shift+?' }, '?');
+  zonas.derecha.append(botonDeAtajos);
   const soltarTema = montarSelectorDeTema(zonas.derecha);
   zonas.derecha.append(el('span', { class: 'barra-separador', 'aria-hidden': 'true' }));
   montarGenerar(zonas.derecha, estado, { generar, detener });
@@ -438,7 +450,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
       aviso.mostrar(explicacion);
     });
   }
-  const bienvenidaMontada = montarBienvenida(dom.bienvenida, [
+  const bienvenida = montarBienvenida(dom.bienvenida, [
     {
       clave: 'dive-loop',
       titulo: 'Mirá el dive loop',
@@ -473,6 +485,11 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     },
   ]);
 
+  const hojaDeAtajos = montarHojaDeAtajos(dom.app, botonDeAtajos, () => {
+    estado.set({ panel: 'resultados' });
+    bienvenida.mostrar();
+  });
+
   // Precedencia al arrancar: hash de la URL > ?caso= > localStorage > primer golden del indice.
   async function arrancar(): Promise<void> {
     try {
@@ -502,6 +519,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
       window.removeEventListener('hashchange', alCambiarElHash);
       destruirAtajos();
       soltarTema();
+      hojaDeAtajos.destruir();
       sacarMarcadorDelCuadro();
       destruirImportar();
       destruirGuardar();
