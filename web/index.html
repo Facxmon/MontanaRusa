@@ -19,19 +19,143 @@
     <meta property="og:url" content="https://facxmon.github.io/MontanaRusa/" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <!-- Las dos fuentes que se ven arriba de todo, antes que el CSS las pida. -->
+    <link rel="preload" href="/fuentes/IBMPlexSans-SemiBold.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fuentes/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/src/portada.css" />
   </head>
   <body>
-    <!-- Portada del portfolio. Esqueleto de la fase 0: el contenido llega en la fase 4. -->
+    <!--
+      Portada del portfolio (fase 4.6). Sin JavaScript de la app: carga sin
+      Three.js ni uPlot; el visualizador es otra pagina (visualizador.html).
+
+      EL CONTENIDO LO ESCRIBE EL AUTOR. Todo lo que esta entre corchetes y
+      marcado con class="marcador" es un placeholder a reemplazar; no hay
+      cifras, logros, fechas ni textos biograficos inventados. Lo unico que
+      no es placeholder son hechos del repositorio: la descripcion de las meta
+      tags, los nombres de los elementos y modos que calcula el codigo, la
+      norma que se verifica y el link al repositorio.
+    -->
+    <header class="portada-barra">
+      <a class="portada-marca" href="./">Montaña rusa en miniatura</a>
+      <nav aria-label="Secciones">
+        <a href="#video">Video</a>
+        <a href="#proyecto">Proyecto</a>
+        <a href="#modelo">Modelo</a>
+        <a href="#contacto">Contacto</a>
+      </nav>
+    </header>
+
     <main class="portada">
-      <header class="portada-cabecera">
-        <h1>Montaña rusa en miniatura</h1>
-        <p class="portada-bajada">[Placeholder: una línea sobre el proyecto.]</p>
-        <a class="portada-boton" href="visualizador.html">Abrir el visualizador</a>
-      </header>
-      <!-- sección: video -->
-      <!-- sección: proyecto -->
-      <!-- sección: contacto -->
+      <section class="portada-heroe" aria-labelledby="titulo">
+        <p class="portada-sobretitulo">Diseño y verificación · ASTM F2291</p>
+        <h1 id="titulo">Montaña rusa en miniatura</h1>
+        <p class="portada-bajada">
+          Geometría de la vía, normativa de aceleraciones y visualizador 3D.
+        </p>
+        <p class="marcador">[TEXTO: descripción del proyecto en 3–4 líneas]</p>
+        <div class="portada-acciones">
+          <a class="portada-cta" href="visualizador.html">
+            Abrir el visualizador
+            <svg class="portada-flecha" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          </a>
+          <a class="portada-secundario" href="https://github.com/Facxmon/MontanaRusa">Ver el código en GitHub</a>
+        </div>
+      </section>
+
+      <section id="video" class="portada-seccion" aria-labelledby="titulo-video">
+        <h2 id="titulo-video">Video</h2>
+        <!--
+          Contenedor 16:9 con el alto reservado (aspect-ratio): cuando llegue
+          el video no mueve nada de la pagina. Para ponerlo, reemplazar el
+          .video-marcador por UNA de estas dos opciones:
+
+          1. Video alojado (YouTube, sin cookies hasta dar play):
+             <iframe src="https://www.youtube-nocookie.com/embed/[ID]" title="[TITULO DEL VIDEO]"
+                     loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                     referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+          2. Archivo propio en public/video/ (no descarga nada hasta dar play):
+             <video controls preload="none" playsinline poster="og.png" width="1280" height="720">
+               <source src="video/[ARCHIVO].mp4" type="video/mp4" />
+             </video>
+        -->
+        <figure class="video">
+          <div class="video-marco">
+            <div class="video-marcador marcador" role="img" aria-label="Espacio reservado para el video">
+              [VIDEO: iframe o &lt;video&gt; — ver el comentario en index.html]
+            </div>
+          </div>
+          <figcaption class="marcador">[TEXTO: qué se ve en el video, una línea]</figcaption>
+        </figure>
+      </section>
+
+      <section id="proyecto" class="portada-seccion" aria-labelledby="titulo-proyecto">
+        <h2 id="titulo-proyecto">El proyecto</h2>
+        <p class="marcador">[TEXTO: el problema y el objetivo del proyecto, un párrafo]</p>
+        <p class="marcador">[TEXTO: cómo se abordó: modelo en MATLAB, verificación contra la norma, prototipo, un párrafo]</p>
+        <p class="marcador">[TEXTO: estado actual y próximos pasos, dos o tres líneas]</p>
+      </section>
+
+      <section id="modelo" class="portada-seccion" aria-labelledby="titulo-modelo">
+        <h2 id="titulo-modelo">Qué implementa el modelo</h2>
+        <p class="marcador">[TEXTO: introducción a los mecanismos del modelo, dos o tres líneas]</p>
+        <div class="portada-grilla">
+          <article class="portada-tarjeta">
+            <h3>Elementos de vía</h3>
+            <ul class="portada-lista">
+              <li>Loop vertical</li>
+              <li>Dive loop</li>
+              <li>Hélice</li>
+              <li>Over-banked turn</li>
+            </ul>
+            <p class="marcador">[TEXTO: qué tienen en común y cómo se encadenan]</p>
+          </article>
+          <article class="portada-tarjeta">
+            <h3>Modos de curvatura</h3>
+            <ul class="portada-lista">
+              <li>Clotoide</li>
+              <li>Fuerza G constante</li>
+              <li>Aceleración normal constante</li>
+              <li>G normativa máxima</li>
+            </ul>
+            <p class="marcador">[TEXTO: para qué sirve cada modo]</p>
+          </article>
+          <article class="portada-tarjeta">
+            <h3>Verificación</h3>
+            <ul class="portada-lista">
+              <li>Criterios de aceptación según ASTM F2291</li>
+              <li>Escalado del prototipo al modelo por Froude</li>
+            </ul>
+            <p class="marcador">[TEXTO: qué se verifica y contra qué límites]</p>
+          </article>
+        </div>
+        <p class="marcador">[TEXTO: otros mecanismos del modelo físico, si los hay (tracción, frenos, estructura)]</p>
+      </section>
+
+      <section class="portada-final" aria-labelledby="titulo-final">
+        <h2 id="titulo-final">Probarlo</h2>
+        <p>El visualizador corre el mismo modelo en el navegador: se cambian los parámetros y se ve la vía, las G y los criterios.</p>
+        <a class="portada-cta" href="visualizador.html">
+          Abrir el visualizador
+          <svg class="portada-flecha" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </a>
+      </section>
+
+      <section id="contacto" class="portada-seccion" aria-labelledby="titulo-contacto">
+        <h2 id="titulo-contacto">Contacto</h2>
+        <ul class="portada-contacto">
+          <li><span class="portada-contacto-etiqueta">Correo</span> <span class="marcador">[CONTACTO: correo]</span></li>
+          <li><span class="portada-contacto-etiqueta">LinkedIn</span> <span class="marcador">[CONTACTO: URL de LinkedIn]</span></li>
+          <li><span class="portada-contacto-etiqueta">Repositorio</span> <a href="https://github.com/Facxmon/MontanaRusa">github.com/Facxmon/MontanaRusa</a></li>
+        </ul>
+      </section>
     </main>
+
+    <footer class="portada-pie">
+      <a href="visualizador.html">Visualizador</a>
+      <a href="https://github.com/Facxmon/MontanaRusa">Repositorio</a>
+      <span class="marcador">[TEXTO: autor]</span>
+    </footer>
   </body>
 </html>

@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
+import { pluginCssEnLinea } from './plugins/cssEnLinea';
 import { pluginGolden } from './plugins/golden';
 
 // Los golden files los genera MATLAB (GenerarGoldenFiles.m) en ../golden.
@@ -8,7 +9,8 @@ const CARPETA_GOLDEN = fileURLToPath(new URL('../golden', import.meta.url));
 export default defineConfig({
   // El sitio se publica como GitHub Pages de proyecto: https://<usuario>.github.io/MontanaRusa/
   base: '/MontanaRusa/',
-  plugins: [pluginGolden(CARPETA_GOLDEN)],
+  // La portada lleva su CSS dentro del HTML: pinta con un solo viaje (plugins/cssEnLinea.ts).
+  plugins: [pluginGolden(CARPETA_GOLDEN), pluginCssEnLinea(['index.html'])],
   build: {
     // Dos paginas: la portada (sin Three.js ni uPlot) y el visualizador.
     rollupOptions: {
