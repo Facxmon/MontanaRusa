@@ -25,14 +25,24 @@ function textoDeUbicacion(donde: UbicacionDeExtremo | null): string {
   return partes.join(' · ');
 }
 
-function cifra(etiqueta: string, valor: string, donde: string): HTMLElement {
+function cifra(etiqueta: string, valor: string, donde: string, deA?: string): HTMLElement {
   return el(
     'div',
     { class: 'veredicto-cifra' },
     el('span', { class: 'veredicto-cifra-etiqueta' }, etiqueta),
     el('span', { class: 'veredicto-cifra-valor', 'data-clave': etiqueta }, valor),
+    // Con una comparacion A/B (fase 4.8): cuanto valia en A y la diferencia.
+    deA ? el('span', { class: 'veredicto-cifra-a' }, deA) : null,
     el('span', { class: 'veredicto-cifra-donde' }, donde),
   );
+}
+
+/** "A 7.23 G (−1.54)": el valor de A y cuanto cambio B respecto de A. */
+function textoDeA(b: number | null, a: number | null): string | undefined {
+  if (a === null || b === null) return undefined;
+  const diferencia = b - a;
+  const signo = diferencia > 0 ? '+' : diferencia < 0 ? '−' : '±';
+  return `A ${formatear(a, 'G')} (${signo}${formatear(Math.abs(diferencia), 'G').replace(' G', '')})`;
 }
 
 export function montarVeredicto(contenedor: HTMLElement, estado: Estado): void {
@@ -42,6 +52,8 @@ export function montarVeredicto(contenedor: HTMLElement, estado: Estado): void {
     vaciar(contenedor);
     if (!layout) return;
     const v = veredictoDelLayout(layout);
+    const { comparacion } = estado.get();
+    const a = comparacion && comparacion.layout !== layout ? veredictoDelLayout(comparacion.layout) : null;
     const clase = v.pasa ? 'pasa' : 'falla';
 
     const peor = v.peorCriterio;
@@ -69,9 +81,9 @@ export function montarVeredicto(contenedor: HTMLElement, estado: Estado): void {
         el(
           'div',
           { class: 'veredicto-cifras' },
-          cifra('Gz máxima', formatear(v.gzMaxima, 'G'), textoDeUbicacion(v.dondeGzMaxima)),
-          cifra('Gz mínima', formatear(v.gzMinima, 'G'), textoDeUbicacion(v.dondeGzMinima)),
-          cifra('|Gy| máxima', formatear(v.gyMaximaAbsoluta, 'G'), textoDeUbicacion(v.dondeGyMaxima)),
+          cifra('Gz máxima', formatear(v.gzMaxima, 'G'), textoDeUbicacion(v.dondeGzMaxima), a ? textoDeA(v.gzMaxima, a.gzMaxima) : undefined),
+          cifra('Gz mínima', formatear(v.gzMinima, 'G'), textoDeUbicacion(v.dondeGzMinima), a ? textoDeA(v.gzMinima, a.gzMinima) : undefined),
+          cifra('|Gy| máxima', formatear(v.gyMaximaAbsoluta, 'G'), textoDeUbicacion(v.dondeGyMaxima), a ? textoDeA(v.gyMaximaAbsoluta, a.gyMaximaAbsoluta) : undefined),
         ),
         el(
           'p',
@@ -96,6 +108,6 @@ export function montarVeredicto(contenedor: HTMLElement, estado: Estado): void {
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {
-    if (nuevo.layout !== anterior.layout) dibujar(esRecalculo(nuevo, anterior));
+    if (nuevo.layout !== anterior.layout || nuevo.comparacion !== anterior.comparacion) dibujar(esRecalculo(nuevo, anterior));
   });
 }

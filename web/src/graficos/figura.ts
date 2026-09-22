@@ -26,7 +26,7 @@ import { fuenteDeCanvas, tema } from '../tema';
  * Node), asi que describe QUE color lleva cada serie y aca se resuelve al
  * valor del tema (tokens.css) en el momento de dibujar.
  */
-export type ColorDeSerie = 'serie1' | 'serie2' | 'serie3' | 'limite' | 'admisibleTrazo' | 'admisibleRelleno' | 'cero';
+export type ColorDeSerie = 'serie1' | 'serie2' | 'serie3' | 'comparacion1' | 'comparacion2' | 'comparacion3' | 'limite' | 'admisibleTrazo' | 'admisibleRelleno' | 'cero';
 
 export interface SerieDeFigura {
   etiqueta: string;
@@ -74,6 +74,8 @@ export interface DatosDeFigura {
    * con x cuando sinHuecosEnX saca nodos sin tiempo.
    */
   nodos?: number[];
+  /** Con la comparacion A/B cada serie tiene huecos donde el otro diseno tiene puntos: se unen. */
+  unirHuecos?: boolean;
 }
 
 function colorDeSerie(color: ColorDeSerie): string {
@@ -85,6 +87,12 @@ function colorDeSerie(color: ColorDeSerie): string {
       return t.serie2;
     case 'serie3':
       return t.serie3;
+    case 'comparacion1':
+      return t.serieComparacion1;
+    case 'comparacion2':
+      return t.serieComparacion2;
+    case 'comparacion3':
+      return t.serieComparacion3;
     case 'limite':
       return t.serieLimite;
     case 'admisibleTrazo':
@@ -147,7 +155,7 @@ export function opcionesDeFigura(datos: DatosDeFigura, tamano: TamanoDeFigura, c
         stroke: colorDeSerie(s.color),
         width: (s.ancho ?? 1.6) * escala,
         dash: s.trazos?.map((d) => d * escala),
-        spanGaps: false,
+        spanGaps: datos.unirHuecos ?? false,
         points: { show: false },
         value: (_u: uPlot, v: number | null) => (v === null ? SIN_DATO : formatearNumero(v, datos.decimales, datos.notacion)),
       })),

@@ -22,6 +22,7 @@ import { CalculoAbortado, ClienteDeCalculo, ErrorDeCalculo, PedidoSuperado } fro
 import { deserializarDiseno, desdeTextoCompacto } from './nucleo/serializar';
 import { montarAtajos } from './paneles/atajos';
 import { montarBienvenida } from './paneles/bienvenida';
+import { fijarComoA, montarBotonComparar } from './paneles/comparar';
 import { montarAviso } from './paneles/aviso';
 import { montarCriterios } from './paneles/criterios';
 import { montarValoresDelCursor } from './paneles/cursor';
@@ -149,6 +150,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     autoGenerar: leerAutoGenerar(),
     panel: 'resultados',
     nodo: null,
+    comparacion: null,
   });
 
   const escena = new Escena(dom.vista3d);
@@ -288,6 +290,8 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     aviso.mostrar(importado.formato === 'layout' ? `${nombre}: layout del contrato, se reconstruyó el diseño y se está calculando.` : `${nombre}: diseño importado, calculando.`);
   });
   const destruirGuardar = montarGuardar(zonas.izquierda, estado, { escena, aviso });
+  zonas.izquierda.append(el('span', { class: 'barra-separador', 'aria-hidden': 'true' }));
+  montarBotonComparar(zonas.izquierda, estado);
   // El diseno se guarda en localStorage (debounce de 1 s) en cada cambio.
   const guardador = guardadorDeDiseno();
   estado.suscribir((nuevo, anterior) => {
@@ -424,6 +428,8 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   /** Abre un diseno a partir del golden, le aplica un cambio y lo genera, con los graficos de G a la vista. */
   function probarCambio(caso: string, cambiar: (d: EntradaDeDiseno) => EntradaDeDiseno, explicacion: string): void {
     conCaso(caso, () => {
+      // Lo de antes queda como A: el grafico muestra las dos curvas (fase 4.8).
+      fijarComoA(estado);
       abrirDiseno();
       const diseno = estado.get().diseno;
       if (!diseno) return;
@@ -451,7 +457,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
         probarCambio(
           'loop-clotoide',
           (d) => ({ ...d, parametros: { ...d.parametros, RadioDelLoop: d.parametros.RadioDelLoop * 1.5 } }),
-          'Radio del loop × 1,5: la Gz máxima baja (veredicto y gráfico de Gz). Deshacer (Ctrl+Z) vuelve al radio original.',
+          'Radio del loop × 1,5: la Gz máxima baja. En los gráficos, A (tono claro) es el loop original y B el nuevo. Ctrl+Z vuelve al radio original.',
         ),
     },
     {
@@ -462,7 +468,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
         probarCambio(
           'loop-clotoide',
           (d) => ({ ...d, parametros: { ...d.parametros, ModoCurvatura: 'FuerzaGConstante' } }),
-          'Modo FuerzaGConstante: la curvatura se ajusta para que la G quede fija; mirá la meseta en el gráfico de Gz.',
+          'Modo FuerzaGConstante: la curvatura se ajusta para que la G quede fija. En el gráfico de Gz, A (tono claro) es la clotoide y B la meseta de G constante.',
         ),
     },
   ]);

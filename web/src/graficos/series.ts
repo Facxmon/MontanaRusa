@@ -520,3 +520,72 @@ export function estadisticaDeRango(figura: DatosDeFigura, desde: number, hasta: 
       return { etiqueta: serie.etiqueta, maximo, xDelMaximo, minimo, xDelMinimo, promedio: cantidad > 0 ? suma / cantidad : null, cantidad };
     });
 }
+
+// ------------------------------------------------------------ comparacion A/B
+// (fase 4.8) Un layout fijado como A se superpone al vivo (B): mismas
+// figuras, las series de DATOS de A en tono mas claro. Los limites, bandas y
+// franjas son los de B (son los que se estan verificando). Como A y B tienen
+// sus propios nodos, el eje x es la union ordenada de los dos y cada serie
+// lleva null donde no tiene punto; la figura une esos huecos (unirHuecos).
+
+const COLOR_DE_A: Partial<Record<SerieDeFigura['color'], SerieDeFigura['color']>> = {
+  serie1: 'comparacion1',
+  serie2: 'comparacion2',
+  serie3: 'comparacion3',
+};
+
+/** Etiqueta de una serie con la letra del diseno delante: la leyenda dice cual es cual. */
+export const conLetra = (letra: 'A' | 'B', etiqueta: string) => `${letra} · ${etiqueta}`;
+
+/** Superpone a la figura viva (B) las series de datos de la misma figura de A. Puro. */
+export function superponerComparacion(b: DatosDeFigura, a: DatosDeFigura | undefined): DatosDeFigura {
+  if (!a) return b;
+  const deA = a.series.filter((s) => COLOR_DE_A[s.color] !== undefined && !s.ocultarEnLeyenda);
+  if (deA.length === 0) return b;
+
+  // Union ordenada de los dos ejes x; un x que esta en los dos es un solo punto.
+  const x: number[] = [];
+  const indiceB: number[] = [];
+  const indiceA: number[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < b.x.length || j < a.x.length) {
+    const xb = b.x[i];
+    const xa = a.x[j];
+    if (xa === undefined || (xb !== undefined && xb < xa)) {
+      x.push(xb!);
+      indiceB.push(i++);
+      indiceA.push(-1);
+    } else if (xb === undefined || xa < xb) {
+      x.push(xa);
+      indiceB.push(-1);
+      indiceA.push(j++);
+    } else {
+      x.push(xb);
+      indiceB.push(i++);
+      indiceA.push(j++);
+    }
+  }
+  const tomar = (valores: (number | null)[], indices: number[]) => indices.map((k) => (k < 0 ? null : valores[k] ?? null));
+  // El nodo global de un punto que solo tiene A es el ultimo de B visto: la
+  // lista queda creciente (la busqueda binaria del cursor la necesita asi).
+  let nodos: number[] | undefined;
+  if (b.nodos) {
+    nodos = [];
+    let ultimo = b.nodos[0] ?? 0;
+    for (const k of indiceB) {
+      if (k >= 0) ultimo = b.nodos[k]!;
+      nodos.push(ultimo);
+    }
+  }
+  return {
+    ...b,
+    x,
+    nodos,
+    unirHuecos: true,
+    series: [
+      ...b.series.map((s) => ({ ...s, etiqueta: COLOR_DE_A[s.color] ? conLetra('B', s.etiqueta) : s.etiqueta, valores: tomar(s.valores, indiceB) })),
+      ...deA.map((s) => ({ ...s, etiqueta: conLetra('A', s.etiqueta), color: COLOR_DE_A[s.color]!, ancho: 1.4, valores: tomar(s.valores, indiceA) })),
+    ],
+  };
+}

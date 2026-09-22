@@ -14,6 +14,7 @@
 
 import type { Estado } from '../estado';
 import { alCambiarTema } from '../tema';
+import { franjaDeComparacion } from '../paneles/comparar';
 import { leerAlmacen, escribirAlmacen } from '../paneles/almacen';
 import { el, vaciar } from '../paneles/dom';
 import { montarPestanas } from '../paneles/pestanas';
@@ -28,6 +29,7 @@ import {
   ETIQUETA_DE_EJE,
   extraerColumnas,
   figurasDePestana,
+  superponerComparacion,
   PESTANAS,
   type EjeX,
   type Pestana,
@@ -168,7 +170,13 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
     vaciar(cuerpo);
     if (vista === 'via3d' || !layout) return;
     const columnas = extraerColumnas(layout, elemento);
-    const datos = figurasDePestana(pestana as Pestana, columnas, ejeX);
+    let datos = figurasDePestana(pestana as Pestana, columnas, ejeX);
+    // Comparacion A/B (fase 4.8): las mismas figuras de A, superpuestas.
+    const { comparacion } = estado.get();
+    if (comparacion && comparacion.layout !== layout && (elemento === null || comparacion.layout.elementos[elemento])) {
+      const deA = figurasDePestana(pestana as Pestana, extraerColumnas(comparacion.layout, elemento), ejeX);
+      datos = datos.map((d, i) => superponerComparacion(d, deA[i]));
+    }
     datosDeFiguras = datos;
     cuerpo.append(
       el(
@@ -179,6 +187,8 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
           : `Elemento ${elemento + 1}: ${layout.elementos[elemento]?.tipo ?? ''}. Las franjas son los subtramos.`,
       ),
     );
+    const franja = franjaDeComparacion(estado);
+    if (franja) cuerpo.append(franja);
     const cartel = ayudaDeNavegacion();
     if (cartel) cuerpo.append(cartel);
 
@@ -281,7 +291,8 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
       nuevo.elemento !== anterior.elemento ||
       nuevo.pestana !== anterior.pestana ||
       nuevo.ejeX !== anterior.ejeX ||
-      nuevo.vista !== anterior.vista
+      nuevo.vista !== anterior.vista ||
+      nuevo.comparacion !== anterior.comparacion
     ) {
       dibujarFiguras();
       return;

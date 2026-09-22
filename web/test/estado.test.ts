@@ -24,6 +24,7 @@ const inicial: DatosDeEstado = {
   autoGenerar: false,
   panel: 'resultados',
   nodo: null,
+  comparacion: null,
 };
 
 describe('crearEstado', () => {

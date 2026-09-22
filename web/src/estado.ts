@@ -64,6 +64,19 @@ export interface DatosDeEstado {
    * el marcador de la via y el reproductor; null cuando no hay cursor.
    */
   nodo: number | null;
+  /**
+   * Diseno fijado como A para comparar (fase 4.8), o null. Se guarda el
+   * LAYOUT (las curvas) ademas del diseno: recalcular A cada vez costaria
+   * segundos, y un golden no tiene diseno hasta que se lo abre.
+   */
+  comparacion: Comparacion | null;
+}
+
+export interface Comparacion {
+  layout: Layout;
+  diseno: EntradaDeDiseno | null;
+  /** Como se lo nombra en la leyenda y en la franja: el caso, o "diseño propio". */
+  etiqueta: string;
 }
 
 export type Suscriptor = (estado: DatosDeEstado, anterior: DatosDeEstado) => void;

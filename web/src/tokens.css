@@ -64,6 +64,10 @@
   --azul-400-rgb: 108, 182, 255;
   --verde-norma-600-rgb: 12, 163, 12;
   --rojo-500-rgb: 255, 92, 92;
+  --azul-500-rgb: 57, 135, 229;
+  --azul-600-rgb: 37, 106, 191;
+  --naranja-500-rgb: 217, 89, 38;
+  --verde-600-rgb: 25, 158, 112;
   --rojo-600-rgb: 208, 59, 59;
 
   /* ---------- espaciado ---------- */
@@ -198,6 +202,10 @@
   --serie-1: var(--azul-500);
   --serie-2: var(--naranja-500);
   --serie-3: var(--verde-600);
+  /* Comparacion A/B (fase 4.8): el diseno fijado como A, en tono mas claro. */
+  --serie-comparacion-1: rgba(var(--azul-500-rgb), 0.45);
+  --serie-comparacion-2: rgba(var(--naranja-500-rgb), 0.45);
+  --serie-comparacion-3: rgba(var(--verde-600-rgb), 0.45);
   --serie-limite: var(--rojo-600);
   --serie-admisible-trazo: rgba(var(--verde-norma-600-rgb), 0.7);
   --serie-admisible-relleno: rgba(var(--verde-norma-600-rgb), 0.10);
@@ -258,6 +266,9 @@
   --serie-1: var(--azul-600);
   --serie-2: var(--naranja-500);
   --serie-3: var(--verde-600);
+  --serie-comparacion-1: rgba(var(--azul-600-rgb), 0.4);
+  --serie-comparacion-2: rgba(var(--naranja-500-rgb), 0.4);
+  --serie-comparacion-3: rgba(var(--verde-600-rgb), 0.4);
   --serie-limite: var(--rojo-600);
   --serie-admisible-trazo: var(--verde-norma-600);
   --serie-admisible-relleno: rgba(var(--verde-norma-600-rgb), 0.12);

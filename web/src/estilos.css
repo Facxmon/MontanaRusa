@@ -963,3 +963,24 @@ summary { cursor: pointer; font-size: var(--texto-sm); color: var(--texto-1); pa
 .recorrido-titulo { font-weight: 600; font-size: var(--texto-sm); }
 .recorrido-titulo::after { content: " →"; color: var(--acento); }
 .recorrido-detalle { font-size: var(--texto-xs); color: var(--texto-2); }
+
+/* ---------- comparacion A/B (fase 4.8) ---------- */
+.boton-barra.activo { background: var(--acento-suave); border-color: var(--acento); color: var(--acento); }
+.comparacion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2);
+  margin: 0 0 var(--esp-3);
+  padding: var(--esp-2) var(--esp-3);
+  border: 1px solid var(--borde-sutil);
+  border-left: 3px solid var(--acento);
+  border-radius: var(--radio);
+  background: var(--superficie-1);
+  font-size: var(--texto-sm);
+}
+.comparacion-muestra { display: inline-block; width: var(--esp-5); height: 3px; border-radius: 2px; }
+.comparacion-a { background: var(--serie-comparacion-1); }
+.comparacion-b { background: var(--serie-1); margin-left: var(--esp-2); }
+.comparacion-acciones { display: inline-flex; gap: var(--esp-1); margin-left: auto; }
+.veredicto-cifra-a { font-family: var(--mono); font-size: var(--texto-xs); color: var(--texto-2); font-variant-numeric: tabular-nums; }
