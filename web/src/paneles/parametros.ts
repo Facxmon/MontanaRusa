@@ -35,6 +35,7 @@ import {
   ParametrosPorDefecto,
 } from '../nucleo/parametros';
 import type { Declaracion, ModoCurvatura, NombreDeParametro, Parametros } from '../nucleo/tipos';
+import { EscalasDeFroude } from '../nucleo/basicos';
 import { ayudaDeCampo } from './ayuda';
 import { el, tarjeta } from './dom';
 import {
@@ -169,7 +170,10 @@ function etiquetaVisible(nombre: NombreDeParametro, descripcion: string, clave: 
   return { texto, ayuda, etiqueta };
 }
 
-function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: Actualizar, diagnostico?: Diagnostico | null): HTMLElement {
+/** Valor con que arranca un parametro anulable al destildar "vacio (derivar)": el que se venia derivando. */
+type Derivar = (nombre: NombreDeParametro) => number[] | null;
+
+function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: Actualizar, diagnostico?: Diagnostico | null, derivar?: Derivar): HTMLElement {
   const nombre = pascal(declaracion.clave);
   const { texto: etiqueta, ayuda } = etiquetaVisible(nombre, declaracion.descripcion, declaracion.clave);
   let control: HTMLElement;
@@ -188,7 +192,7 @@ function campo(declaracion: DeclaracionDeParametro, valor: unknown, actualizar: 
     casilla.checked = valor;
     control = casilla;
   } else if (PARAMETROS_ANULABLES.includes(nombre)) {
-    control = campoAnulable(nombre, valor, actualizar);
+    control = campoAnulable(nombre, valor, actualizar, derivar);
   } else if (typeof valor === 'number') {
     control = entradaNumerica(valor, etiquetaDe(nombre), (v) => actualizar(nombre, v));
   } else if (Array.isArray(valor) && valor.length === 3 && valor.every((v) => typeof v === 'number')) {
@@ -244,7 +248,7 @@ function marcarSiTieneError(fila: HTMLElement, nombre: NombreDeParametro, diagno
   return fila;
 }
 
-function campoAnulable(nombre: NombreDeParametro, valor: unknown, actualizar: Actualizar): HTMLElement {
+function campoAnulable(nombre: NombreDeParametro, valor: unknown, actualizar: Actualizar, derivar?: Derivar): HTMLElement {
   const vacio = valor === null || valor === undefined || (Array.isArray(valor) && valor.length === 0);
   const esVector = nombre === 'OnsetMaximoModelo';
   const contenedor = el('span', { class: 'campo-anulable' });
@@ -262,6 +266,17 @@ function campoAnulable(nombre: NombreDeParametro, valor: unknown, actualizar: Ac
     entradas.append(entrada);
   });
   casilla.addEventListener('change', () => {
+    // Al pasar de "derivar" a un valor propio se arranca del valor que se
+    // venia derivando (para el onset, sqrt(lambda) x onset normativo) y no de
+    // cero: un presupuesto de onset nulo deja al calculo minutos iterando.
+    const derivado = !casilla.checked && vacio ? derivar?.(nombre) : null;
+    if (derivado && derivado.length === valores.length) {
+      const inputs = Array.from(entradas.querySelectorAll('input'));
+      derivado.forEach((v, i) => {
+        valores[i] = v;
+        inputs[i]!.value = textoDeEntrada(v, etiquetaDe(nombre).unidadDePresentacion);
+      });
+    }
     entradas.querySelectorAll('input').forEach((i) => (i.disabled = casilla.checked));
     emitir();
   });
@@ -280,14 +295,14 @@ function esDelSolver(declaracion: DeclaracionDeParametro): boolean {
 const deDiseno = (lista: DeclaracionDeParametro[]) => lista.filter((d) => !esDelSolver(d));
 const deSolver = (lista: DeclaracionDeParametro[]) => lista.filter(esDelSolver);
 
-function grupo(titulo: string, lista: DeclaracionDeParametro[], parametros: Parametros, actualizar: Actualizar, abierto: boolean, diagnostico: Diagnostico | null): HTMLElement {
+function grupo(titulo: string, lista: DeclaracionDeParametro[], parametros: Parametros, actualizar: Actualizar, abierto: boolean, diagnostico: Diagnostico | null, derivar?: Derivar): HTMLElement {
   const conError = lista.some((d) => diagnostico?.parametros.includes(pascal(d.clave)));
   return el(
     'details',
     // Un grupo cerrado que esconde el campo con error se abre solo.
     { open: abierto || conError },
     el('summary', {}, `${titulo} (${lista.length})`, conError ? el('span', { class: 'summary-error', title: 'Hay un campo con error en este grupo' }, ' ⚠') : null),
-    el('div', { class: 'campos' }, lista.map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizar, diagnostico))),
+    el('div', { class: 'campos' }, lista.map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizar, diagnostico, derivar))),
   );
 }
 
@@ -430,6 +445,12 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
       selectorDeModo.append(o);
     }
     const modo = ParametrosDelModo(parametros.ModoCurvatura);
+    // Lo que el nucleo deriva cuando un anulable esta vacio, con los globales VIGENTES (no los del dibujo).
+    const derivar: Derivar = (nombre) => {
+      const vigentes = estado.get().diseno?.parametros;
+      if (!vigentes || nombre !== 'OnsetMaximoModelo') return null;
+      return [...EscalasDeFroude({ ...vigentes, OnsetMaximoModelo: null }).OnsetMaximo];
+    };
     const aceptacion = declaraciones(ParametrosDeAceptacion());
     const generales = declaraciones(ParametrosGenerales());
 
@@ -448,8 +469,8 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
           declaraciones(modo.Lista).map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizarGlobal, diagnostico)),
         ),
       ),
-      grupo('Criterios de aceptación', deDiseno(aceptacion), parametros, actualizarGlobal, false, diagnostico),
-      grupo('Generales', deDiseno(generales), parametros, actualizarGlobal, false, diagnostico),
+      grupo('Criterios de aceptación', deDiseno(aceptacion), parametros, actualizarGlobal, false, diagnostico, derivar),
+      grupo('Generales', deDiseno(generales), parametros, actualizarGlobal, false, diagnostico, derivar),
       grupo('Avanzado — numérico', [...deSolver(aceptacion), ...deSolver(generales)], parametros, actualizarGlobal, false, diagnostico),
     ));
   };
