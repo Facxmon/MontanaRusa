@@ -99,6 +99,8 @@
   /* Valor de la leyenda de uPlot. */
   --ancho-leyenda-valor: 7ch;
   --alto-figura: 240px;
+  /* Tooltip del cursor de los graficos. */
+  --ancho-tooltip-figura: 260px;
 }
 
 /* ---------- tema oscuro (el unico por ahora) ---------- */

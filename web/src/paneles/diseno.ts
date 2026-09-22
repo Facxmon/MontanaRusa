@@ -10,7 +10,7 @@ import { textoDelLayout } from '../nucleo/descargar';
 import { CATALOGO_DE_ELEMENTOS } from '../nucleo/parametros';
 import type { NombreDeElemento } from '../nucleo/tipos';
 import { el, vaciar } from './dom';
-import { descargarArchivo } from './guardar';
+import { descargarArchivo } from './archivo';
 
 function contarAjustes(inst: InstanciaDeElemento): number {
   return Object.keys(inst.ajustes).length;

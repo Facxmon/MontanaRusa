@@ -57,6 +57,12 @@ export interface DatosDeEstado {
   autoGenerar: boolean;
   /** Pestana del panel lateral. */
   panel: PanelLateral;
+  /**
+   * Nodo bajo el cursor, como INDICE DE NODO GLOBAL sobre todo el layout
+   * (el mismo que usa la via 3D). Es el estado que comparten los graficos,
+   * el marcador de la via y el reproductor; null cuando no hay cursor.
+   */
+  nodo: number | null;
 }
 
 export type Suscriptor = (estado: DatosDeEstado, anterior: DatosDeEstado) => void;

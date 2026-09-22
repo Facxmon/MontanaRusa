@@ -7,7 +7,10 @@
 //    nodo, para re-graficar en cualquier lado (series.csv).
 //  - textoLeeme: fecha, versiones, origen y el contenido del paquete
 //    (LEEME.txt).
+//  - csvDeFigura: una figura sola (eje x mas las series visibles), para el
+//    boton de exportar de cada grafico.
 
+import type { DatosDeFigura } from '../graficos/figura';
 import type * as Contrato from '../contrato/tipos';
 import type { EntradaDeDiseno } from './calcular';
 import { redondearTodo } from './exportar';
@@ -111,4 +114,26 @@ export function textoLeeme({ layout, origen, fecha, archivos }: DatosDelLeeme): 
     ...archivos.map((a) => `  ${a}`),
     '',
   ].join('\n');
+}
+
+// ------------------------------------------------ CSV de una figura
+/**
+ * Una figura como CSV: la columna del eje x y una columna por serie visible,
+ * con los nombres que se leen en la leyenda. Es la version por figura del
+ * series.csv del paquete (fase 2): lo que hace que la curva que se esta
+ * mirando se pueda re-graficar en cualquier lado sin bajar los 2 MB del
+ * layout entero. Puro, como todo lo de este modulo.
+ */
+export function csvDeFigura(figura: DatosDeFigura): string {
+  const series = figura.series.filter((s) => !s.ocultarEnLeyenda);
+  const filas: string[] = [[figura.etiquetaX, ...series.map((s) => s.etiqueta)].map(entrecomillar).join(',')];
+  figura.x.forEach((x, i) => {
+    filas.push([celda(x), ...series.map((s) => celda(s.valores[i]))].join(','));
+  });
+  return `${filas.join('\n')}\n`;
+}
+
+/** Las etiquetas de las series traen comas y parentesis: van entre comillas. */
+function entrecomillar(texto: string): string {
+  return `"${texto.replace(/"/g, '""')}"`;
 }

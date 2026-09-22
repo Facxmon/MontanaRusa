@@ -2,6 +2,19 @@
 // y varias series, con franjas verticales (subtramos o elementos), lineas de
 // referencia y bandas entre dos series. Lo que se dibuja lo describe
 // series.ts; aca solo se traduce a opciones de uPlot.
+//
+// Navegacion (fase 3): uPlot ya traia arrastrar-para-hacer-zoom en X y doble
+// clic para volver, pero nada lo indicaba y no habia forma de mirar el eje Y.
+// Se agrega, en un plugin y sin cambiar de libreria (uPlot es mas chica y mas
+// rapida que las alternativas y nada de esto la necesita):
+//  - zoom tambien en Y arrastrando en vertical (cursor.drag.uni decide si el
+//    arrastre fue horizontal, vertical o de caja);
+//  - zoom con la rueda (Shift = eje Y), centrado donde esta el puntero;
+//  - arrastre para desplazarse con la rueda apretada o con Shift.
+// El mousedown del arrastre se escucha en u.root EN FASE DE CAPTURA: uPlot
+// registra el suyo sobre u.over en el constructor, o sea antes que cualquier
+// listener que se agregue en el hook `ready`, y desde un ancestro en captura
+// es la unica forma de ganarle y que no arranque una seleccion.
 
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
@@ -55,6 +68,12 @@ export interface DatosDeFigura {
   series: SerieDeFigura[];
   franjas: Franja[];
   bandas?: BandaEntreSeries[];
+  /**
+   * Indice de nodo GLOBAL de cada punto de x (series.ts). Es lo que liga el
+   * cursor del grafico con la via 3D y con el reproductor; se filtra junto
+   * con x cuando sinHuecosEnX saca nodos sin tiempo.
+   */
+  nodos?: number[];
 }
 
 function colorDeSerie(color: ColorDeSerie): string {
@@ -107,7 +126,13 @@ export function opcionesDeFigura(datos: DatosDeFigura, tamano: TamanoDeFigura, c
     ...tamano,
     title: datos.titulo,
     cursor: claveDeSincronizacion
-      ? { sync: { key: claveDeSincronizacion, setSeries: false }, points: { size: 6 } }
+      ? {
+          sync: { key: claveDeSincronizacion, setSeries: false },
+          points: { size: 6 },
+          // uni: si el arrastre supera este umbral en un solo eje, la
+          // seleccion es de ese eje; si supera en los dos, es una caja.
+          drag: { x: true, y: true, uni: 12, dist: 0 },
+        }
       : { show: false },
     legend: { show: claveDeSincronizacion !== null, live: true },
     scales: { x: { time: false } },
@@ -161,32 +186,164 @@ export function dibujarFranjas(u: uPlot, franjas: Franja[], escala = 1): void {
   ctx.restore();
 }
 
+/** Cuanto se acerca o se aleja un "click" de la rueda. */
+const FACTOR_DE_RUEDA = 1.25;
+
+/**
+ * Zoom con la rueda y desplazamiento arrastrando. Va como plugin para que la
+ * exportacion a PNG (que arma su propio uPlot sin cursor) no lo cargue.
+ */
+function zoomYDesplazamiento(): uPlot.Plugin {
+  return {
+    hooks: {
+      ready: [
+        (u: uPlot) => {
+          const over = u.over;
+
+          over.addEventListener(
+            'wheel',
+            (evento: WheelEvent) => {
+              evento.preventDefault();
+              const eje = evento.shiftKey ? 'y' : 'x';
+              const escala = u.scales[eje];
+              if (!escala || escala.min === undefined || escala.max === undefined) return;
+              const caja = over.getBoundingClientRect();
+              // Fraccion del eje donde esta el puntero: el zoom deja ese punto quieto.
+              const fraccion =
+                eje === 'x' ? (evento.clientX - caja.left) / caja.width : 1 - (evento.clientY - caja.top) / caja.height;
+              const factor = evento.deltaY < 0 ? 1 / FACTOR_DE_RUEDA : FACTOR_DE_RUEDA;
+              const centro = escala.min + (escala.max - escala.min) * Math.min(Math.max(fraccion, 0), 1);
+              u.setScale(eje, {
+                min: centro - (centro - escala.min) * factor,
+                max: centro + (escala.max - centro) * factor,
+              });
+            },
+            { passive: false },
+          );
+
+          // Arrastre con la rueda apretada o con Shift: desplaza los dos ejes.
+          let desde: { x: number; y: number; ejeX: [number, number]; ejeY: [number, number] } | null = null;
+          const alApretar = (evento: MouseEvent) => {
+            const conRueda = evento.button === 1;
+            const conShift = evento.button === 0 && evento.shiftKey;
+            if (!conRueda && !conShift) return;
+            const ex = u.scales.x;
+            const ey = u.scales.y;
+            if (ex?.min === undefined || ex.max === undefined || ey?.min === undefined || ey.max === undefined) return;
+            evento.preventDefault();
+            evento.stopPropagation();
+            desde = { x: evento.clientX, y: evento.clientY, ejeX: [ex.min, ex.max], ejeY: [ey.min, ey.max] };
+          };
+          const alMover = (evento: MouseEvent) => {
+            if (!desde) return;
+            const caja = over.getBoundingClientRect();
+            const dx = ((evento.clientX - desde.x) / caja.width) * (desde.ejeX[1] - desde.ejeX[0]);
+            const dy = ((evento.clientY - desde.y) / caja.height) * (desde.ejeY[1] - desde.ejeY[0]);
+            u.setScale('x', { min: desde.ejeX[0] - dx, max: desde.ejeX[1] - dx });
+            u.setScale('y', { min: desde.ejeY[0] + dy, max: desde.ejeY[1] + dy });
+          };
+          const alSoltar = () => {
+            desde = null;
+          };
+          // Captura desde la raiz: si no, uPlot ya arranco su propia seleccion.
+          u.root.addEventListener('mousedown', alApretar, true);
+          window.addEventListener('mousemove', alMover);
+          window.addEventListener('mouseup', alSoltar);
+          u.hooks.destroy = [
+            ...(u.hooks.destroy ?? []),
+            () => {
+              window.removeEventListener('mousemove', alMover);
+              window.removeEventListener('mouseup', alSoltar);
+            },
+          ];
+        },
+      ],
+    },
+  };
+}
+
+export interface OpcionesDeLaFigura {
+  claveDeSincronizacion: string;
+  /** Alto del area de dibujo en px CSS. */
+  alto: number;
+  /** El cursor paso por este punto (indice dentro de datos.x), o salio de la figura. */
+  alMoverCursor?: (indice: number | null) => void;
+  /** Clic sobre un punto de la figura. */
+  alElegirPunto?: (indice: number) => void;
+  /** El rango visible en x cambio (zoom, desplazamiento o doble clic). */
+  alCambiarRango?: (desde: number, hasta: number, completo: boolean) => void;
+}
+
 export class Figura {
   private grafico: uPlot | null = null;
+  private datos: DatosDeFigura | null = null;
+  private alto: number;
   private readonly contenedor: HTMLElement;
-  private readonly claveDeSincronizacion: string;
+  private readonly opciones: OpcionesDeLaFigura;
   private readonly observador: ResizeObserver;
+  /** Valores de todas las series en el punto del cursor, al lado del puntero. */
+  private readonly tooltip: HTMLElement;
 
-  constructor(contenedor: HTMLElement, claveDeSincronizacion: string) {
+  constructor(contenedor: HTMLElement, opciones: OpcionesDeLaFigura) {
     this.contenedor = contenedor;
-    this.claveDeSincronizacion = claveDeSincronizacion;
+    this.opciones = opciones;
+    this.alto = opciones.alto;
+    this.tooltip = document.createElement('div');
+    this.tooltip.className = 'figura-tooltip';
+    this.tooltip.hidden = true;
     this.observador = new ResizeObserver(() => this.ajustarTamano());
     this.observador.observe(contenedor);
   }
 
   private tamano(): TamanoDeFigura {
-    return { width: Math.max(320, this.contenedor.clientWidth), height: 240 };
+    return { width: Math.max(320, this.contenedor.clientWidth), height: this.alto };
   }
 
   private ajustarTamano(): void {
     if (this.grafico) this.grafico.setSize(this.tamano());
   }
 
+  /** Cambia el alto del area de dibujo sin rehacer el uPlot. */
+  cambiarAlto(alto: number): void {
+    this.alto = alto;
+    this.ajustarTamano();
+  }
+
+  /** Mueve el cursor al punto dado; no dispara alMoverCursor de vuelta. */
+  ponerCursorEn(indice: number | null): void {
+    const u = this.grafico;
+    if (!u) return;
+    this.deAfuera = true;
+    if (indice === null) {
+      u.setCursor({ left: -10, top: -10 });
+      this.tooltip.hidden = true;
+    } else {
+      const x = u.data[0]![indice];
+      if (typeof x === 'number') u.setCursor({ left: u.valToPos(x, 'x'), top: u.cursor.top ?? 0 });
+    }
+    this.deAfuera = false;
+  }
+
+  /** true mientras el cursor lo mueve otro panel: no se reenvia el aviso. */
+  private deAfuera = false;
+
   /** Reemplaza el contenido entero (las series pueden cambiar de cantidad). */
   mostrar(datos: DatosDeFigura): void {
     this.destruir();
-    const opciones = opcionesDeFigura(datos, this.tamano(), this.claveDeSincronizacion);
+    this.datos = datos;
+    const opciones = opcionesDeFigura(datos, this.tamano(), this.opciones.claveDeSincronizacion);
+    opciones.plugins = [zoomYDesplazamiento()];
+    opciones.hooks = {
+      ...opciones.hooks,
+      setCursor: [(u: uPlot) => this.dibujarTooltip(u)],
+      setScale: [
+        (u: uPlot, clave: string) => {
+          if (clave === 'x') this.avisarDelRango(u);
+        },
+      ],
+    };
     this.grafico = new uPlot(opciones, [datos.x, ...datos.series.map((s) => s.valores)], this.contenedor);
+    this.contenedor.append(this.tooltip);
 
     // Leyenda: las series marcadas como ocultas no se listan.
     const filas = this.contenedor.querySelectorAll<HTMLElement>('.u-legend .u-series');
@@ -194,13 +351,71 @@ export class Figura {
       const fila = filas[i + 1];
       if (fila && s.ocultarEnLeyenda) fila.style.display = 'none';
     });
+
+    const u = this.grafico;
+    u.over.addEventListener('mouseleave', () => {
+      this.tooltip.hidden = true;
+      this.opciones.alMoverCursor?.(null);
+    });
+    u.over.addEventListener('click', (evento) => {
+      // Un clic que termina un arrastre (zoom o desplazamiento) no elige nada.
+      if (evento.shiftKey || u.cursor.idx === null || u.cursor.idx === undefined) return;
+      this.opciones.alElegirPunto?.(u.cursor.idx);
+    });
+    this.avisarDelRango(u);
+  }
+
+  private avisarDelRango(u: uPlot): void {
+    if (!this.opciones.alCambiarRango) return;
+    const escala = u.scales.x;
+    const x = u.data[0] as number[];
+    if (!escala || escala.min === undefined || escala.max === undefined || x.length === 0) return;
+    const completo = escala.min <= x[0]! && escala.max >= x[x.length - 1]!;
+    this.opciones.alCambiarRango(escala.min, escala.max, completo);
+  }
+
+  /**
+   * El tooltip del cursor: los valores de TODAS las series de la figura en
+   * ese punto, al lado del puntero, en vez de obligar a bajar a la leyenda.
+   */
+  private dibujarTooltip(u: uPlot): void {
+    const datos = this.datos;
+    const indice = u.cursor.idx;
+    if (!datos || indice === null || indice === undefined || (u.cursor.left ?? -1) < 0) {
+      this.tooltip.hidden = true;
+      if (!this.deAfuera) this.opciones.alMoverCursor?.(null);
+      return;
+    }
+    const x = datos.x[indice];
+    this.tooltip.replaceChildren(
+      filaDeTooltip(`${datos.etiquetaX}: ${typeof x === 'number' ? formatearNumero(x, datos.decimalesX) : SIN_DATO}`),
+      ...datos.series.flatMap((serie) => {
+        if (serie.ocultarEnLeyenda) return [];
+        const valor = serie.valores[indice];
+        return [
+          filaDeSerie(
+            serie,
+            valor === null || valor === undefined ? SIN_DATO : formatearNumero(valor, datos.decimales, datos.notacion),
+          ),
+        ];
+      }),
+    );
+    this.tooltip.hidden = false;
+    // Del lado del cursor donde haya lugar, para no tapar lo que se esta mirando.
+    const izquierda = (u.cursor.left ?? 0) + u.bbox.left / devicePixelRatio;
+    const aLaDerecha = izquierda + this.tooltip.offsetWidth + 16 < this.contenedor.clientWidth;
+    this.tooltip.style.left = `${Math.round(aLaDerecha ? izquierda + 12 : izquierda - this.tooltip.offsetWidth - 12)}px`;
+    this.tooltip.style.top = `${Math.round((u.cursor.top ?? 0) + u.bbox.top / devicePixelRatio)}px`;
+    if (!this.deAfuera) this.opciones.alMoverCursor?.(indice);
   }
 
   /** Destruye el uPlot y vacia el contenedor; el ResizeObserver sigue hasta destruirDelTodo. */
   destruir(): void {
     this.grafico?.destroy();
     this.grafico = null;
+    this.datos = null;
     this.contenedor.replaceChildren();
+    this.tooltip.hidden = true;
   }
 
   /** destruir() mas soltar el ResizeObserver: la figura no se vuelve a usar. */
@@ -208,4 +423,27 @@ export class Figura {
     this.destruir();
     this.observador.disconnect();
   }
+}
+
+function filaDeTooltip(texto: string): HTMLElement {
+  const fila = document.createElement('div');
+  fila.className = 'figura-tooltip-x';
+  fila.textContent = texto;
+  return fila;
+}
+
+function filaDeSerie(serie: SerieDeFigura, valor: string): HTMLElement {
+  const fila = document.createElement('div');
+  fila.className = 'figura-tooltip-serie';
+  const muestra = document.createElement('span');
+  muestra.className = 'figura-tooltip-muestra';
+  muestra.style.background = colorDeSerie(serie.color);
+  const nombre = document.createElement('span');
+  nombre.className = 'figura-tooltip-nombre';
+  nombre.textContent = serie.etiqueta;
+  const numero = document.createElement('span');
+  numero.className = 'figura-tooltip-valor';
+  numero.textContent = valor;
+  fila.append(muestra, nombre, numero);
+  return fila;
 }

@@ -74,6 +74,60 @@ export interface Columnas {
   franjas: Record<EjeX, Franja[]>;
   onsetNormativo: [number, number, number];
   radioMinimoFabricable: number | null;
+  /**
+   * Indice de nodo GLOBAL de cada columna: el mismo que usa la via 3D
+   * (geometriaDeVia.aplanarNodos), o sea todo el layout sin los nodos
+   * repetidos de los empalmes. Es el estado que comparten los graficos, el
+   * 3D y el reproductor.
+   */
+  nodos: Int32Array;
+}
+
+/** Primer nodo global de cada elemento; espejo de aplanarNodos (contrato, seccion 6). */
+export function iniciosDeElemento(layout: Layout): number[] {
+  const inicios: number[] = [];
+  let acumulado = 0;
+  layout.elementos.forEach((elemento, i) => {
+    inicios.push(acumulado);
+    acumulado += elemento.nodos.numeroDeNodos - (i > 0 ? 1 : 0);
+  });
+  return inicios;
+}
+
+/** Nodo global de un nodo local. El nodo 0 de un elemento es el ultimo del anterior. */
+export function nodoGlobalDe(layout: Layout, elemento: number, nodoLocal: number): number {
+  return iniciosDeElemento(layout)[elemento]! + nodoLocal - (elemento > 0 ? 1 : 0);
+}
+
+/** A que elemento, nodo local y subtramo corresponde un nodo global. */
+export function ubicacionDeNodo(layout: Layout, nodoGlobal: number): { elemento: number; nodoLocal: number; subtramo: string | null } | null {
+  const inicios = iniciosDeElemento(layout);
+  for (let i = layout.elementos.length - 1; i >= 0; i--) {
+    if (nodoGlobal < inicios[i]!) continue;
+    const nodoLocal = nodoGlobal - inicios[i]! + (i > 0 ? 1 : 0);
+    const elemento = layout.elementos[i]!;
+    if (nodoLocal >= elemento.nodos.numeroDeNodos) return null;
+    const sub = elemento.subtramos.find((t) => nodoLocal >= t.indiceInicio && nodoLocal <= t.indiceFin);
+    return { elemento: i, nodoLocal, subtramo: sub?.nombre ?? null };
+  }
+  return null;
+}
+
+/**
+ * Indice dentro de una lista CRECIENTE de nodos globales (columnas.nodos, o
+ * el `nodos` ya filtrado de una figura), o null si ese nodo no esta. Binaria
+ * porque se llama en cada movimiento del cursor y por figura.
+ */
+export function indiceDeNodo(nodos: ArrayLike<number>, nodoGlobal: number): number | null {
+  let bajo = 0;
+  let alto = nodos.length - 1;
+  while (bajo <= alto) {
+    const medio = (bajo + alto) >> 1;
+    if (nodos[medio]! === nodoGlobal) return medio;
+    if (nodos[medio]! < nodoGlobal) bajo = medio + 1;
+    else alto = medio - 1;
+  }
+  return null;
 }
 
 function numero(v: number | null | undefined): number | null {
@@ -114,16 +168,20 @@ export function extraerColumnas(layout: Layout, elementoElegido: number | null):
   const arco: (number | null)[] = [];
   const tiempo: (number | null)[] = [];
   const tiempoPrototipo: (number | null)[] = [];
+  const nodos: number[] = [];
+  const inicios = iniciosDeElemento(layout);
   const franjas: Record<EjeX, Franja[]> = { arco: [], tiempo: [], tiempoPrototipo: [] };
 
   for (const tramo of tramos) {
     const n = tramo.elemento.nodos;
     const inicioGlobal = arco.length;
+    const desplazamiento = inicios[tramo.indice]! - (tramo.indice > 0 ? 1 : 0);
     for (let i = tramo.desde; i < n.numeroDeNodos; i++) {
       const t = numero(n.tiempo[i]);
       arco.push(numero(n.arco[i]));
       tiempo.push(t === null ? null : t + tramo.desfaseTiempo);
       tiempoPrototipo.push(t === null ? null : t * tramo.factorTiempo + tramo.desfaseTiempoPrototipo);
+      nodos.push(desplazamiento + i);
     }
     const finGlobal = arco.length - 1;
     const enX = (eje: EjeX, local: number): number | null => {
@@ -153,6 +211,7 @@ export function extraerColumnas(layout: Layout, elementoElegido: number | null):
     franjas,
     onsetNormativo: tripleta(layout.parametros.valores.onsetNormativoPorEje, [NaN, NaN, NaN]),
     radioMinimoFabricable: numero(layout.parametros.valores.radioMinimoFabricable as number | undefined),
+    nodos: Int32Array.from(nodos),
   };
 }
 
@@ -387,6 +446,7 @@ export function sinHuecosEnX(figura: DatosDeFigura): DatosDeFigura {
   return {
     ...figura,
     x: conservar.map((i) => figura.x[i]!),
+    nodos: figura.nodos ? conservar.map((i) => figura.nodos![i]!) : undefined,
     series: figura.series.map((s) => ({ ...s, valores: conservar.map((i) => s.valores[i] ?? null) })),
   };
 }
@@ -406,5 +466,57 @@ export function figurasDePestana(pestana: Pestana, columnas: Columnas, ejeX: Eje
         return figurasDeCurvatura(columnas, ejeX);
     }
   })();
-  return figuras.map(sinHuecosEnX);
+  // El indice de nodo global viaja con cada figura: es lo que hace que el
+  // cursor del grafico, el marcador del 3D y el reproductor hablen de lo mismo.
+  const nodos = Array.from(columnas.nodos);
+  return figuras.map((figura) => sinHuecosEnX({ ...figura, nodos }));
+}
+
+/** Lo que se muestra de una serie cuando se mira un rango del grafico. */
+export interface EstadisticaDeSerie {
+  etiqueta: string;
+  maximo: number | null;
+  /** Valor de x donde ocurre el maximo: leer un pico de G es querer saber DONDE. */
+  xDelMaximo: number | null;
+  minimo: number | null;
+  xDelMinimo: number | null;
+  promedio: number | null;
+  /** Nodos con dato dentro del rango. */
+  cantidad: number;
+}
+
+/**
+ * Maximo, minimo, promedio y donde ocurre el maximo de cada serie visible,
+ * sobre el rango [desde, hasta] del eje x. Puro: se testea en Node.
+ */
+export function estadisticaDeRango(figura: DatosDeFigura, desde: number, hasta: number): EstadisticaDeSerie[] {
+  const dentro: number[] = [];
+  figura.x.forEach((v, i) => {
+    if (typeof v === 'number' && v >= desde && v <= hasta) dentro.push(i);
+  });
+  return figura.series
+    .filter((s) => !s.ocultarEnLeyenda)
+    .map((serie) => {
+      let maximo: number | null = null;
+      let minimo: number | null = null;
+      let xDelMaximo: number | null = null;
+      let xDelMinimo: number | null = null;
+      let suma = 0;
+      let cantidad = 0;
+      for (const i of dentro) {
+        const v = serie.valores[i];
+        if (v === null || v === undefined || !Number.isFinite(v)) continue;
+        if (maximo === null || v > maximo) {
+          maximo = v;
+          xDelMaximo = figura.x[i] ?? null;
+        }
+        if (minimo === null || v < minimo) {
+          minimo = v;
+          xDelMinimo = figura.x[i] ?? null;
+        }
+        suma += v;
+        cantidad++;
+      }
+      return { etiqueta: serie.etiqueta, maximo, xDelMaximo, minimo, xDelMinimo, promedio: cantidad > 0 ? suma / cantidad : null, cantidad };
+    });
 }

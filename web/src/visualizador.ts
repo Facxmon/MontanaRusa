@@ -22,6 +22,7 @@ import { deserializarDiseno, desdeTextoCompacto } from './nucleo/serializar';
 import { montarAtajos } from './paneles/atajos';
 import { montarAviso } from './paneles/aviso';
 import { montarCriterios } from './paneles/criterios';
+import { montarValoresDelCursor } from './paneles/cursor';
 import { montarDeshacer } from './paneles/deshacer';
 import { montarDiseno } from './paneles/diseno';
 import { el } from './paneles/dom';
@@ -66,7 +67,8 @@ function armarDom() {
   const elementos = el('section');
   const resumenElemento = el('section');
   const criterios = el('section');
-  const panelResultados = el('div', { class: 'panel-resultados' }, selectorDeMagnitud, leyenda, resumenLayout, elementos, resumenElemento, criterios);
+  const valoresDelCursor = el('section');
+  const panelResultados = el('div', { class: 'panel-resultados' }, selectorDeMagnitud, leyenda, resumenLayout, valoresDelCursor, elementos, resumenElemento, criterios);
   const diseno = el('section');
   const parametros = el('section');
   const panelDiseno = el('div', { class: 'panel-diseno', hidden: true }, diseno, parametros);
@@ -104,6 +106,7 @@ function armarDom() {
     elementos,
     resumenElemento,
     criterios,
+    valoresDelCursor,
     panelResultados,
     diseno,
     parametros,
@@ -141,6 +144,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     ultimoCalculoMs: null,
     autoGenerar: leerAutoGenerar(),
     panel: 'resultados',
+    nodo: null,
   });
 
   const escena = new Escena(dom.vista3d);
@@ -159,6 +163,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   montarElementos(dom.elementos, estado);
   montarResumenElemento(dom.resumenElemento, estado);
   montarCriterios(dom.criterios, estado);
+  montarValoresDelCursor(dom.valoresDelCursor, estado);
   montarSelectorDeVista(dom.selectorDeVista, estado);
   const destruirReproductor = montarReproductor(dom.reproductor, estado, escena, carro);
   const destruirGraficos = montarPanelDeGraficos(dom.graficos, estado);

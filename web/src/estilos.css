@@ -239,19 +239,105 @@ html, body {
 .pestana.activa { background: var(--superficie-3); color: var(--texto-1); }
 
 .graficos-barra { display: flex; align-items: center; justify-content: space-between; gap: var(--esp-3); flex-wrap: wrap; margin-bottom: var(--esp-2); }
+.graficos-opciones { display: flex; align-items: center; gap: var(--esp-3); flex-wrap: wrap; }
 .graficos-eje { display: inline-flex; align-items: center; gap: var(--esp-2); font-size: var(--texto-sm); color: var(--texto-2); }
 .graficos-eje select { width: auto; }
 .graficos-ayuda { margin: 0 0 var(--esp-2); }
-.figura { margin-bottom: var(--esp-4); }
+.graficos-cuerpo { min-height: 0; }
+.figura { position: relative; }
+
+/* Cartel que cuenta como se navega; se muestra una sola vez (localStorage). */
+.graficos-ayuda-zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  margin: 0 0 var(--esp-3);
+  padding: var(--esp-2) var(--esp-3);
+  background: var(--acento-suave);
+  border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio);
+  font-size: var(--texto-sm);
+  color: var(--texto-2);
+}
+
+/* Una figura: acciones flotando arriba a la derecha, el uPlot y la estadistica del rango. */
+.figura-caja { position: relative; margin-bottom: var(--esp-4); }
+.figura-caja[hidden] { display: none; }
+.figura-acciones {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  gap: var(--esp-1);
+  opacity: 0;
+  transition: opacity var(--dur-rapida) var(--curva);
+}
+.figura-caja:hover .figura-acciones,
+.figura-acciones:focus-within { opacity: 1; }
+
+/* Expandida: ocupa todo el panel de graficos y las demas se esconden. */
+.graficos-cuerpo.expandido { display: flex; flex-direction: column; height: 100%; }
+.figura-caja.expandida { flex: 1; margin-bottom: 0; }
+.figura-caja.expandida .figura-acciones { opacity: 1; }
+
+/* Tooltip del cursor: los valores de todas las series en ese punto. */
+.figura-tooltip {
+  position: absolute;
+  z-index: 3;
+  width: var(--ancho-tooltip-figura);
+  padding: var(--esp-2);
+  background: var(--superficie-flotante);
+  border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra-flotante);
+  font-size: var(--texto-xs);
+  pointer-events: none;
+}
+.figura-tooltip[hidden] { display: none; }
+.figura-tooltip-x { margin-bottom: var(--esp-1); color: var(--texto-2); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.figura-tooltip-serie { display: grid; grid-template-columns: auto minmax(0, 1fr) var(--ancho-leyenda-valor); align-items: center; gap: var(--esp-1); }
+.figura-tooltip-muestra { width: var(--esp-2); height: var(--esp-2); border-radius: var(--radio-chico); }
+.figura-tooltip-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--texto-2); }
+.figura-tooltip-valor { text-align: right; color: var(--texto-1); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Estadistica del rango elegido, debajo de la figura. */
+.figura-rango { margin-top: var(--esp-1); }
+.figura-rango[hidden] { display: none; }
+.figura-rango .ayuda { margin: 0 0 var(--esp-1); }
+.figura-rango-tabla th[scope="row"] { font-weight: 400; }
+.figura-rango-tabla thead th { color: var(--texto-3); font-weight: 500; text-align: right; }
+.figura-rango-tabla thead th:first-child { text-align: left; }
+.figura-rango-tabla td { text-align: right; }
+.figura-rango-donde { color: var(--texto-2); }
 
 /* uPlot con el tema de la pagina */
-.uplot { font-family: var(--fuente); }
-.uplot .u-title { font-size: var(--texto-sm); font-weight: 600; color: var(--texto-1); text-align: left; padding-left: var(--esp-1); }
-.uplot .u-legend { font-size: var(--texto-xs); color: var(--texto-2); text-align: left; padding: var(--esp-1); }
-.uplot .u-legend .u-series > * { padding: var(--esp-1) var(--esp-2) var(--esp-1) 0; }
-.uplot .u-legend .u-marker { border-radius: var(--radio-chico); }
+.uplot { font-family: var(--fuente); display: flex; flex-direction: column; }
+.uplot .u-title { order: 0; font-size: var(--texto-sm); font-weight: 600; color: var(--texto-1); text-align: left; padding-left: var(--esp-1); }
+/* La leyenda va ARRIBA del grafico y en una sola linea: el valor vivo se lee
+   al lado del titulo y no al final de la figura. El <table> se aplana con flex. */
+.uplot .u-legend {
+  order: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--esp-3);
+  margin: 0;
+  font-size: var(--texto-xs);
+  color: var(--texto-2);
+  text-align: left;
+  padding: var(--esp-1);
+}
+.uplot .u-wrap { order: 2; }
+.uplot .u-legend .u-series { display: inline-flex; align-items: baseline; gap: var(--esp-1); }
+.uplot .u-legend .u-series > * { padding: 0; }
+.uplot .u-legend .u-marker { border-radius: var(--radio-chico); align-self: center; }
 .uplot .u-legend .u-value { display: inline-block; box-sizing: content-box; min-width: var(--ancho-leyenda-valor); text-align: right; color: var(--texto-1); font-family: var(--mono); }
 .u-select { background: var(--acento-suave); }
+.uplot .u-over { cursor: crosshair; }
+
+/* Bloque "valores en el cursor" del panel lateral. */
+.cursor-donde { margin: 0 0 var(--esp-2); }
 
 .panel {
   overflow-y: auto;

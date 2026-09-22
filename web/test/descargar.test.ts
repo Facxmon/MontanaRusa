@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { instanciasDesdeTipos, type EntradaDeDiseno } from '../src/nucleo/calcular';
-import { COLUMNAS_DEL_CSV, csvDeSeries, textoDeParametros, textoDelLayout, textoLeeme } from '../src/nucleo/descargar';
+import { COLUMNAS_DEL_CSV, csvDeFigura, csvDeSeries, textoDeParametros, textoDelLayout, textoLeeme } from '../src/nucleo/descargar';
+import { extraerColumnas, figurasDePestana } from '../src/graficos/series';
 import { ParametrosPorDefecto } from '../src/nucleo/parametros';
 import { deserializarDiseno } from '../src/nucleo/serializar';
 import { cargarGolden } from './arnes';
@@ -93,5 +94,33 @@ describe('textoDelLayout', () => {
     const texto = textoDelLayout(golden);
     expect(texto.trimEnd().split('\n')).toHaveLength(1);
     expect(JSON.parse(texto).meta.versionContrato).toBe(golden.meta.versionContrato);
+  });
+});
+
+describe('csvDeFigura', () => {
+  const columnas = extraerColumnas(golden, null);
+  const [figura] = figurasDePestana('cinematica', columnas, 'arco');
+  const csv = csvDeFigura(figura!);
+  const lineas = csv.trimEnd().split('\n');
+
+  it('la cabecera es el eje x mas las series visibles, entrecomilladas', () => {
+    const visibles = figura!.series.filter((s) => !s.ocultarEnLeyenda);
+    expect(lineas[0]).toBe([figura!.etiquetaX, ...visibles.map((s) => s.etiqueta)].map((t) => `"${t}"`).join(','));
+  });
+
+  it('una fila por punto de la figura', () => {
+    expect(lineas.length).toBe(figura!.x.length + 1);
+  });
+
+  it('la primera fila son los valores del primer punto', () => {
+    const celdas = lineas[1]!.split(',');
+    expect(Number(celdas[0])).toBeCloseTo(figura!.x[0] as number, 5);
+    expect(Number(celdas[1])).toBeCloseTo(figura!.series[0]!.valores[0] as number, 5);
+  });
+
+  it('las series ocultas (bordes de banda, referencias repetidas) no van', () => {
+    const [g] = figurasDePestana('g', columnas, 'arco');
+    const visibles = g!.series.filter((s) => !s.ocultarEnLeyenda).length;
+    expect(csvDeFigura(g!).split('\n')[0]!.split('","').length).toBe(visibles + 1);
   });
 });

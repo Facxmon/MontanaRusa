@@ -23,6 +23,7 @@ const inicial: DatosDeEstado = {
   ultimoCalculoMs: null,
   autoGenerar: false,
   panel: 'resultados',
+  nodo: null,
 };
 
 describe('crearEstado', () => {

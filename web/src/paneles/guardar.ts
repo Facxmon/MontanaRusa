@@ -22,6 +22,7 @@ import { extraerColumnas, figurasDePestana, PESTANAS } from '../graficos/series'
 import type { EntradaDeDiseno } from '../nucleo/calcular';
 import { csvDeSeries, textoDeParametros, textoDelLayout, textoLeeme } from '../nucleo/descargar';
 import { aTextoCompacto, serializarDiseno } from '../nucleo/serializar';
+import { descargarArchivo, slug } from './archivo';
 import type { Aviso } from './aviso';
 import { botonDeBarra, icono } from './barra';
 import { el } from './dom';
@@ -31,24 +32,9 @@ export interface DependenciasDeGuardar {
   aviso: Aviso;
 }
 
-/** Nombre apto para archivo: minusculas, sin acentos ni simbolos. */
-export function slug(texto: string): string {
-  return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'diseno';
-}
-
 function marcaDeTiempo(fecha: Date): string {
   const dos = (n: number) => String(n).padStart(2, '0');
   return `${fecha.getFullYear()}${dos(fecha.getMonth() + 1)}${dos(fecha.getDate())}-${dos(fecha.getHours())}${dos(fecha.getMinutes())}`;
-}
-
-export function descargarArchivo(nombre: string, contenido: Blob): void {
-  const url = URL.createObjectURL(contenido);
-  const enlace = el('a', { href: url, download: nombre });
-  document.body.append(enlace);
-  enlace.click();
-  enlace.remove();
-  // El navegador ya tomo el blob; se libera despues de que arranque la descarga.
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /** El diseno a guardar: el abierto, o el derivado del layout en pantalla. */
