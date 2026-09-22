@@ -165,6 +165,29 @@ html, body {
 }
 .aviso[hidden] { display: none; }
 
+/* Arrastrar y soltar un archivo sobre la ventana. */
+.velo-de-arrastre {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--acento-suave);
+  border: 2px dashed var(--acento);
+  color: var(--texto-1);
+  font-size: var(--texto-lg);
+  pointer-events: none;
+}
+.velo-de-arrastre[hidden] { display: none; }
+.velo-de-arrastre span {
+  padding: var(--esp-3) var(--esp-5);
+  background: var(--superficie-1);
+  border: 1px solid var(--acento);
+  border-radius: var(--radio-grande);
+  box-shadow: var(--sombra-flotante);
+}
+
 /* Mientras calcula, el layout anterior sigue visible, atenuado. */
 .principal.calculando .vista3d, .principal.calculando .graficos { opacity: 0.6; }
 .vista3d, .graficos { transition: opacity var(--dur-media) var(--curva); }

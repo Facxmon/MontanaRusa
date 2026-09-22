@@ -29,6 +29,7 @@ import { montarBarra } from './paneles/barra';
 import { montarErrores } from './paneles/errores';
 import { leerAutoGenerar, montarGenerar } from './paneles/generar';
 import { montarGuardar } from './paneles/guardar';
+import { montarImportar } from './paneles/importar';
 import { montarLeyenda } from './paneles/leyenda';
 import { montarReproductor } from './paneles/reproductor';
 import { montarParametros } from './paneles/parametros';
@@ -262,6 +263,10 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   }
 
   zonas.izquierda.append(el('span', { class: 'barra-separador', 'aria-hidden': 'true' }));
+  const destruirImportar = montarImportar(zonas.izquierda, dom.app, estado, (importado, nombre) => {
+    abrirDisenoExterno(importado.diseno, nombre);
+    aviso.mostrar(importado.formato === 'layout' ? `${nombre}: layout del contrato, se reconstruyó el diseño y se está calculando.` : `${nombre}: diseño importado, calculando.`);
+  });
   const destruirGuardar = montarGuardar(zonas.izquierda, estado, { escena, aviso });
   montarGenerar(zonas.derecha, estado, { generar, detener });
   const destruirAtajos = montarAtajos({ generar, detener, deshacer, rehacer });
@@ -370,6 +375,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
       if (temporizador) clearTimeout(temporizador);
       window.removeEventListener('hashchange', alCambiarElHash);
       destruirAtajos();
+      destruirImportar();
       destruirGuardar();
       cliente.terminar();
       destruirReproductor();
