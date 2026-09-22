@@ -125,7 +125,8 @@ export function montarGuardar(contenedor: HTMLElement, estado: Estado, { escena,
   // Menu con las tres salidas: un <details> que se cierra al elegir.
   const menu = el('details', { class: 'menu-barra' });
   const resumen = el('summary', { class: 'boton-barra', title: 'Guardar: paquete .zip, solo parámetros .json o copiar link', 'aria-label': 'Menú guardar' },
-    el('span', { class: 'boton-barra-texto' }, 'Guardar'), icono('menu'));
+    // Con la barra angosta el texto se esconde (fase 4.10) y queda el icono.
+    icono('paquete'), el('span', { class: 'boton-barra-texto' }, 'Guardar'), icono('menu'));
   const item = (nombre: 'paquete' | 'guardar' | 'link', texto: string, ayuda: string, alHacer: () => void) =>
     el('button', { type: 'button', class: 'menu-item', role: 'menuitem', onClick: () => { menu.open = false; alHacer(); } },
       icono(nombre), el('span', {}, el('span', { class: 'menu-item-texto' }, texto), el('span', { class: 'menu-item-ayuda' }, ayuda)));

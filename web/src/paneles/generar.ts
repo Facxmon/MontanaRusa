@@ -46,7 +46,7 @@ export function montarGenerar(contenedor: HTMLElement, estado: Estado, acciones:
     estado.set({ autoGenerar: casilla.checked });
     escribirAlmacen(CLAVE_AUTO_GENERAR, casilla.checked ? '1' : '0');
   });
-  const opcion = el('label', { class: 'barra-opcion', title: 'Recalcular solo con cada edición, como antes; apagado, se calcula con Generar' }, casilla, ' auto-generar');
+  const opcion = el('label', { class: 'barra-opcion', title: 'Recalcular solo con cada edición, como antes; apagado, se calcula con Generar' }, casilla, el('span', { class: 'barra-opcion-texto' }, 'auto-generar'));
 
   contenedor.append(opcion, boton);
   // La misma fraccion, en una linea fina a lo ancho de la barra: se ve desde

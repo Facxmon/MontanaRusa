@@ -530,11 +530,73 @@ html, body {
   font-size: var(--texto-sm);
 }
 
+/* ---------- responsive (fase 4.10) ----------
+   Cuatro escalones, del ancho al angosto:
+   > 1360 px   todo con texto.
+   <= 1360 px  la barra pasa a iconos (con aria-label y tooltip: nada se pierde).
+   <= 1180 px  paso intermedio: panel de 360 px, que con las fichas por
+               instancia de la fase 1 todavia entra, y el area principal gana.
+   <= 900 px   una columna: barra en dos filas (archivo y calculo arriba, la
+               vista abajo), la vista 3D en 60vh y el panel debajo, y la PAGINA
+               scrollea (antes el panel quedaba en 45vh con su propio scroll).
+   <= 560 px   telefono: la barra en tres filas (archivo, calculo, vista), sin
+               textos auxiliares, y el HUD del reproductor scrollea de costado. */
+@media (max-width: 1360px) {
+  .barra-zona .boton-barra:not(.boton-generar) .boton-barra-texto {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .barra-zona .boton-barra:not(.boton-generar):not(.solo-icono) { padding: 0 var(--esp-2); }
+}
+
+@media (max-width: 1180px) {
+  :root { --ancho-panel: 360px; }
+  .veredicto-cifras { gap: var(--esp-1); }
+  .veredicto-cifra-valor { font-size: var(--texto-base); }
+}
+
 @media (max-width: 900px) {
-  .visualizador { grid-template-columns: 1fr; grid-template-rows: var(--alto-barra) minmax(0, 1fr) 45vh; }
-  .barra { grid-template-columns: auto auto auto; gap: var(--esp-2); }
-  .panel { border-left: none; border-top: 1px solid var(--borde-sutil); }
-  .errores { right: var(--esp-3); }
+  .visualizador { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 60vh auto; height: auto; min-height: 100vh; }
+  .barra {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "izquierda derecha" "centro centro";
+    row-gap: 0;
+    padding-top: var(--esp-1);
+  }
+  .barra-zona.izquierda { grid-area: izquierda; }
+  .barra-zona.derecha { grid-area: derecha; }
+  .barra-zona.centro { grid-area: centro; justify-content: center; display: flex; }
+  .panel { border-left: none; border-top: 1px solid var(--borde-sutil); overflow: visible; }
+  .errores { top: var(--esp-3); right: var(--esp-3); }
+  :root[data-tema="claro"] .vista3d { margin: var(--esp-2) var(--esp-2) 0; }
+}
+
+@media (max-width: 560px) {
+  /* Tres filas: archivo, calculo (tema, atajos, generar) y la vista. */
+  .barra { grid-template-columns: minmax(0, 1fr); grid-template-areas: "izquierda" "derecha" "centro"; padding: var(--esp-1) var(--esp-2) 0; gap: var(--esp-1); }
+  .barra-zona.derecha { justify-content: space-between; }
+  .barra-zona { gap: 2px; }
+  .barra-separador, .barra-opcion-texto { display: none; }
+  .barra-zona .boton-barra.solo-icono, .barra-zona .boton-barra:not(.boton-generar) { width: var(--esp-6); padding: 0; justify-content: center; }
+  .boton-generar { padding: 0 var(--esp-3); }
+  .selector-de-tema .boton-tema { width: var(--esp-5); }
+  .reproductor-hud { max-width: 100%; overflow-x: auto; }
+  .panel-cabecera, .panel-cuerpo { padding-left: var(--esp-3); padding-right: var(--esp-3); }
+  .veredicto-cifras { grid-template-columns: 1fr; }
+  .graficos { padding: var(--esp-2); }
+  /* Formulario: los vectores y la caja van debajo de su etiqueta, y en la
+     ficha el "heredado / pisado" pasa a su propia linea. */
+  .campo:has(.campo-vector, .campo-caja) { grid-template-columns: minmax(0, 1fr); }
+  .ficha .campo { grid-template-columns: minmax(0, 1fr) auto; }
+  .ficha .campo-estado { grid-column: 1 / -1; justify-content: flex-end; min-width: 0; }
+  .secuencia-fila { gap: var(--esp-1); }
+  .secuencia-numero { width: auto; }
+  /* El menu Guardar se abre a lo ancho de la pantalla, debajo de la primera fila. */
+  .menu-lista { position: fixed; top: calc(var(--esp-6) + var(--esp-3)); left: var(--esp-2); right: var(--esp-2); min-width: 0; }
 }
 
 /* ---------- paneles ---------- */
