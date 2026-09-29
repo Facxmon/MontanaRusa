@@ -46,6 +46,7 @@ import {
   etiquetaDe,
   fueraDelRango,
   modosQueLoConsumen,
+  seMuestraConModos,
   textoConUnidad,
   textoDeEntrada,
   type Etiqueta,
@@ -491,8 +492,12 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
       if (!vigentes || nombre !== 'OnsetMaximoModelo') return null;
       return [...EscalasDeFroude({ ...vigentes, OnsetMaximoModelo: null }).OnsetMaximo];
     };
-    const aceptacion = declaraciones(ParametrosDeAceptacion());
-    const generales = declaraciones(ParametrosGenerales());
+    // Los que solo actuan en ciertos modos (FactorDeSeguridadNormativo) se
+    // muestran si algun elemento del diseno usa ese modo, propio o heredado.
+    const modosEnUso = [parametros.ModoCurvatura, ...diseno.secuencia.map((i) => modoEfectivo(parametros, i.ajustes))];
+    const visible = (d: DeclaracionDeParametro) => seMuestraConModos(pascal(d.clave), modosEnUso);
+    const aceptacion = declaraciones(ParametrosDeAceptacion()).filter(visible);
+    const generales = declaraciones(ParametrosGenerales()).filter(visible);
 
     contenedor.append(tarjeta(
       {

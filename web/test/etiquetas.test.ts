@@ -13,6 +13,7 @@ import {
   etiquetaDe,
   fueraDelRango,
   modosQueLoConsumen,
+  seMuestraConModos,
   textoConUnidad,
   textoDeEntrada,
 } from '../src/paneles/etiquetas';
@@ -153,6 +154,22 @@ describe('de que depende cada parametro', () => {
     expect(modosQueLoConsumen('FuerzaGObjetivo')).toEqual(['FuerzaGConstante']);
     expect(modosQueLoConsumen('RadioDeReferencia')).toEqual(['Clotoide']);
     expect(modosQueLoConsumen('RadioDeLaHelice')).toEqual([]);
+  });
+});
+
+describe('parametros condicionales al modo', () => {
+  it('el factor de seguridad normativo solo se muestra si algun elemento usa GNormativaMaxima', () => {
+    expect(seMuestraConModos('FactorDeSeguridadNormativo', ['Clotoide'])).toBe(false);
+    expect(seMuestraConModos('FactorDeSeguridadNormativo', ['Clotoide', 'FuerzaGConstante'])).toBe(false);
+    expect(seMuestraConModos('FactorDeSeguridadNormativo', ['GNormativaMaxima'])).toBe(true);
+    // Global en Clotoide pero una instancia con modo propio normativo: se muestra.
+    expect(seMuestraConModos('FactorDeSeguridadNormativo', ['Clotoide', 'GNormativaMaxima'])).toBe(true);
+  });
+
+  it('los demas parametros globales no dependen del modo', () => {
+    for (const n of nombres.filter((n) => n !== 'FactorDeSeguridadNormativo')) {
+      expect(seMuestraConModos(n, ['Clotoide'])).toBe(true);
+    }
   });
 });
 

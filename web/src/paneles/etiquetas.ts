@@ -33,7 +33,7 @@ import {
   ParametrosDelModo,
   ParametrosGenerales,
 } from '../nucleo/parametros';
-import type { NombreDeParametro } from '../nucleo/tipos';
+import type { ModoCurvatura, NombreDeParametro } from '../nucleo/tipos';
 
 /**
  * Unidad con la que se muestra y se edita un parametro.
@@ -186,6 +186,26 @@ export const ETIQUETAS: Record<NombreDeParametro, Etiqueta> = construir();
 /** La etiqueta de un parametro; si faltara (el test lo impide) cae al propio nombre. */
 export function etiquetaDe(nombre: NombreDeParametro): Etiqueta {
   return ETIQUETAS[nombre] ?? { nombre, ayuda: '' };
+}
+
+/**
+ * Parametros de los grupos globales que solo tienen efecto en algunos modos
+ * de curvatura aunque no los declare ParametrosDelModo (estan en otro bloque
+ * del contrato y ahi se quedan: esto es solo presentacion). El formulario
+ * los muestra si al menos una instancia del diseno usa uno de esos modos.
+ *
+ * FactorDeSeguridadNormativo esta en los criterios de aceptacion, pero solo
+ * lo lee el objetivo de GNormativaMaxima (CurvaturaDelModo y el criterio que
+ * lo reconstruye); la verificacion es siempre contra la norma literal.
+ */
+const SOLO_EN_MODOS: Partial<Record<NombreDeParametro, readonly ModoCurvatura[]>> = {
+  FactorDeSeguridadNormativo: ['GNormativaMaxima'],
+};
+
+/** true si el parametro se muestra con estos modos en uso (el global y los propios de cada instancia). */
+export function seMuestraConModos(nombre: NombreDeParametro, modosEnUso: readonly ModoCurvatura[]): boolean {
+  const modos = SOLO_EN_MODOS[nombre];
+  return !modos || modosEnUso.some((m) => modos.includes(m));
 }
 
 /** En que modos de curvatura se consume este parametro (vacio si no es del modo). */

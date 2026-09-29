@@ -591,3 +591,51 @@ elemento se construye con sus propios `Parametros`. Lo que faltaba era la interf
 - La animación de los acordeones depende de `interpolate-size`, que hoy es solo de Chromium; en Firefox y
   Safari abren sin animar.
 - Contenido de la portada (textos, video, contacto): lo escribe el autor.
+
+---
+
+# Correcciones (2026-09-29): toggles de límites, comparación A/B y parámetros condicionales
+
+Arreglos de interfaz, sin cambios de física ni de contrato. Los diagnósticos que se hicieron en la misma
+tanda (bounding box, radio de referencia, auditoría de categorías, clotoides, peralte del over-banked turn
+y línea de base de los límites normativos) están en
+[`Diagnostico/DiagnosticosDeVerificacion.md`](../Diagnostico/DiagnosticosDeVerificacion.md).
+
+## Cada toggle de límite controla solo sus líneas
+
+Las tres referencias de los gráficos de G (admisible dure lo que dure, límite a 200 ms y límite aplicable)
+son simétricas: una serie arriba y otra abajo, y la de abajo no va en la leyenda para no duplicarla. Al
+apagar una desde la leyenda de uPlot se apagaba **solo la de arriba**: la de abajo quedaba dibujada, con el
+mismo color que las otras dos, y no se sabía cuál era cuál (típicamente, el −2 G punteado de 200 ms parecía
+el límite aplicable).
+
+- `SerieDeFigura.acompanaA` (figura.ts): índice de la serie de la leyenda a la que acompaña.
+- `acompanantesDe` (series.ts, puro) y el hook `setSeries` de `Figura`: prender o apagar una serie de la
+  leyenda hace lo mismo con sus acompañantes y con nada más. La banda admisible se apaga con sus dos bordes.
+- Se aplica también al presupuesto de onset de los gráficos de jerk.
+- Test: `series.test.ts`, "toggles de las líneas de límite": toda serie oculta en la leyenda tiene un líder
+  visible y el de 200 ms no arrastra al aplicable (ni al revés).
+
+## Comparación A/B: los dos valores en la misma abscisa
+
+El eje x de una figura comparada es la unión de los de A y B, y cada serie tiene `null` en los puntos del
+otro diseño (fase 4.8). El tooltip y la leyenda leían el valor crudo del punto, así que al mover el cursor
+alternaban entre A y B. Ahora `valorEnElCursor` (series.ts, puro) interpola linealmente en x entre los
+puntos vecinos de la misma serie cuando la figura une huecos: es lo que la línea dibujada muestra en esa
+abscisa. Fuera del rango de una serie no se inventa valor. Los datos de la figura (CSV, estadística del
+rango) no cambian. Test en `comparacion.test.ts`.
+
+## Parámetros condicionales al modo
+
+`FactorDeSeguridadNormativo` está en los criterios de aceptación (así lo declara MATLAB y así viaja en el
+contrato), pero solo lo lee el objetivo de `GNormativaMaxima`. El formulario global lo muestra solo si
+**algún elemento** usa ese modo, heredado del global o propio de la instancia (`seMuestraConModos` en
+`etiquetas.ts`). El valor no se toca al ocultarlo. El resto de la auditoría de categorías quedó como
+propuesta, sin aplicar (ver el diagnóstico, A6).
+
+## Lo que no se cambió
+
+- **Radio de referencia**: no se movió a Parámetros generales porque en el modelo es por elemento (cada
+  `ElementoXxx` lo pisa con su radio: A5 del diagnóstico).
+- **Bounding box**: el límite 0 del criterio es de MATLAB (el valor es el desborde); no se tocó ni el
+  criterio ni el tamaño de la caja (A3).

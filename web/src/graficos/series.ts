@@ -275,14 +275,18 @@ function figuraDeG(
   const aplicableSup = porTramo(columnas, (t) => limiteAplicable(t, clave, curvaPositiva(t), 1));
   const aplicableInf = porTramo(columnas, (t) => limiteAplicable(t, clave, curvaNegativa, -1));
 
+  // Cada referencia es simetrica: la mitad inferior no va en la leyenda y
+  // acompana a la superior (acompanaA), asi el toggle de la leyenda apaga
+  // las dos y ninguna otra. Antes la inferior quedaba dibujada y se confundia
+  // el limite de 200 ms con el aplicable.
   const inicio = series.length;
   series.push(
     { etiqueta: 'Admisible dure lo que dure (evento largo)', valores: largoSup, color: ADMISIBLE_TRAZO, ancho: 1 },
-    { etiqueta: 'evento largo, inferior', valores: largoInf, color: ADMISIBLE_TRAZO, ancho: 1, ocultarEnLeyenda: true },
+    { etiqueta: 'evento largo, inferior', valores: largoInf, color: ADMISIBLE_TRAZO, ancho: 1, ocultarEnLeyenda: true, acompanaA: inicio },
     { etiqueta: 'Límite a 200 ms', valores: cortoSup, color: LIMITE, ancho: 1.2, trazos: [6, 4] },
-    { etiqueta: '200 ms, inferior', valores: cortoInf, color: LIMITE, ancho: 1.2, trazos: [6, 4], ocultarEnLeyenda: true },
+    { etiqueta: '200 ms, inferior', valores: cortoInf, color: LIMITE, ancho: 1.2, trazos: [6, 4], ocultarEnLeyenda: true, acompanaA: inicio + 2 },
     { etiqueta: 'Límite aplicable (duración del evento sostenido)', valores: aplicableSup, color: LIMITE, ancho: 1.6 },
-    { etiqueta: 'aplicable, inferior', valores: aplicableInf, color: LIMITE, ancho: 1.6, ocultarEnLeyenda: true },
+    { etiqueta: 'aplicable, inferior', valores: aplicableInf, color: LIMITE, ancho: 1.6, ocultarEnLeyenda: true, acompanaA: inicio + 4 },
   );
   const bandas: BandaEntreSeries[] = [{ superior: inicio, inferior: inicio + 1, color: ADMISIBLE_RELLENO }];
   return {
@@ -335,7 +339,7 @@ export function figurasDeJerk(columnas: Columnas, ejeX: EjeX): DatosDeFigura[] {
       series: [
         { etiqueta: `Jerk de ${nombre}`, valores, color: SERIE[0], ancho: 1.6 },
         { etiqueta: 'Presupuesto de onset', valores: presupuesto, color: LIMITE, ancho: 1.2, trazos: [6, 4] },
-        { etiqueta: 'presupuesto, inferior', valores: presupuesto.map((v) => (v === null ? null : -v)), color: LIMITE, ancho: 1.2, trazos: [6, 4], ocultarEnLeyenda: true },
+        { etiqueta: 'presupuesto, inferior', valores: presupuesto.map((v) => (v === null ? null : -v)), color: LIMITE, ancho: 1.2, trazos: [6, 4], ocultarEnLeyenda: true, acompanaA: 1 },
       ],
       franjas: columnas.franjas[ejeX],
     };
@@ -470,6 +474,42 @@ export function figurasDePestana(pestana: Pestana, columnas: Columnas, ejeX: Eje
   // cursor del grafico, el marcador del 3D y el reproductor hablen de lo mismo.
   const nodos = Array.from(columnas.nodos);
   return figuras.map((figura) => sinHuecosEnX({ ...figura, nodos }));
+}
+
+/** Series que acompanan a la de indice `lider` (base 0 en `series`): se prenden y apagan con ella. */
+export function acompanantesDe(series: readonly SerieDeFigura[], lider: number): number[] {
+  const indices: number[] = [];
+  series.forEach((s, j) => {
+    if (s.acompanaA === lider && j !== lider) indices.push(j);
+  });
+  return indices;
+}
+
+/**
+ * Valor de una serie en el punto `indice` del cursor, para el tooltip y la
+ * leyenda. Con la comparacion A/B el eje x es la union de los dos y cada
+ * serie tiene null en los puntos del otro diseno: sin esto, el cursor
+ * mostraba A o B segun a cual perteneciera el punto, nunca los dos. Si la
+ * figura une huecos (unirHuecos), el valor que falta se interpola
+ * linealmente en x entre los puntos vecinos de la MISMA serie, que es lo que
+ * la linea dibujada muestra en esa abscisa. Fuera del rango de la serie
+ * (antes de su primer punto o despues del ultimo) no hay valor.
+ */
+export function valorEnElCursor(figura: Pick<DatosDeFigura, 'x' | 'unirHuecos'>, valores: readonly (number | null)[], indice: number): number | null {
+  const propio = valores[indice];
+  if (propio !== null && propio !== undefined) return propio;
+  if (!figura.unirHuecos) return null;
+  let antes = indice - 1;
+  while (antes >= 0 && (valores[antes] === null || valores[antes] === undefined)) antes--;
+  let despues = indice + 1;
+  while (despues < valores.length && (valores[despues] === null || valores[despues] === undefined)) despues++;
+  if (antes < 0 || despues >= valores.length) return null;
+  const x = figura.x[indice]!;
+  const x0 = figura.x[antes]!;
+  const x1 = figura.x[despues]!;
+  const y0 = valores[antes]!;
+  const y1 = valores[despues]!;
+  return x1 === x0 ? y0 : y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
 }
 
 /** Lo que se muestra de una serie cuando se mira un rango del grafico. */

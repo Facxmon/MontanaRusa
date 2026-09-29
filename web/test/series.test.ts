@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { analizarLayout } from '../src/contrato/cargar';
 import {
+  acompanantesDe,
   columna,
   estadisticaDeRango,
   extraerColumnas,
@@ -185,5 +186,30 @@ describe('estadisticaDeRango', () => {
     const [g] = figurasDePestana('g', c, 'arco');
     const visibles = g!.series.filter((s) => !s.ocultarEnLeyenda).length;
     expect(estadisticaDeRango(g!, 0, 1).length).toBe(visibles);
+  });
+});
+
+describe('toggles de las lineas de limite (cada uno controla solo sus lineas)', () => {
+  it('la mitad inferior de cada referencia acompana a su superior y a ninguna otra', () => {
+    const c = extraerColumnas(circuito, null);
+    for (const pestana of ['g', 'jerk'] as const) {
+      for (const f of figurasDePestana(pestana, c, 'tiempo')) {
+        f.series.forEach((s, i) => {
+          if (!s.ocultarEnLeyenda) return;
+          // Toda serie oculta en la leyenda tiene un lider visible, y es una sola.
+          expect(s.acompanaA, `${f.titulo}: ${s.etiqueta}`).toBeDefined();
+          const lider = f.series[s.acompanaA!]!;
+          expect(lider.ocultarEnLeyenda).toBeFalsy();
+          expect(acompanantesDe(f.series, s.acompanaA!)).toContain(i);
+        });
+      }
+    }
+    const [, , gz] = figurasDePestana('g', c, 'tiempo');
+    const indice = (etiqueta: string) => gz!.series.findIndex((s) => s.etiqueta === etiqueta);
+    // El limite de 200 ms y el aplicable no se mezclan.
+    expect(acompanantesDe(gz!.series, indice('Límite a 200 ms')).map((j) => gz!.series[j]!.etiqueta)).toEqual(['200 ms, inferior']);
+    expect(acompanantesDe(gz!.series, indice('Límite aplicable (duración del evento sostenido)')).map((j) => gz!.series[j]!.etiqueta)).toEqual(['aplicable, inferior']);
+    expect(acompanantesDe(gz!.series, indice('Admisible dure lo que dure (evento largo)')).map((j) => gz!.series[j]!.etiqueta)).toEqual(['evento largo, inferior']);
+    expect(acompanantesDe(gz!.series, 0)).toEqual([]);
   });
 });
