@@ -63,7 +63,7 @@ A6 (fila de `BoundingBoxDisponible`), sin aplicar.
   (prototipo)", 8 m), y ya está en Parámetros generales. Si el pedido se refería a ese, no hay nada
   que mover.
 
-## A6. Auditoría de categorías del panel (propuestas, **no aplicadas**)
+## A6. Auditoría de categorías del panel (propuestas; **aplicadas** en la segunda tanda, ver Seguimiento)
 
 Estado actual del panel: ficha de la instancia (modo de curvatura + parámetros del modo + geometría
 del elemento) y parámetros globales en cuatro grupos: *Modo de curvatura*, *Criterios de aceptación*,
@@ -335,3 +335,38 @@ del acondicionamiento (0,95 s). La implementación toma el pico del evento, que 
 todo el evento continuo, y ese evento sigue por el arco del OBT y la Hélice: su pico es −1,527 G a 1,073 s,
 a 0,959 s. Además, con el umbral de 0,01 G, el −0,035 G del final del loop es un evento sostenido y forma
 con el +0,33 G la reversión más rápida (0,381 s).
+
+---
+
+## Seguimiento (segunda tanda, 2026-09-29): qué se hizo con A6, B1, B2 y 7.1.7.1
+
+Donde arriba dice "modo `Clotoide`" se refiere al modo que **hoy se llama `ArcoCircular`**: las tablas
+de B1 y B2 son la foto de antes del cambio y no se reescribieron.
+
+- **A6, aplicado entero.** Secciones, condiciones de visibilidad y lugar de cada parámetro según la tabla
+  de A6 (`web/DISENO.md`, "Panel por secciones, modos de curvatura y peralte al CIR"). El radio de
+  referencia se muestra de solo lectura como "= radio del elemento"; `VersoresEnGrafico3D` se oculta en
+  la web; `InclinacionHelicoidalImpuesta` pasa a la ficha.
+- **`DiametroRueda`.** Sigue sin entrar en ningún cálculo, y ahora la ayuda lo dice. Físicamente el
+  diámetro influye en dos cosas que el modelo no desagrega: la resistencia a la rodadura (se modela como
+  `Crr·N` con `Crr` calibrado; en la realidad `Crr ≈ δ/r` y el torque de fricción de rodamientos pesa
+  como `1/r`, así que el diámetro está implícito en `Crr`) y la inercia de rotación de las ruedas (no
+  modelada: con `I = k·m_w·r²` la energía de rotación es `½·k·m_w·v²`, que **no depende del diámetro**
+  sino de la masa de las ruedas: suma `k·Σm_w` a la masa efectiva). Además cuenta para el
+  dimensionamiento (memoria §9.2).
+- **B1, resuelto con un renombre y un modo nuevo.** El arco de radio constante se llama `ArcoCircular`
+  y `Clotoide` es una clotoide simétrica de verdad: κ lineal en el arco hasta `1/(R + d·cosψ)` en la
+  mitad del giro y de vuelta a cero, sin arco constante (`documentacion_generador_elementos.md` §5.2).
+  Los diseños guardados (v1) y los layouts de contrato < 1.2.0 se migran a `ArcoCircular`. Las rampas
+  `ClotoideEntrada`/`ClotoideSalida` de los otros modos siguen siendo smoothstep/Hermite.
+- **B2, opciones agregadas.** El over-banked turn conserva el peralte constante y suma
+  `ModoDePeralteDelGiro` relativo al CIR con un desvío constante. Todos los elementos tienen dos ticks
+  excluyentes para el peralte siempre alineado al CIR, con cualquiera de sus dos definiciones: **U hacia
+  el centro de curvatura** (ψ = 0) o **eje del carro sobre la fuerza específica del riel** (Gy de
+  balance nula) (§5.3 de la misma documentación). Con el segundo, la Gy que queda en el pasajero es la
+  de la dinámica del roll (en el OBT de 240° a 5 m/s, entre −0,23 y +0,33 G, contra −1,9 G con 110°
+  constantes).
+- **7.1.7.1, sin reset.** Un evento de +Gz que empieza dentro de la ventana reducida y termina afuera se
+  compara con la curva reducida dentro de la ventana y con la normal después, **siempre con la duración
+  acumulada desde el inicio del evento** (`LimitesDelEvento.m`; memoria §5.7). Queda resuelto el TODO de
+  `VentanasMasGzReducido`.

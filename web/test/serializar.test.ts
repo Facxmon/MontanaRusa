@@ -94,7 +94,7 @@ describe('deserializarDiseno rechaza con un mensaje que dice que campo y que se 
   const ei = { pos: [0, 0, 1], tan: [1, 0, 0], arr: [0, 0, 1], vel: 5 };
 
   it('version desconocida', () => {
-    expect(() => deserializarDiseno({ v: 2, p: {}, ei, s: [] })).toThrowError(/v = 2 .* v = 1/);
+    expect(() => deserializarDiseno({ v: 3, p: {}, ei, s: [] })).toThrowError(/v = 3 .* v = 2/);
     expect(() => deserializarDiseno({ p: {}, ei, s: [] })).toThrowError(/v = nada/);
   });
 
@@ -127,6 +127,6 @@ describe('deserializarDiseno rechaza con un mensaje que dice que campo y que se 
     expect(() => desdeTextoCompacto('abc$')).toThrowError(/base64url/);
     expect(() => desdeTextoCompacto('')).toThrowError(/vacio/);
     expect(() => desdeTextoCompacto('AAAA')).toThrowError(/descomprimir/);
-    expect(() => desdeTextoCompacto(aTextoCompacto({ v: 2, p: {}, ei, s: [] } as never))).toThrowError(/v = 2/);
+    expect(() => desdeTextoCompacto(aTextoCompacto({ v: 3, p: {}, ei, s: [] } as never))).toThrowError(/v = 3/);
   });
 });

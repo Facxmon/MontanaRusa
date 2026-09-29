@@ -5,9 +5,9 @@ import { listarCasos, textoDelIndice } from '../plugins/golden';
 const CARPETA_GOLDEN = fileURLToPath(new URL('../../golden', import.meta.url));
 
 describe('listarCasos', () => {
-  it('lista los once casos del contrato, sin extension, con el circuito primero', () => {
+  it('lista los diecisiete casos del contrato, sin extension, con el circuito primero', () => {
     const casos = listarCasos(CARPETA_GOLDEN);
-    expect(casos).toHaveLength(11);
+    expect(casos).toHaveLength(17);
     expect(casos[0]).toBe('circuito-demolayout');
     expect(casos.every((caso) => !caso.endsWith('.json'))).toBe(true);
     expect(casos.slice(1)).toEqual([...casos.slice(1)].sort((a, b) => a.localeCompare(b)));

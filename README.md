@@ -21,7 +21,7 @@ que las dos piezas de código tienen que respetar.
 | Cómo se dimensiona la longitud de una clotoide | [`memoria_de_calculo.md`](memoria_de_calculo.md) | [§7](memoria_de_calculo.md#7-longitudes-de-transición-derivación-y-escalado) |
 | Dimensionamiento del carro, modelo distorsionado vs. semejante | [`memoria_de_calculo.md`](memoria_de_calculo.md) | [§9](memoria_de_calculo.md#9-dimensionamiento-del-carro) |
 | Cómo el generador construye la geometría paso a paso (las tres capas) | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§4.1](documentacion_generador_elementos.md#41-cómo-se-construye-la-geometría-paso-a-paso) |
-| Los cuatro modos de curvatura (Clotoide, FuerzaGConstante, etc.) | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§5](documentacion_generador_elementos.md#5-los-cuatro-modos-de-curvatura) |
+| Los modos de curvatura (ArcoCircular, Clotoide, FuerzaGConstante, etc.) y el peralte referido al CIR | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§5](documentacion_generador_elementos.md#5-los-modos-de-curvatura) |
 | Método A vs. Método B de acoplamiento geometría-dinámica | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§6](documentacion_generador_elementos.md#6-los-dos-métodos-de-acoplamiento) |
 | Chequeos de factibilidad e interferencia | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§8](documentacion_generador_elementos.md#8-chequeos-de-factibilidad) |
 | Qué tests corren y qué verifican | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§11](documentacion_generador_elementos.md#11-tests-de-validación) |
@@ -54,7 +54,7 @@ Detalle completo en [`documentacion_generador_elementos.md` §2](documentacion_g
 run('analisis_energia.m')     % modelo preliminar sobre una trayectoria de prueba (no es geometría de diseño)
 run('DemoElemento.m')         % un elemento del generador en detalle: reporte y gráficos
 run('DemoLayout.m')           % los cuatro elementos encadenados en un circuito
-run('TestsValidacion.m')      % dieciseis tests del generador, termina con error si alguno falla
+run('TestsValidacion.m')      % diecinueve tests del generador, termina con error si alguno falla
 run('GenerarGoldenFiles.m')   % regenera golden/*.json y los valida contra el esquema (necesita node)
 ```
 

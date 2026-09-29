@@ -50,7 +50,7 @@ describe('guardar y restaurar', () => {
     const texto = almacen.getItem('montanarusa.diseno')!;
     expect(texto.length).toBeLessThan(2000);
     expect(texto).not.toContain('nodos');
-    expect(JSON.parse(texto).d.v).toBe(1);
+    expect(JSON.parse(texto).d.v).toBe(2);
   });
 
   it('sin nada guardado devuelve null, y descartar lo borra', () => {

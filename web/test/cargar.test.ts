@@ -16,7 +16,7 @@ describe('analizarLayout', () => {
   });
 
   it('rechaza un MAJOR distinto con un mensaje que lo nombra', () => {
-    const texto = golden('loop-arcocircular').replace('"versionContrato":"1.0.0"', '"versionContrato":"2.0.0"');
+    const texto = golden('loop-arcocircular').replace('"versionContrato":"1.2.0"', '"versionContrato":"2.0.0"');
     expect(() => analizarLayout(texto)).toThrowError(/2\.0\.0/);
   });
 

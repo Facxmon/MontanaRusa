@@ -131,7 +131,7 @@ Qué consume cada modo lo declara `ParametrosDelModo`; qué consume cada element
 | — | `Parametros.ModoDePeralteDelGiro` | peralte del over-banked turn: `'Constante'` (usa `PeralteDelGiro`) \| `'RelativoAlCentroDeCurvatura'` \| `'RelativoALaFuerza'` | — (enum) | generador §5.3 | `'Constante'` |
 | — | `Parametros.DesvioDePeralteDelGiro` | desvío constante del peralte respecto del CIR en los modos relativos; positivo = más volcado hacia adentro | rad | generador §5.3 | 0 |
 | — | `Parametros.PeralteAlineadoAlCentroDeCurvatura` | lógico, todos los elementos: $\mathbf U$ apunta siempre al centro de curvatura del riel ($\psi = 0$); excluyente con el siguiente | — | generador §5.3 | `false` |
-| — | `Parametros.PeralteAlineadoALaFuerza` | lógico, todos los elementos: el eje del carro sigue siempre a la fuerza específica $v^2oldsymbol\kappa + g\hat z$ ($G_y$ de balance nula) | — | generador §5.3 | `false` |
+| — | `Parametros.PeralteAlineadoALaFuerza` | lógico, todos los elementos: el eje del carro sigue siempre a la fuerza específica $v^2\boldsymbol\kappa + g\hat z$ ($G_y$ de balance nula) | — | generador §5.3 | `false` |
 | — | `Receta.AlineacionDelPeralte`, `Receta.DesvioDelPeralte` | cómo se para el carro respecto del CIR (`'Constante'` \| `'CentroDeCurvatura'` \| `'Fuerza'`) y con qué desvío; los arma `PeralteDelElemento.m` | — (enum), rad | generador §5.3 | `'Constante'`, 0 |
 | — | `Parametros.MetodoDeAcoplamiento` | método de acoplamiento geometría-dinámica, `'A'`\|`'B'`\|`'Ambos'` | — (enum) | generador §6 | `'A'` |
 | — | `Parametros.CalcularVelocidadMinima` | booleano: si se corre la búsqueda de velocidad inicial mínima | — (lógico) | generador §8 | `true` |

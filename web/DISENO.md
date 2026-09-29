@@ -680,3 +680,60 @@ hay ventanas de 7.1.7.1 se agrega la curva reducida.
 - Mismo sistema de figuras (tema, zoom, PNG, CSV, comparación A/B). No se liga al cursor del 3D: sus
   puntos no son nodos. El selector de eje horizontal se oculta en esta pestaña.
 - `curvaDelRecorrido` y `figurasDeDuracion` son puras (`series.ts`) y tienen tests.
+- Con ventanas de 7.1.7.1, la curva del recorrido usa `limitesDelEvento` (norma.ts): un evento que empieza
+  dentro de la ventana y termina afuera se compara con la curva reducida y después con la normal, siempre
+  con la duración acumulada desde el inicio del evento (el límite no se resetea al salir de la ventana).
+
+---
+
+# Panel por secciones, modos de curvatura y peralte al CIR (2026-09-29)
+
+Los cambios de física están en MATLAB y en el port (`documentacion_generador_elementos.md` §5.2 y §5.3,
+memoria de cálculo §5.7 y §7.9). Acá, lo que cambia en la interfaz.
+
+## Secciones del formulario global (A6 aplicado)
+
+`Etiqueta.seccion` reemplaza a `grupo`. `GRUPOS_GLOBALES` (etiquetas.ts) fija el orden:
+
+| Grupo plegable | Secciones |
+|---|---|
+| Criterios de aceptación | Norma · Fabricación y espacio |
+| Generales | Tren y carro · Resistencia al avance · Escala (prototipo) |
+| Avanzado | Resolución · Numérico |
+
+- `'ficha'`: un global que se edita en la ficha de la instancia, en la sección nueva "Geometría avanzada"
+  (`InclinacionHelicoidalImpuesta`, los dos ticks de peralte al CIR).
+- `'oculto'`: no se muestra en la web (`VersoresEnGrafico3D`, que solo leen los gráficos de MATLAB).
+- `DiametroRueda` sigue visible en "Tren y carro"; su ayuda aclara que no entra en ningún cálculo.
+
+## Qué se muestra: `seMuestra(nombre, modosEnUso, parametros)`
+
+Reemplaza a `seMuestraConModos`. Dos tablas declarativas; un parámetro oculto conserva su valor.
+
+- `SOLO_EN_MODOS`: `FactorDeSeguridadNormativo` con `GNormativaMaxima` en uso; `TolObjetivoDeG` con
+  `FuerzaGConstante` o `GNormativaMaxima`.
+- `SOLO_SI`: arrastre (`RhoAire`, `CoefArrastre`, `AreaFrontal`) con `ModelarArrastre`; `FactorTren` además
+  con más de un carro; `PasoBusquedaVelocidad` con `CalcularVelocidadMinima`. El peralte propio del
+  elemento se oculta con el peralte alineado al CIR, y en el over-banked turn `PeralteDelGiro` solo en modo
+  `'Constante'` y `DesvioDePeralteDelGiro` solo en los relativos.
+- En el formulario global las condiciones se evalúan con los globales; en la ficha, con globales más
+  ajustes de la instancia. El formulario se redibuja solo al editar un parámetro de `CAMBIAN_LA_VISTA`.
+- El radio de referencia del modo (`ArcoCircular`, `Clotoide`) se muestra de solo lectura como "= radio
+  del elemento" (`RADIO_DEL_ELEMENTO`): lo pisa cada elemento (A5).
+
+## Ticks de peralte excluyentes
+
+`PeralteAlineadoAlCentroDeCurvatura` y `PeralteAlineadoALaFuerza` son dos casillas en la ficha de cada
+instancia. `conExclusionDePeralte` convierte "prendí una" en "prendí una y apagué la otra" en el mismo
+ajuste, así que el núcleo nunca recibe las dos (si las recibiera, `PeralteDelElemento` lanza un error).
+
+## Modos: `Clotoide` pasa a llamarse `ArcoCircular`
+
+El selector de modo lista `ArcoCircular` (el arco de radio constante de siempre) y `Clotoide` (la clotoide
+simétrica nueva). Los diseños viejos se migran al leerlos, así que nada guardado cambia de geometría:
+
+- Serialización v2 (`serializar.ts`): un diseño v1 con `Clotoide`, global o por instancia, se lee como
+  `ArcoCircular`.
+- Contrato 1.2.0 (`cargar.ts`): lo mismo para layouts de contrato anterior a 1.2.0 (valores, defaults,
+  esquema y ajustes de cada elemento).
+- Las tarjetas de bienvenida usan el golden `loop-arcocircular`.

@@ -38,8 +38,8 @@ describe('dos helices distintas en la misma secuencia', () => {
     expect(a!.nodos.numeroDeNodos).not.toBe(b!.nodos.numeroDeNodos);
   });
 
-  it('el contrato lleva ajustes solo en la instancia que piso algo, y version 1.1.0', () => {
-    expect(layout.meta.versionContrato).toBe('1.1.0');
+  it('el contrato lleva ajustes solo en la instancia que piso algo, y version 1.2.0', () => {
+    expect(layout.meta.versionContrato).toBe('1.2.0');
     expect(layout.elementos[0]!.ajustes).toEqual({ radioDeLaHelice: 0.5 });
     expect(layout.elementos[0]!.inertes).toBeUndefined();
     expect(layout.elementos[1]!.ajustes).toBeUndefined();
@@ -64,7 +64,7 @@ describe('inertes', () => {
     const { Inertes } = AjustarParametros(d.parametros, d.secuencia[0]!.ajustes, 'LoopVertical');
     expect(Inertes.map((n) => textoDeInerte(n, d.parametros.ModoCurvatura, 'LoopVertical'))).toEqual([
       'ajustaste RadioDeLaHelice pero el elemento LoopVertical no lo consume',
-      'ajustaste FuerzaGObjetivo pero el modo Clotoide no lo consume',
+      'ajustaste FuerzaGObjetivo pero el modo ArcoCircular no lo consume',
     ]);
   });
 
