@@ -12,7 +12,7 @@ import { SimularSobreTrack } from './simular';
 import type {
   BusquedaVelocidad, Criterio, Diagnostico, Elemento, Estado, Layout, NombreDeElemento, Parametros, Receta, RegistroDeLayout, Reporte, Resumen, Sim, Track,
 } from './tipos';
-import { AgregarCriterio, ChequeosPosteriores, ChequeosPrevios } from './verificacion';
+import { AgregarCriterio, ChequeosPosteriores, ChequeosPrevios, VerificarLayoutNormativo } from './verificacion';
 
 export type Constructor = (EstadoEntrada: Estado, Parametros: Parametros, Layout?: Layout | null) => [Estado, Elemento, Reporte];
 
@@ -354,12 +354,15 @@ export function LayoutNuevo(EstadoInicialDelLayout: Estado, Parametros: Parametr
 export function LayoutAgregarElemento(Layout: Layout, Elemento: Elemento, EstadoSalida: Estado, Reporte: Reporte): Layout {
   const Registro: RegistroDeLayout = { Elemento, EstadoEntrada: Elemento.EstadoEntrada, EstadoSalida, Reporte };
   const desde = Layout.PuntosRiel.length === 0 ? 0 : 1;
-  return {
+  // Los eventos sostenidos de la norma se miden de corrido en todo el
+  // circuito: el elemento nuevo puede alargar un evento del anterior, asi que
+  // se vuelve a verificar el layout entero (VerificarLayoutNormativo.m).
+  return VerificarLayoutNormativo({
     ...Layout,
     Elementos: [...Layout.Elementos, Registro],
     EstadoActual: EstadoSalida,
     PuntosRiel: [...Layout.PuntosRiel, ...Elemento.Track.PuntosRiel.slice(desde)],
     LongitudArcoRiel: [...Layout.LongitudArcoRiel, ...Array.from(Elemento.Track.LongitudArco.subarray(desde))],
-  };
+  });
 }
 

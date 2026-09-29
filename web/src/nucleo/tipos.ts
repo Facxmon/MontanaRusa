@@ -350,6 +350,39 @@ export interface EventoSostenido {
   PicoG: number;
 }
 
+/** 7.1.6: reversiones entre eventos sostenidos de signo opuesto en X o Y (ReversionesSostenidas). */
+export interface Reversion {
+  /** Tiempo de prototipo entre picos del par mas rapido que toca el elemento; Infinity si no hay pares. */
+  TiempoPicoAPicoMinimo: number;
+  /** true si algun par que toca el elemento tiene menos de 0.2 s entre picos: el limite cae al 50 %. */
+  Reducida: boolean;
+  /** Del evento critico (el de mayor exceso entre los reducidos que tocan el elemento); NaN si no hay. */
+  TiempoPicoAPico: number;
+  PicoG: number;
+  DuracionReal: number;
+  LimiteReducido: number;
+  Exceso: number;
+}
+
+/**
+ * Linea de tiempo continua del layout para la norma (SerieNormativaDelLayout.m):
+ * G de todos los elementos concatenadas sin repetir los nodos de los empalmes,
+ * con el tiempo en PROTOTIPO. `Elemento` (base 0) dice cual se esta verificando.
+ */
+export interface ContextoNormativo {
+  TiempoPrototipo: Float64Array;
+  Gx: Float64Array;
+  Gy: Float64Array;
+  Gz: Float64Array;
+  /** [primero, ultimo] (base 0, inclusivos) de cada elemento, con el nodo del empalme de entrada. */
+  Rango: Array<[number, number]>;
+  /** Nodos dentro de una ventana de 7.1.7.1 (rige MasGzReducido). */
+  Reducida: boolean[];
+  /** Nodos de un evento -Gz de mas de 3 s de prototipo. */
+  EnAirtimeLargo: boolean[];
+  Elemento: number;
+}
+
 export interface Normativo {
   FactorTiempo: number;
   DuracionModelo: number;
@@ -361,6 +394,8 @@ export interface Normativo {
   Gy: EventoSostenido;
   MasGx: EventoSostenido;
   MenosGx: EventoSostenido;
+  ReversionGx: Reversion;
+  ReversionGy: Reversion;
   Elipse: { ValorMaximoGyGz: number; ValorMaximoGxGz: number; ValorMaximoGxGy: number; Semiejes: Vec3 };
   OnsetDeCarga: number;
   OnsetNormativoReal: number;

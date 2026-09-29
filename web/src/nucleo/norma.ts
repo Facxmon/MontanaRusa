@@ -1,7 +1,8 @@
 // Curvas limite de ASTM F2291-06a, seccion 7. Port literal de
-// Verificacion/LimiteNormativo.m, Fisica/LimiteDeDiseno.m y
-// Verificacion/LimitePorPunto.m. Las tablas tienen que coincidir fila por
-// fila con memoria_de_calculo.md, seccion 5, igual que en MATLAB.
+// Verificacion/LimiteNormativo.m, Fisica/LimiteDeDiseno.m,
+// Verificacion/LimitePorPunto.m, GMinimaEvaluable.m y VentanasMasGzReducido.m.
+// Las tablas tienen que coincidir fila por fila con memoria_de_calculo.md,
+// seccion 5, igual que en MATLAB.
 //
 // La duracion que entra aca es la del PROTOTIPO: la del modelo hay que
 // multiplicarla antes por sqrt(lambda) (factorTiempo).
@@ -29,6 +30,16 @@ const TABLAS: Record<CurvaNormativa, readonly Fila[]> = {
 };
 
 export const CURVAS_NORMATIVAS = Object.keys(TABLAS) as CurvaNormativa[];
+
+/**
+ * Umbral de |G| por debajo del cual no se evaluan limites: 0.01 G. Espejo de
+ * Verificacion/GMinimaEvaluable.m, y tienen que coincidir. Es un valor
+ * elegido para el proyecto, NO de la norma: separa el ruido numerico (Gy de
+ * 1e-13 G en un elemento plano) de una aceleracion con sentido fisico. Todas
+ * las curvas de las Figs. 6-10 arrancan en 1.1 G o mas, asi que ningun
+ * veredicto real depende de este numero. No es un parametro de usuario.
+ */
+export const G_MIN_EVALUABLE = 0.01;
 
 export function tablaNormativa(curva: CurvaNormativa): readonly Fila[] {
   const tabla = TABLAS[curva];
@@ -114,10 +125,50 @@ export function tramosContiguos(mascara: ArrayLike<boolean>): Array<[number, num
 }
 
 /**
+ * Nodos donde rige la curva +Gz reducida (7.1.7.1), sobre la linea de tiempo
+ * del layout en tiempo del PROTOTIPO. Port de VentanasMasGzReducido.m:
+ *  - un evento -Gz es un intervalo continuo con -Gz >= G_MIN_EVALUABLE;
+ *  - si dura mas de 3 s, la transicion a +Gz es el primer nodo posterior con
+ *    Gz >= G_MIN_EVALUABLE, y la ventana son los nodos a 6 s o menos de ella.
+ * TODO(7.1.7.1): un evento de +Gz que toca la ventana se evalua entero con
+ * MasGzReducido (lo conservador); la norma no dice que hacer con uno que
+ * empieza adentro y termina afuera. Ver VentanasMasGzReducido.m.
+ */
+export function ventanasMasGzReducido(gz: ArrayLike<number>, tiempoPrototipo: ArrayLike<number>): { reducida: boolean[]; enAirtimeLargo: boolean[] } {
+  const n = gz.length;
+  const reducida = new Array<boolean>(n).fill(false);
+  const enAirtimeLargo = new Array<boolean>(n).fill(false);
+  const mascara = Array.from({ length: n }, (_, i) => -gz[i]! >= G_MIN_EVALUABLE);
+  for (const [inicio, fin] of tramosContiguos(mascara)) {
+    if (tiempoPrototipo[fin]! - tiempoPrototipo[inicio]! <= 3.0) continue;
+    for (let i = inicio; i <= fin; i++) enAirtimeLargo[i] = true;
+    let transicion = -1;
+    for (let i = fin + 1; i < n; i++) {
+      if (gz[i]! >= G_MIN_EVALUABLE) {
+        transicion = i;
+        break;
+      }
+    }
+    if (transicion < 0) continue;
+    for (let i = transicion; i < n; i++) {
+      if (tiempoPrototipo[i]! - tiempoPrototipo[transicion]! <= 6.0) reducida[i] = true;
+    }
+  }
+  return { reducida, enAirtimeLargo };
+}
+
+/**
  * Limite normativo aplicable en cada nodo: la duracion del evento sostenido
  * que lo contiene a su nivel de G (cuantizado en `niveles` escalones), por
  * sqrt(lambda), evaluada en la curva. NaN donde la G no tiene ese signo.
  * Port de LimitePorPunto.m; `signo` es +1 o -1 segun el lado evaluado.
+ *
+ * Los eventos de menos de 200 ms se evaluan en 0.2 s, igual que en la
+ * verificacion, asi que un nodo queda por encima de esta linea si y solo si
+ * su evento no cumple. Por debajo de G_MIN_EVALUABLE no hay limite, y la
+ * grilla arranca en max(G_MIN_EVALUABLE, maximo/niveles). Para la linea de
+ * tiempo del layout se pasa el tiempo del prototipo con factorTiempo = 1;
+ * `reducida` (solo +Gz) son las ventanas de 7.1.7.1.
  */
 export function limitePorPunto(
   g: ArrayLike<number>,
@@ -126,6 +177,7 @@ export function limitePorPunto(
   factorTiempo: number,
   signo: 1 | -1,
   niveles = 40,
+  reducida?: ArrayLike<boolean>,
 ): Float64Array {
   const n = g.length;
   const h = new Float64Array(n);
@@ -135,19 +187,27 @@ export function limitePorPunto(
     if (Number.isFinite(h[i]!) && h[i]! > maximo) maximo = h[i]!;
   }
   const limite = new Float64Array(n).fill(NaN);
-  if (!(maximo > 0)) return limite;
+  if (!(maximo >= G_MIN_EVALUABLE)) return limite;
 
-  // linspace(maximo/niveles, maximo, niveles), de menor a mayor: cada nodo
-  // termina con el limite del nivel mas alto que alcanza.
+  // linspace(max(umbral, maximo/niveles), maximo, niveles), de menor a mayor:
+  // cada nodo termina con el limite del nivel mas alto que alcanza.
+  const primero = Math.max(G_MIN_EVALUABLE, maximo / niveles);
   for (let j = 0; j < niveles; j++) {
-    const nivel = niveles === 1 ? maximo : maximo / niveles + ((maximo - maximo / niveles) * j) / (niveles - 1);
+    const nivel = niveles === 1 ? maximo : primero + ((maximo - primero) * j) / (niveles - 1);
     const mascara = new Array<boolean>(n);
     for (let i = 0; i < n; i++) mascara[i] = h[i]! >= nivel;
     for (const [inicio, fin] of tramosContiguos(mascara)) {
       const duracion = Math.max((tiempo[fin]! - tiempo[inicio]!) * factorTiempo, 0.2);
-      const valor = signo * Math.abs(limiteNormativo(curva, duracion));
+      const curvaDelEvento = reducida && algunoEntre(reducida, inicio, fin) ? 'MasGzReducido' : curva;
+      const valor = signo * Math.abs(limiteNormativo(curvaDelEvento, duracion));
       for (let i = inicio; i <= fin; i++) limite[i] = valor;
     }
   }
   return limite;
+}
+
+/** true si algun elemento de la mascara entre inicio y fin (inclusivos) es true: el any(...) de MATLAB. */
+export function algunoEntre(mascara: ArrayLike<boolean>, inicio: number, fin: number): boolean {
+  for (let i = inicio; i <= fin; i++) if (mascara[i]) return true;
+  return false;
 }

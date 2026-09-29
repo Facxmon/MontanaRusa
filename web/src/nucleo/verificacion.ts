@@ -1,13 +1,16 @@
 // Port de Verificacion/: AgregarCriterio, ChequeosPrevios, ChequeosPosteriores,
-// VerificarLimitesNormativos y DistanciaMinimaEntrePolilineas. Los textos de
+// VerificarLimitesNormativos, CriteriosNormativos, SerieNormativaDelLayout,
+// VerificarLayoutNormativo y DistanciaMinimaEntrePolilineas. Los textos de
 // los criterios son los de MATLAB, con los mismos formatos de sprintf.
 
 import { BrazoDeVerificacion, EscalasDeFroude, MarcoTransporteDesdeCarro } from './basicos';
 import {
-  cruz, linspace, maximo, minimo, modulo, norma, normaDe, punto as productoPunto, rad2deg, resta, sprintfF, type Vec3,
+  cruz, linspace, maximo, maximoConIndice, minimo, modulo, norma, normaDe, punto as productoPunto, rad2deg, resta, sprintfF, type Vec3,
 } from './matematica';
-import { limiteNormativo, tramosContiguos, type CurvaNormativa } from './norma';
-import type { Criterio, Escala, Estado, EventoSostenido, Layout, Normativo, Parametros, Receta, SentidoDeCriterio, Sim, Track } from './tipos';
+import { algunoEntre, G_MIN_EVALUABLE, limiteNormativo, tramosContiguos, ventanasMasGzReducido, type CurvaNormativa } from './norma';
+import type {
+  ContextoNormativo, Criterio, Escala, Estado, EventoSostenido, Layout, Normativo, Parametros, Receta, Reversion, SentidoDeCriterio, Sim, Track,
+} from './tipos';
 
 // ------------------------------------------------------------ criterios
 export function AgregarCriterio(
@@ -155,16 +158,10 @@ export function ChequeosPosteriores(Track: Track, Sim: Sim, Parametros: Parametr
   AgregarCriterio(Criterios, 'Onset de 0 G a 2 G (7.1.7.2)', 'MenorOIgual', Normativo.OnsetDeCarga, Escala.OnsetMaximo[2], 'G/s',
     'Alcance literal de la clausula: solo transiciones desde 0 G o menos hacia 2 G o mas.');
 
-  AgregarCriterioNormativo(Criterios, '+Gz (Fig. 10)', Normativo.MasGz);
-  AgregarCriterioNormativo(Criterios, '-Gz (Fig. 9)', Normativo.MenosGz);
-  AgregarCriterioNormativo(Criterios, 'Gy (Fig. 8)', Normativo.Gy);
-  AgregarCriterioNormativo(Criterios, '+Gx (Fig. 6)', Normativo.MasGx);
-  AgregarCriterioNormativo(Criterios, '-Gx (Fig. 7)', Normativo.MenosGx);
-
-  AgregarCriterio(Criterios, 'Elipse de dos ejes Gy-Gz (7.1.5.1)', 'MenorOIgual', Normativo.Elipse.ValorMaximoGyGz, 1, '-',
-    'Semiejes iguales a los limites de 200 ms multiplicados por 1.1.');
-  AgregarCriterio(Criterios, 'Elipse de dos ejes Gx-Gz (7.1.5.1)', 'MenorOIgual', Normativo.Elipse.ValorMaximoGxGz, 1, '-');
-  AgregarCriterio(Criterios, 'Elipse de dos ejes Gx-Gy (7.1.5.1)', 'MenorOIgual', Normativo.Elipse.ValorMaximoGxGy, 1, '-');
+  // Para el elemento suelto. Si el elemento entra a un layout,
+  // VerificarLayoutNormativo recalcula este bloque sobre la linea de tiempo
+  // continua del circuito y reemplaza estas mismas lineas.
+  Criterios.push(...CriteriosNormativos(Normativo));
 
   AgregarCriterio(Criterios, 'Gz maxima en la cabeza', 'Informativo', maximo(validos(Sim.GzCabeza)), NaN, 'G',
     `A ${sprintfF(Parametros.DistanciaHeartline + Parametros.DistanciaHeartlineACabeza, 3)} m del riel (d + e). Las verificadas arriba estan a ${sprintfF(Sim.BrazoDeVerificacion, 3)} m.`);
@@ -173,14 +170,51 @@ export function ChequeosPosteriores(Track: Track, Sim: Sim, Parametros: Parametr
   return [Criterios, Normativo];
 }
 
+/**
+ * Lineas del reporte que resumen el bloque normativo: limites dependientes de
+ * la duracion (Figs. 6-10), reversiones (7.1.6) y elipses (7.1.5.1), en ese
+ * orden. Port de CriteriosNormativos.m.
+ */
+export function CriteriosNormativos(Normativo: Normativo): Criterio[] {
+  const Criterios: Criterio[] = [];
+  AgregarCriterioNormativo(Criterios, '+Gz (Fig. 10)', Normativo.MasGz);
+  AgregarCriterioNormativo(Criterios, '-Gz (Fig. 9)', Normativo.MenosGz);
+  AgregarCriterioNormativo(Criterios, 'Gy (Fig. 8)', Normativo.Gy);
+  AgregarCriterioNormativo(Criterios, '+Gx (Fig. 6)', Normativo.MasGx);
+  AgregarCriterioNormativo(Criterios, '-Gx (Fig. 7)', Normativo.MenosGx);
+
+  AgregarCriterioDeReversion(Criterios, 'Reversiones de Gx (7.1.6)', Normativo.ReversionGx);
+  AgregarCriterioDeReversion(Criterios, 'Reversiones de Gy (7.1.6)', Normativo.ReversionGy);
+
+  AgregarCriterio(Criterios, 'Elipse de dos ejes Gy-Gz (7.1.5.1)', 'MenorOIgual', Normativo.Elipse.ValorMaximoGyGz, 1, '-',
+    'Semiejes iguales a los limites de 200 ms multiplicados por 1.1.');
+  AgregarCriterio(Criterios, 'Elipse de dos ejes Gx-Gz (7.1.5.1)', 'MenorOIgual', Normativo.Elipse.ValorMaximoGxGz, 1, '-');
+  AgregarCriterio(Criterios, 'Elipse de dos ejes Gx-Gy (7.1.5.1)', 'MenorOIgual', Normativo.Elipse.ValorMaximoGxGy, 1, '-');
+  return Criterios;
+}
+
 function AgregarCriterioNormativo(Criterios: Criterio[], Nombre: string, Evento: EventoSostenido): void {
   if (!Number.isFinite(Evento.Exceso)) {
     AgregarCriterio(Criterios, Nombre, 'Informativo', Evento.PicoG, NaN, 'G',
-      'Ningun evento sostenido supera los 200 ms: fuera del alcance de la norma (7.1.4.2).');
+      `Sin G evaluable de ese signo (el maximo no llega a ${sprintfF(G_MIN_EVALUABLE, 2)} G): no hay evento que evaluar.`);
     return;
   }
   AgregarCriterio(Criterios, Nombre, 'MenorOIgual', Evento.Exceso, 0, 'G',
-    `Nivel critico ${sprintfF(Evento.NivelCritico, 2)} G sostenido ${sprintfF(Evento.DuracionReal, 2)} s equivalentes reales; limite ${sprintfF(Evento.LimiteAplicado, 2)} G.`);
+    `Nivel critico ${sprintfF(Evento.NivelCritico, 2)} G sostenido ${sprintfF(Evento.DuracionReal, 2)} s equivalentes reales; limite ${sprintfF(Evento.LimiteAplicado, 2)} G. ` +
+      'Los eventos de menos de 0.2 s se evaluan contra el limite de 200 ms.');
+}
+
+function AgregarCriterioDeReversion(Criterios: Criterio[], Nombre: string, Reversion: Reversion): void {
+  if (Reversion.Reducida) {
+    AgregarCriterio(Criterios, Nombre, 'MenorOIgual', Reversion.Exceso, 0, 'G',
+      `Reversion entre eventos sostenidos con ${sprintfF(Reversion.TiempoPicoAPico, 3)} s entre picos (menos de 0.2 s): el limite ` +
+        `del pico cae al 50 %. Pico ${sprintfF(Reversion.PicoG, 2)} G sostenido ${sprintfF(Reversion.DuracionReal, 2)} s reales; limite reducido ${sprintfF(Reversion.LimiteReducido, 2)} G.`);
+    return;
+  }
+  const Detalle = Number.isFinite(Reversion.TiempoPicoAPicoMinimo)
+    ? 'Ninguna reversion entre eventos sostenidos tiene menos de 0.2 s entre picos: sin reduccion del limite. El valor es la mas rapida, en s reales.'
+    : 'Sin reversiones entre eventos sostenidos de signo opuesto.';
+  AgregarCriterio(Criterios, Nombre, 'Informativo', Reversion.TiempoPicoAPicoMinimo, 0.2, 's', Detalle);
 }
 
 function SeparacionOrientada(Track: Track, IndiceA: number, IndiceB: number, Parametros: Parametros): number {
@@ -260,7 +294,89 @@ export function DistanciaMinimaEntrePolilineas(
 }
 
 // ------------------------------------------------------------ norma
-export function VerificarLimitesNormativos(Sim: Sim, Escala: Escala, Parametros: Parametros): Normativo {
+/**
+ * Linea de tiempo continua del layout para la norma. Port de
+ * SerieNormativaDelLayout.m: las G de todos los elementos concatenadas, con
+ * el tiempo en PROTOTIPO (cada tramo escalado con el factorTiempo de SU
+ * elemento y acumulado), sin repetir el nodo de cada empalme. `Rango` de
+ * cada elemento incluye su nodo de empalme de entrada.
+ */
+export function SerieNormativaDelLayout(Sims: Sim[], FactoresTiempo: number[]): Omit<ContextoNormativo, 'Elemento'> {
+  const TiempoPrototipo: number[] = [];
+  const Gx: number[] = [];
+  const Gy: number[] = [];
+  const Gz: number[] = [];
+  const Rango: Array<[number, number]> = [];
+  let Desfase = 0;
+  Sims.forEach((Sim, i) => {
+    const Desde = i === 0 ? 0 : 1;
+    const Primero = i === 0 ? 0 : TiempoPrototipo.length - 1; // el nodo del empalme
+    for (let k = Desde; k < Sim.Tiempo.length; k++) {
+      TiempoPrototipo.push(Sim.Tiempo[k]! * FactoresTiempo[i]! + Desfase);
+      Gx.push(Sim.Gx[k]!);
+      Gy.push(Sim.Gy[k]!);
+      Gz.push(Sim.Gz[k]!);
+    }
+    Rango.push([Primero, TiempoPrototipo.length - 1]);
+    // Si el carro se quedo sin energia el tiempo del final es NaN: el desfase sale del ultimo nodo con tiempo.
+    let Ultimo = Sim.Tiempo.length - 1;
+    while (Ultimo > 0 && Number.isNaN(Sim.Tiempo[Ultimo]!)) Ultimo--;
+    Desfase += Sim.Tiempo[Ultimo]! * FactoresTiempo[i]!;
+  });
+  const { reducida, enAirtimeLargo } = ventanasMasGzReducido(Gz, TiempoPrototipo);
+  return {
+    TiempoPrototipo: Float64Array.from(TiempoPrototipo),
+    Gx: Float64Array.from(Gx),
+    Gy: Float64Array.from(Gy),
+    Gz: Float64Array.from(Gz),
+    Rango,
+    Reducida: reducida,
+    EnAirtimeLargo: enAirtimeLargo,
+  };
+}
+
+/**
+ * Recalcula el bloque normativo de cada elemento sobre la linea de tiempo
+ * continua del layout y reemplaza las lineas de CriteriosNormativos en sus
+ * posteriores. Port de VerificarLayoutNormativo.m. Se corre entera cada vez
+ * que el layout cambia: un elemento nuevo puede alargar un evento del
+ * anterior y cambiar su veredicto. Devuelve un layout nuevo (no muta los
+ * reportes anteriores).
+ */
+export function VerificarLayoutNormativo(Layout: Layout): Layout {
+  if (Layout.Elementos.length === 0) return Layout;
+  const Escalas = Layout.Elementos.map((r) => EscalasDeFroude(r.Elemento.Parametros));
+  const Serie = SerieNormativaDelLayout(
+    Layout.Elementos.map((r) => r.Elemento.Sim),
+    Escalas.map((e) => e.RaizLambdaLoop),
+  );
+  const Elementos = Layout.Elementos.map((Registro, i) => {
+    if (!Registro.Reporte) return Registro;
+    const Normativo = VerificarLimitesNormativos(Registro.Elemento.Sim, Escalas[i]!, Registro.Elemento.Parametros, { ...Serie, Elemento: i });
+    const Nuevos = CriteriosNormativos(Normativo);
+    const Posteriores = [...Registro.Reporte.Posteriores];
+    const Desde = Posteriores.findIndex((c) => c.Nombre === Nuevos[0]!.Nombre);
+    const Coinciden = Desde >= 0 && Nuevos.every((c, k) => Posteriores[Desde + k]?.Nombre === c.Nombre);
+    if (!Coinciden) {
+      throw new Error(`El reporte del elemento ${i + 1} (${Registro.Elemento.Nombre}) no trae las lineas normativas de CriteriosNormativos en el orden esperado.`);
+    }
+    Posteriores.splice(Desde, Nuevos.length, ...Nuevos);
+    return { ...Registro, Reporte: { ...Registro.Reporte, Posteriores, Normativo } };
+  });
+  return { ...Layout, Elementos };
+}
+
+/**
+ * Port de VerificarLimitesNormativos.m. Sin `Contexto` (un elemento suelto)
+ * la serie es la del propio elemento; con el, la del layout entero, y el
+ * elemento evalua los eventos que tocan alguno de sus nodos con la duracion
+ * completa. Los eventos de menos de 0.2 s se evaluan contra el limite de
+ * 200 ms (criterio conservador del proyecto) y por debajo de G_MIN_EVALUABLE
+ * no se evalua.
+ */
+export function VerificarLimitesNormativos(Sim: Sim, Escala: Escala, Parametros: Parametros, Contexto?: ContextoNormativo): Normativo {
+  const C: ContextoNormativo = Contexto ?? { ...SerieNormativaDelLayout([Sim], [Escala.RaizLambdaLoop]), Elemento: 0 };
+
   const n = Sim.Gz.length;
   const Tiempo: number[] = [];
   const Gx: number[] = [];
@@ -283,15 +399,21 @@ export function VerificarLimitesNormativos(Sim: Sim, Escala: Escala, Parametros:
   const FactorTiempo = Escala.RaizLambdaLoop;
   const DuracionModelo = Tiempo[Tiempo.length - 1]! - Tiempo[0]!;
 
-  const EventoAirtimeLargo = PeorEventoSostenido(Gz, Tiempo, 'MenosGzBase', FactorTiempo, -1);
-  const HuboAirtimeSostenido = EventoAirtimeLargo.DuracionMasLarga > 3.0;
-  const CurvaMasGz: CurvaNormativa = HuboAirtimeSostenido ? 'MasGzReducido' : 'MasGzTodas';
+  const Rango = C.Rango[C.Elemento]!;
+  const TiempoLayout = C.TiempoPrototipo;
 
-  const MasGz = PeorEventoSostenido(Gz, Tiempo, CurvaMasGz, FactorTiempo, 1);
-  const MenosGz = PeorEventoSostenido(Gz, Tiempo, 'MenosGzBase', FactorTiempo, -1);
-  const GyEvento = PeorEventoSostenido(Gy.map(Math.abs), Tiempo, 'GyBase', FactorTiempo, 1);
-  const MasGx = PeorEventoSostenido(Gx, Tiempo, 'MasGxBase', FactorTiempo, 1);
-  const MenosGx = PeorEventoSostenido(Gx, Tiempo, 'MenosGxBase', FactorTiempo, -1);
+  // 7.1.7.1, literal sobre la linea de tiempo del layout (ventanasMasGzReducido).
+  const HuboAirtimeSostenido = algunoEntre(C.EnAirtimeLargo, Rango[0], Rango[1]);
+  const CurvaMasGz: CurvaNormativa = algunoEntre(C.Reducida, Rango[0], Rango[1]) ? 'MasGzReducido' : 'MasGzTodas';
+
+  const MasGz = PeorEventoSostenido(C.Gz, TiempoLayout, Rango, 'MasGzTodas', 1, C.Reducida);
+  const MenosGz = PeorEventoSostenido(C.Gz, TiempoLayout, Rango, 'MenosGzBase', -1, null);
+  const GyEvento = PeorEventoSostenido(C.Gy.map(Math.abs), TiempoLayout, Rango, 'GyBase', 1, null);
+  const MasGx = PeorEventoSostenido(C.Gx, TiempoLayout, Rango, 'MasGxBase', 1, null);
+  const MenosGx = PeorEventoSostenido(C.Gx, TiempoLayout, Rango, 'MenosGxBase', -1, null);
+
+  const ReversionGx = ReversionesSostenidas(C.Gx, TiempoLayout, Rango, 'MasGxBase', 'MenosGxBase');
+  const ReversionGy = ReversionesSostenidas(C.Gy, TiempoLayout, Rango, 'GyBase', 'GyBase');
 
   const SemiejeGx = SemiejePorSigno(Gx, 'MasGxBase', 'MenosGxBase');
   const SemiejeGy = SemiejePorSigno(Gy, 'GyBase', 'GyBase');
@@ -309,6 +431,8 @@ export function VerificarLimitesNormativos(Sim: Sim, Escala: Escala, Parametros:
     Gy: GyEvento,
     MasGx,
     MenosGx,
+    ReversionGx,
+    ReversionGy,
     Elipse: {
       ValorMaximoGyGz: elipse(Gy, SemiejeGy, Gz, SemiejeGz),
       ValorMaximoGxGz: elipse(Gx, SemiejeGx, Gz, SemiejeGz),
@@ -328,31 +452,102 @@ function SemiejePorSigno(G: number[], CurvaPositiva: CurvaNormativa, CurvaNegati
   return G.map((g) => (g >= 0 ? SemiejePositivo : SemiejeNegativo));
 }
 
-function PeorEventoSostenido(G: number[], Tiempo: number[], Curva: CurvaNormativa, FactorTiempo: number, Signo: 1 | -1): EventoSostenido {
-  const H = G.map((g) => Signo * g);
+/**
+ * Peor evento sostenido contra la curva. G y Tiempo son la linea de tiempo
+ * del layout (tiempo ya en PROTOTIPO); Rango, los nodos del elemento. Los
+ * niveles salen del maximo del elemento y se evaluan los eventos que tocan
+ * alguno de sus nodos. `Reducida` (solo +Gz): un evento que toca una
+ * ventana de 7.1.7.1 se evalua con MasGzReducido.
+ */
+export function PeorEventoSostenido(
+  G: ArrayLike<number>, Tiempo: ArrayLike<number>, Rango: [number, number], Curva: CurvaNormativa, Signo: 1 | -1, Reducida: ArrayLike<boolean> | null,
+): EventoSostenido {
+  const H = Array.from(G, (g) => Signo * g);
+  const HElemento = H.slice(Rango[0], Rango[1] + 1);
   const Evento: EventoSostenido = {
-    Curva, Signo, NivelCritico: 0, DuracionReal: 0, LimiteAplicado: NaN, Exceso: -Infinity, DuracionMasLarga: 0, PicoG: Signo * maximo(H),
+    Curva, Signo, NivelCritico: 0, DuracionReal: 0, LimiteAplicado: NaN, Exceso: -Infinity, DuracionMasLarga: 0, PicoG: Signo * maximo(HElemento),
   };
-  const HMaximo = maximo(H);
-  if (!(HMaximo > 0) || H.length < 2) return Evento;
+  const HMaximo = maximo(HElemento);
+  if (!(HMaximo >= G_MIN_EVALUABLE) || HElemento.length < 2) return Evento; // nada evaluable de este signo
 
-  const Niveles = linspace(HMaximo / 60, HMaximo, 60);
+  const Niveles = linspace(Math.max(G_MIN_EVALUABLE, HMaximo / 60), HMaximo, 60);
   for (const Nivel of Niveles) {
     for (const [inicio, fin] of tramosContiguos(H.map((h) => h >= Nivel))) {
-      const DuracionReal = (Tiempo[fin]! - Tiempo[inicio]!) * FactorTiempo;
+      if (fin < Rango[0] || inicio > Rango[1]) continue;
+      let DuracionReal = Tiempo[fin]! - Tiempo[inicio]!;
       if (DuracionReal > Evento.DuracionMasLarga) Evento.DuracionMasLarga = DuracionReal;
-      if (DuracionReal < 0.2) continue;
-      const LimiteMagnitud = Signo * limiteNormativo(Curva, DuracionReal);
+      // 7.1.4.2 no cubre los eventos de menos de 200 ms; el proyecto los evalua contra el limite de 200 ms.
+      DuracionReal = Math.max(DuracionReal, 0.2);
+      const CurvaDelEvento: CurvaNormativa = Reducida && algunoEntre(Reducida, inicio, fin) ? 'MasGzReducido' : Curva;
+      const LimiteMagnitud = Signo * limiteNormativo(CurvaDelEvento, DuracionReal);
       const Exceso = Nivel - LimiteMagnitud;
       if (Exceso > Evento.Exceso) {
         Evento.Exceso = Exceso;
         Evento.NivelCritico = Signo * Nivel;
         Evento.DuracionReal = DuracionReal;
         Evento.LimiteAplicado = Signo * LimiteMagnitud;
+        Evento.Curva = CurvaDelEvento;
       }
     }
   }
   return Evento;
+}
+
+/**
+ * 7.1.6: reversiones entre eventos sostenidos en X o Y. Port de
+ * ReversionesSostenidas (VerificarLimitesNormativos.m). Un evento es un
+ * intervalo de un mismo signo con |G| >= G_MIN_EVALUABLE, sostenido si dura
+ * 0.2 s o mas; si dos sostenidos consecutivos de signo opuesto tienen menos
+ * de 0.2 s entre picos, el limite del pico de cada uno cae al 50 % del que le
+ * corresponde por su duracion.
+ * TODO(7.1.6): dos sostenidos consecutivos del mismo signo no se unen ni se
+ * evaluan (la norma no dice si son uno solo).
+ */
+export function ReversionesSostenidas(
+  G: ArrayLike<number>, Tiempo: ArrayLike<number>, Rango: [number, number], CurvaPositiva: CurvaNormativa, CurvaNegativa: CurvaNormativa,
+): Reversion {
+  const Reversion: Reversion = {
+    TiempoPicoAPicoMinimo: Infinity, Reducida: false, TiempoPicoAPico: NaN, PicoG: NaN, DuracionReal: NaN, LimiteReducido: NaN, Exceso: -Infinity,
+  };
+  const Valores = Array.from(G);
+  const Eventos: Array<[number, number, 1 | -1]> = [
+    ...tramosContiguos(Valores.map((g) => g >= G_MIN_EVALUABLE)).map(([a, b]): [number, number, 1 | -1] => [a, b, 1]),
+    ...tramosContiguos(Valores.map((g) => g <= -G_MIN_EVALUABLE)).map(([a, b]): [number, number, 1 | -1] => [a, b, -1]),
+  ];
+  if (Eventos.length === 0) return Reversion;
+  Eventos.sort((p, q) => p[0] - q[0]);
+  const Sostenidos = Eventos.filter(([a, b]) => Tiempo[b]! - Tiempo[a]! >= 0.2);
+
+  for (let k = 0; k < Sostenidos.length - 1; k++) {
+    const Par = [Sostenidos[k]!, Sostenidos[k + 1]!];
+    if (Par[0]![2] === Par[1]![2]) continue; // mismo signo: no es una reversion (ver el TODO)
+    const Toca = Par.map(([a, b]) => b >= Rango[0] && a <= Rango[1]);
+    if (!Toca.some(Boolean)) continue;
+    const Picos = Par.map(([a, b]) => {
+      const [, Posicion] = maximoConIndice(Valores.slice(a, b + 1).map(Math.abs));
+      return { valor: Valores[a + Posicion]!, tiempo: Tiempo[a + Posicion]! };
+    });
+    const Separacion = Math.abs(Picos[1]!.tiempo - Picos[0]!.tiempo);
+    Reversion.TiempoPicoAPicoMinimo = Math.min(Reversion.TiempoPicoAPicoMinimo, Separacion);
+    if (Separacion >= 0.2) continue;
+    Reversion.Reducida = true;
+    for (let j = 0; j < 2; j++) {
+      if (!Toca[j]) continue;
+      const [a, b, signo] = Par[j]!;
+      const Curva = signo > 0 ? CurvaPositiva : CurvaNegativa;
+      const Duracion = Tiempo[b]! - Tiempo[a]!;
+      const LimiteReducido = 0.5 * Math.abs(limiteNormativo(Curva, Duracion));
+      const Exceso = Math.abs(Picos[j]!.valor) - LimiteReducido;
+      if (Exceso > Reversion.Exceso) {
+        Reversion.Exceso = Exceso;
+        Reversion.PicoG = Picos[j]!.valor;
+        Reversion.DuracionReal = Duracion;
+        Reversion.LimiteReducido = signo * LimiteReducido;
+        Reversion.TiempoPicoAPico = Separacion;
+      }
+    }
+  }
+  return Reversion;
 }
 
 function OnsetDeTransicionCritica(Gz: number[], JerkGz: number[]): number {

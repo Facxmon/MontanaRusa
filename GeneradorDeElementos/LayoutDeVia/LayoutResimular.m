@@ -39,6 +39,10 @@ function [Layout, Avisos] = LayoutResimular(Layout, Parametros)
 
     Layout.EstadoActual = Estado;
 
+    % Con otra dinamica cambian las G y con ellas los eventos sostenidos: el
+    % bloque normativo se recalcula sobre la linea de tiempo del layout.
+    Layout = VerificarLayoutNormativo(Layout);
+
     for i = 1:numel(Avisos)
         warning('LayoutResimular:Aviso', '%s', Avisos{i});
     end

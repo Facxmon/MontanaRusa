@@ -1,4 +1,4 @@
-function Limite = LimitePorPunto(G, Tiempo, Curva, FactorTiempo, Signo, NumeroDeNiveles)
+function Limite = LimitePorPunto(G, Tiempo, Curva, FactorTiempo, Signo, NumeroDeNiveles, Reducida)
 %LIMITEPORPUNTO Limite normativo aplicable en cada punto del recorrido.
 %   Para cada nodo se mide la duracion del evento sostenido que lo contiene a
 %   su propio nivel de G, se convierte a duracion equivalente del prototipo
@@ -28,10 +28,25 @@ function Limite = LimitePorPunto(G, Tiempo, Curva, FactorTiempo, Signo, NumeroDe
 %   no pasa por aca (VerificarLimitesNormativos barre sus propios niveles).
 %
 %   Los eventos de menos de 200 ms no estan cubiertos (7.1.4.2); ahi se evalua
-%   la curva en 0.2 s, que es su extremo mas permisivo.
+%   la curva en 0.2 s, que es su extremo mas permisivo. Es el mismo criterio
+%   que usa la verificacion (VerificarLimitesNormativos), asi que un nodo
+%   queda por encima de esta linea si y solo si su evento no cumple.
+%
+%   Por debajo de GMinimaEvaluable no hay limite: si el maximo del lado
+%   evaluado no llega al umbral todo queda en NaN, y la grilla de niveles
+%   arranca en max(GMinimaEvaluable, maximo/NumeroDeNiveles). Sin esto, una
+%   Gy de 1e-13 G (ruido) dibujaba un limite en peine.
+%
+%   Para la linea de tiempo de todo el layout se pasa el tiempo del
+%   prototipo acumulado con FactorTiempo = 1. Reducida (opcional, solo +Gz)
+%   marca los nodos de las ventanas de 7.1.7.1 (VentanasMasGzReducido): un
+%   evento que toca uno se evalua con MasGzReducido.
 
     if nargin < 6 || isempty(NumeroDeNiveles)
         NumeroDeNiveles = 40;
+    end
+    if nargin < 7
+        Reducida = [];
     end
 
     H = Signo * G(:);
@@ -40,11 +55,12 @@ function Limite = LimitePorPunto(G, Tiempo, Curva, FactorTiempo, Signo, NumeroDe
     Limite = nan(NumeroDeNodos, 1);
 
     ValorMaximo = max(H(isfinite(H)));
-    if isempty(ValorMaximo) || ValorMaximo <= 0
+    Umbral = GMinimaEvaluable();
+    if isempty(ValorMaximo) || ValorMaximo < Umbral
         return
     end
 
-    Niveles = linspace(ValorMaximo/NumeroDeNiveles, ValorMaximo, NumeroDeNiveles);
+    Niveles = linspace(max(Umbral, ValorMaximo/NumeroDeNiveles), ValorMaximo, NumeroDeNiveles);
 
     % Los niveles se recorren de menor a mayor, asi que cada nodo termina con
     % el limite del nivel mas alto que alcanza: el que efectivamente le aplica.
@@ -52,10 +68,14 @@ function Limite = LimitePorPunto(G, Tiempo, Curva, FactorTiempo, Signo, NumeroDe
         Tramos = TramosContiguos(H >= Nivel);
         for k = 1:size(Tramos, 1)
             Duracion = max((Tiempo(Tramos(k,2)) - Tiempo(Tramos(k,1))) * FactorTiempo, 0.2);
+            CurvaDelEvento = Curva;
+            if ~isempty(Reducida) && any(Reducida(Tramos(k,1):Tramos(k,2)))
+                CurvaDelEvento = 'MasGzReducido';
+            end
 
             % Las tablas de las curvas negativas ya vienen con signo, asi que
             % se toma el modulo y se le pone el signo del lado evaluado.
-            Limite(Tramos(k,1):Tramos(k,2)) = Signo * abs(LimiteNormativo(Curva, Duracion));
+            Limite(Tramos(k,1):Tramos(k,2)) = Signo * abs(LimiteNormativo(CurvaDelEvento, Duracion));
         end
     end
 end
