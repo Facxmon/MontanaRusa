@@ -13,16 +13,23 @@ import { AjustarParametros, ParametrosPorDefecto } from '../src/nucleo/parametro
 import type { ModoCurvatura, NombreDeElemento, Parametros } from '../src/nucleo/tipos';
 
 export const CASOS: Record<string, { elemento: NombreDeElemento; modo: ModoCurvatura; ajustes: Partial<Parametros> }> = {
-  'loop-clotoide': { elemento: 'LoopVertical', modo: 'Clotoide', ajustes: {} },
+  'loop-arcocircular': { elemento: 'LoopVertical', modo: 'ArcoCircular', ajustes: {} },
   'loop-gconstante': { elemento: 'LoopVertical', modo: 'FuerzaGConstante', ajustes: {} },
   'loop-normativa': { elemento: 'LoopVertical', modo: 'GNormativaMaxima', ajustes: {} },
   'loop-anconstante': { elemento: 'LoopVertical', modo: 'AceleracionNormalConstante', ajustes: {} },
-  'helice-clotoide': { elemento: 'Helice', modo: 'Clotoide', ajustes: {} },
+  'helice-arcocircular': { elemento: 'Helice', modo: 'ArcoCircular', ajustes: {} },
   'helice-normativa': { elemento: 'Helice', modo: 'GNormativaMaxima', ajustes: {} },
-  'obt-clotoide': { elemento: 'OverBankedTurn', modo: 'Clotoide', ajustes: { AnguloDelGiro: (240 * Math.PI) / 180 } },
+  'obt-arcocircular': { elemento: 'OverBankedTurn', modo: 'ArcoCircular', ajustes: { AnguloDelGiro: (240 * Math.PI) / 180 } },
   'obt-normativa': { elemento: 'OverBankedTurn', modo: 'GNormativaMaxima', ajustes: { AnguloDelGiro: (240 * Math.PI) / 180 } },
-  'diveloop-clotoide': { elemento: 'DiveLoop', modo: 'Clotoide', ajustes: {} },
+  'diveloop-arcocircular': { elemento: 'DiveLoop', modo: 'ArcoCircular', ajustes: {} },
   'diveloop-normativa': { elemento: 'DiveLoop', modo: 'GNormativaMaxima', ajustes: {} },
+  // Modo Clotoide de verdad y peralte referido al CIR (GenerarGoldenFiles.m).
+  'loop-clotoide': { elemento: 'LoopVertical', modo: 'Clotoide', ajustes: {} },
+  'obt-clotoide': { elemento: 'OverBankedTurn', modo: 'Clotoide', ajustes: { AnguloDelGiro: (240 * Math.PI) / 180 } },
+  'obt-alineado-centro': { elemento: 'OverBankedTurn', modo: 'ArcoCircular', ajustes: { AnguloDelGiro: (240 * Math.PI) / 180, PeralteAlineadoAlCentroDeCurvatura: true } },
+  'obt-alineado-fuerza': { elemento: 'OverBankedTurn', modo: 'ArcoCircular', ajustes: { AnguloDelGiro: (240 * Math.PI) / 180, PeralteAlineadoALaFuerza: true } },
+  'obt-relativo-fuerza': { elemento: 'OverBankedTurn', modo: 'ArcoCircular', ajustes: { AnguloDelGiro: (240 * Math.PI) / 180, ModoDePeralteDelGiro: 'RelativoALaFuerza', DesvioDePeralteDelGiro: (10 * Math.PI) / 180 } },
+  'helice-alineado-fuerza': { elemento: 'Helice', modo: 'ArcoCircular', ajustes: { PeralteAlineadoALaFuerza: true } },
 };
 
 export function cargarGolden(caso: string): Contrato.Layout {
@@ -51,7 +58,7 @@ export function reconstruirCaso(caso: string): Contrato.Layout {
 /** Reconstruye el circuito de DemoLayout.m. */
 export function reconstruirCircuito(): Contrato.Layout {
   const Parametros = ParametrosPorDefecto();
-  Parametros.ModoCurvatura = 'Clotoide';
+  Parametros.ModoCurvatura = 'ArcoCircular';
   Parametros.MetodoDeAcoplamiento = 'A';
   Parametros.CalcularVelocidadMinima = false;
   Parametros.RadioDelLoop = 0.3;

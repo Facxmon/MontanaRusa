@@ -87,7 +87,7 @@
           "required": ["modoCurvatura", "metodoDeAcoplamiento"],
           "properties": {
             "modoCurvatura": {
-              "enum": ["AceleracionNormalConstante", "Clotoide", "FuerzaGConstante", "GNormativaMaxima"]
+              "enum": ["AceleracionNormalConstante", "ArcoCircular", "Clotoide", "FuerzaGConstante", "GNormativaMaxima"]
             },
             "metodoDeAcoplamiento": { "enum": ["A", "B", "Ambos"] }
           },

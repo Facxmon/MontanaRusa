@@ -467,7 +467,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
       detalle: 'El loop de 30 a 45 cm a la misma velocidad: v²/R es menor.',
       hacer: () =>
         probarCambio(
-          'loop-clotoide',
+          'loop-arcocircular',
           (d) => ({ ...d, parametros: { ...d.parametros, RadioDelLoop: d.parametros.RadioDelLoop * 1.5 } }),
           'Radio del loop × 1,5: la Gz máxima baja. En los gráficos, A (tono claro) es el loop original y B el nuevo. Ctrl+Z vuelve al radio original.',
         ),
@@ -478,9 +478,9 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
       detalle: 'El mismo loop, con la curvatura que mantiene la G fija.',
       hacer: () =>
         probarCambio(
-          'loop-clotoide',
+          'loop-arcocircular',
           (d) => ({ ...d, parametros: { ...d.parametros, ModoCurvatura: 'FuerzaGConstante' } }),
-          'Modo FuerzaGConstante: la curvatura se ajusta para que la G quede fija. En el gráfico de Gz, A (tono claro) es la clotoide y B la meseta de G constante.',
+          'Modo FuerzaGConstante: la curvatura se ajusta para que la G quede fija. En el gráfico de Gz, A (tono claro) es el arco circular y B la meseta de G constante.',
         ),
     },
   ]);

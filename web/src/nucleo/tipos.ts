@@ -6,7 +6,8 @@
 import type { Vec3 } from './matematica';
 import type { CurvaNormativa } from './norma';
 
-export type ModoCurvatura = 'AceleracionNormalConstante' | 'Clotoide' | 'FuerzaGConstante' | 'GNormativaMaxima';
+export type ModoCurvatura = 'AceleracionNormalConstante' | 'ArcoCircular' | 'Clotoide' | 'FuerzaGConstante' | 'GNormativaMaxima';
+export type ModoDePeralte = 'Constante' | 'RelativoAlCentroDeCurvatura' | 'RelativoALaFuerza';
 export type MetodoDeAcoplamiento = 'A' | 'B' | 'Ambos';
 export type SentidoDelGiro = 'Derecha' | 'Izquierda';
 export type PuntoDeVerificacion = 'Heartline' | 'Cabeza';
@@ -31,6 +32,10 @@ export interface Parametros {
   AnguloDelGiro: number;
   PeralteDelGiro: number;
   AvanceDelGiro: number;
+  ModoDePeralteDelGiro: ModoDePeralte;
+  DesvioDePeralteDelGiro: number;
+  PeralteAlineadoAlCentroDeCurvatura: boolean;
+  PeralteAlineadoALaFuerza: boolean;
   SentidoDelGiro: SentidoDelGiro;
   RadioDeReferencia: number;
   InclinacionHelicoidalImpuesta: number | null;
@@ -108,6 +113,9 @@ export interface Receta {
   CurvaLimiteGz: CurvaNormativa;
   CurvaLimiteGy?: CurvaNormativa;
   SentidoDeGy?: 1 | -1;
+  /** PeralteDelElemento.m: como se para el carro respecto del CIR. */
+  AlineacionDelPeralte?: 'Constante' | 'CentroDeCurvatura' | 'Fuerza';
+  DesvioDelPeralte?: number;
 }
 
 /** Contrato de Estado (EstadoInicial.m). */
@@ -282,6 +290,8 @@ export interface Diagnostico {
   FactorLongitudTransicion: number;
   OnsetVerticalGenerado: number;
   OnsetLateralGenerado: number;
+  /** Desalineo maximo entre el eje del carro y la fuerza con el peralte alineado a la fuerza (0 si no). */
+  ResidualAlineacionPeralte: number;
   PerfilVelocidad: { Arco: Float64Array; Velocidad: Float64Array };
   TiempoDeRecorrido: Float64Array;
   GArribaHeartline: Float64Array;

@@ -9,12 +9,12 @@ function [Reducida, EnAirtimeLargo] = VentanasMasGzReducido(Gz, TiempoPrototipo)
 %       con Gz >= GMinimaEvaluable, y la ventana son los nodos que caen a 6 s
 %       o menos de esa transicion. Despues vuelve MasGzTodas.
 %
-%   TODO(7.1.7.1): la norma no dice que curva rige para un evento de +Gz que
-%   empieza dentro de la ventana y termina fuera. Aca (VerificarLimitesNormativos
-%   y LimitePorPunto) un evento que toca al menos un nodo de la ventana se
-%   evalua entero con MasGzReducido, que es lo conservador. Tampoco fija el
-%   instante exacto de la "transicion" (fin del -Gz o comienzo del +Gz); con
-%   el umbral de 0.01 G la diferencia es de milisegundos.
+%   Un evento de +Gz que empieza dentro de la ventana y termina fuera se
+%   evalua con la curva reducida mientras esta adentro y con la normal
+%   despues, sin resetear su duracion (LimitesDelEvento, decision del
+%   usuario). La norma no fija el instante exacto de la "transicion" (fin del
+%   -Gz o comienzo del +Gz); con el umbral de 0.01 G la diferencia es de
+%   milisegundos.
 %
 %   Reducida es una mascara logica del largo de Gz. EnAirtimeLargo marca los
 %   nodos de los eventos -Gz de mas de 3 s (Normativo.HuboAirtimeSostenido).

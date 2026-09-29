@@ -8,7 +8,7 @@ const golden = (caso: string) =>
 
 describe('analizarLayout', () => {
   it('acepta un golden file del contrato v1', () => {
-    const layout = analizarLayout(golden('loop-clotoide'));
+    const layout = analizarLayout(golden('loop-arcocircular'));
     expect(layout.meta.versionContrato.startsWith(`${MAJOR_SOPORTADO}.`)).toBe(true);
     expect(layout.elementos).toHaveLength(1);
     expect(layout.elementos[0].tipo).toBe('LoopVertical');
@@ -16,7 +16,7 @@ describe('analizarLayout', () => {
   });
 
   it('rechaza un MAJOR distinto con un mensaje que lo nombra', () => {
-    const texto = golden('loop-clotoide').replace('"versionContrato":"1.0.0"', '"versionContrato":"2.0.0"');
+    const texto = golden('loop-arcocircular').replace('"versionContrato":"1.0.0"', '"versionContrato":"2.0.0"');
     expect(() => analizarLayout(texto)).toThrowError(/2\.0\.0/);
   });
 

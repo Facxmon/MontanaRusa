@@ -6,7 +6,7 @@ import { MAGNITUDES, magnitudPorClave } from '../src/contrato/magnitudes';
 import { GRIS, colorDe, paradasDeLeyenda, rangoDeMagnitud } from '../src/escena/colores';
 
 const layout = analizarLayout(
-  readFileSync(fileURLToPath(new URL('../../golden/loop-clotoide.json', import.meta.url)), 'utf8'),
+  readFileSync(fileURLToPath(new URL('../../golden/loop-arcocircular.json', import.meta.url)), 'utf8'),
 );
 
 describe('magnitudes', () => {

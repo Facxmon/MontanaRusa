@@ -113,7 +113,8 @@ function Evento = PeorEventoSostenido(G, Tiempo, Rango, Curva, Signo, Reducida)
 %   PROTOTIPO; Rango, los nodos [primero, ultimo] del elemento. Los niveles
 %   salen del maximo del elemento y se evaluan los eventos que tocan al menos
 %   un nodo suyo. Reducida (solo +Gz) marca los nodos de las ventanas de
-%   7.1.7.1: un evento que toca una se evalua con MasGzReducido.
+%   7.1.7.1: dentro de la ventana rige MasGzReducido y despues la curva
+%   normal, sin resetear la duracion del evento (LimitesDelEvento).
 
     H = Signo * G(:);
     HElemento = H(Rango(1):Rango(2));
@@ -143,19 +144,19 @@ function Evento = PeorEventoSostenido(G, Tiempo, Rango, Curva, Signo, Reducida)
             end
             % 7.1.4.2 no cubre los eventos de menos de 200 ms; el proyecto
             % los evalua contra el limite de 200 ms (criterio conservador).
-            DuracionReal = max(DuracionReal, 0.2);
-            CurvaDelEvento = Curva;
-            if ~isempty(Reducida) && any(Reducida(Tramos(k,1):Tramos(k,2)))
-                CurvaDelEvento = 'MasGzReducido';
-            end
-            LimiteMagnitud = Signo * LimiteNormativo(CurvaDelEvento, DuracionReal);
-            Exceso = Nivel - LimiteMagnitud;
-            if Exceso > Evento.Exceso
-                Evento.Exceso         = Exceso;
-                Evento.NivelCritico   = Signo * Nivel;
-                Evento.DuracionReal   = DuracionReal;
-                Evento.LimiteAplicado = Signo * LimiteMagnitud;
-                Evento.Curva          = CurvaDelEvento;
+            % Con ventanas de 7.1.7.1 el evento tiene un limite por tramo de
+            % regimen, con la duracion acumulada desde su inicio
+            % (LimitesDelEvento).
+            [Limites, Duraciones, Curvas] = LimitesDelEvento(Tiempo, Tramos(k,1), Tramos(k,2), Curva, Reducida);
+            for j = 1:numel(Limites)
+                Exceso = Nivel - Limites(j);
+                if Exceso > Evento.Exceso
+                    Evento.Exceso         = Exceso;
+                    Evento.NivelCritico   = Signo * Nivel;
+                    Evento.DuracionReal   = Duraciones(j);
+                    Evento.LimiteAplicado = Signo * Limites(j);
+                    Evento.Curva          = Curvas{j};
+                end
             end
         end
     end

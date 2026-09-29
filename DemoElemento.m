@@ -34,7 +34,7 @@ Elegido = @ElementoLoopVertical;   % @ElementoLoopVertical | @ElementoHelice
                                    % @ElementoOverBankedTurn | @ElementoDiveLoop
 
 Parametros = ParametrosPorDefecto();
-Parametros.ModoCurvatura        = 'GNormativaMaxima';   % 'Clotoide' | 'FuerzaGConstante' | 'AceleracionNormalConstante' | 'GNormativaMaxima'
+Parametros.ModoCurvatura        = 'GNormativaMaxima';   % 'ArcoCircular' | 'Clotoide' | 'FuerzaGConstante' | 'AceleracionNormalConstante' | 'GNormativaMaxima'
 Parametros.MetodoDeAcoplamiento = 'A';                  % 'A' rapido | 'B' punto fijo (~3x) | 'Ambos' compara, para el reporte
 
 %% ===================== AJUSTES DE ESTE CASO ==========================
@@ -54,7 +54,7 @@ Parametros.MetodoDeAcoplamiento = 'A';                  % 'A' rapido | 'B' punto
 % demas parametros geometricos (separacion de patas, vueltas, peralte,
 % avance, sentido) los lista cada elemento llamado sin argumentos.
 %
-% ADVERTENCIA sobre el radio. Solo en Clotoide es geometria: el radio que la
+% ADVERTENCIA sobre el radio. Solo en ArcoCircular y Clotoide es geometria: el radio que la
 % heartline efectivamente toma en el arco. En los modos que dependen de v
 % (FuerzaGConstante, GNormativaMaxima, AceleracionNormalConstante) el radio
 % real es una SALIDA del transporte inverso, y este numero es unicamente la

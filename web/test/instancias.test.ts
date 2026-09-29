@@ -91,7 +91,7 @@ describe('reduccion a MATLAB: con ajustes vacios, calcularLayout es el arnes', (
   function entradaDelCaso(caso: string): EntradaDeDiseno {
     if (caso === 'circuito-demolayout') {
       const parametros = ParametrosPorDefecto();
-      parametros.ModoCurvatura = 'Clotoide';
+      parametros.ModoCurvatura = 'ArcoCircular';
       parametros.MetodoDeAcoplamiento = 'A';
       parametros.CalcularVelocidadMinima = false;
       parametros.RadioDelLoop = 0.3;
@@ -129,8 +129,8 @@ describe('reduccion a MATLAB: con ajustes vacios, calcularLayout es el arnes', (
     }, 120000);
   }
 
-  it('loop-clotoide: bit a bit igual a lo que reconstruye el arnes (salvo la fecha de generacion)', () => {
+  it('loop-arcocircular: bit a bit igual a lo que reconstruye el arnes (salvo la fecha de generacion)', () => {
     const sinFecha = (l: ReturnType<typeof reconstruirCaso>) => ({ ...l, meta: { ...l.meta, generadoEn: '' } });
-    expect(sinFecha(calcularLayout(entradaDelCaso('loop-clotoide'), 'port'))).toEqual(sinFecha(reconstruirCaso('loop-clotoide')));
+    expect(sinFecha(calcularLayout(entradaDelCaso('loop-arcocircular'), 'port'))).toEqual(sinFecha(reconstruirCaso('loop-arcocircular')));
   });
 });

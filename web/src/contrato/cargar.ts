@@ -29,7 +29,31 @@ export function analizarLayout(texto: string): Layout {
       `El layout es de la versión ${version} del contrato y esta página entiende la ${MAJOR_SOPORTADO}.x.x.`,
     );
   }
+  const minor = Number(version.split('.')[1]);
+  if (minor < 2) migrarModoClotoide(documento as Layout);
   return documento as Layout;
+}
+
+/**
+ * Antes de la 1.2.0 del contrato el modo 'Clotoide' era el arco de radio
+ * constante, que ahora se llama 'ArcoCircular' ('Clotoide' es la clotoide
+ * simetrica de verdad). Un layout viejo se lee con el nombre nuevo.
+ */
+function migrarModoClotoide(layout: Layout): void {
+  const renombrar = (valor: unknown) => (valor === 'Clotoide' ? 'ArcoCircular' : valor);
+  const p = layout.parametros as unknown as {
+    valores?: Record<string, unknown>; defaults?: Record<string, unknown>; esquema?: { modo?: { nombre?: unknown; opciones?: unknown[] } };
+  };
+  if (p.valores) p.valores.modoCurvatura = renombrar(p.valores.modoCurvatura);
+  if (p.defaults) p.defaults.modoCurvatura = renombrar(p.defaults.modoCurvatura);
+  if (p.esquema?.modo) {
+    p.esquema.modo.nombre = renombrar(p.esquema.modo.nombre);
+    if (Array.isArray(p.esquema.modo.opciones)) p.esquema.modo.opciones = p.esquema.modo.opciones.map(renombrar);
+  }
+  for (const e of layout.elementos) {
+    const ajustes = (e as unknown as { ajustes?: Record<string, unknown> }).ajustes;
+    if (ajustes && 'modoCurvatura' in ajustes) ajustes.modoCurvatura = renombrar(ajustes.modoCurvatura);
+  }
 }
 
 export async function cargarLayout(url: string): Promise<Layout> {

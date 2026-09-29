@@ -6,7 +6,7 @@
 
 import type * as Contrato from '../contrato/tipos';
 import type { Vec3 } from './matematica';
-import { CATALOGO_DE_ELEMENTOS, DECLARACIONES_DE_ELEMENTOS, ParametrosDeAceptacion, ParametrosDelModo, ParametrosGenerales, ParametrosPorDefecto } from './parametros';
+import { CATALOGO_DE_ELEMENTOS, DECLARACIONES_DE_ELEMENTOS, MODOS_DE_CURVATURA, ParametrosDeAceptacion, ParametrosDelModo, ParametrosGenerales, ParametrosPorDefecto } from './parametros';
 import type { Criterio, Declaracion, Estado, Layout, NombreDeParametro, Parametros, RegistroDeLayout } from './tipos';
 
 /** Lo que una instancia de elemento piso sobre los globales y que de eso no consumio (AjustarParametros). */
@@ -28,7 +28,8 @@ export interface OpcionesDeExportacion {
 }
 
 // 1.1.0: elementos[].ajustes e inertes, opcionales (solo los emite JS; MATLAB sigue en 1.0.0).
-const VERSION_DEL_CONTRATO = '1.1.0';
+// 1.2.0: modo 'ArcoCircular' (ex 'Clotoide') y 'Clotoide' de verdad; bloque normativo sobre el layout.
+const VERSION_DEL_CONTRATO = '1.2.0';
 
 function camel(Nombre: string): string {
   return Nombre[0]!.toLowerCase() + Nombre.slice(1);
@@ -179,7 +180,7 @@ function esquemaDeParametros(P: Parametros): Contrato.Parametros['esquema'] {
   const elementos: Record<string, Contrato.DeclaracionDeParametro[]> = {};
   for (const nombre of CATALOGO_DE_ELEMENTOS) elementos[nombre] = declaraciones(DECLARACIONES_DE_ELEMENTOS[nombre]);
   return {
-    modo: { nombre: P.ModoCurvatura, opciones: ['AceleracionNormalConstante', 'Clotoide', 'FuerzaGConstante', 'GNormativaMaxima'], nota: Nota, parametros: declaraciones(Lista) },
+    modo: { nombre: P.ModoCurvatura, opciones: MODOS_DE_CURVATURA, nota: Nota, parametros: declaraciones(Lista) },
     elementos,
     aceptacion: declaraciones(ParametrosDeAceptacion()),
     generales: declaraciones(ParametrosGenerales()),

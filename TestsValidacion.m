@@ -27,7 +27,7 @@ fprintf('=====================================================================\n
 Parametros = ParametrosBase;
 Parametros.CrrPortantes = 0; Parametros.CrrGuia = 0; Parametros.CrrRetencion = 0;
 Parametros.ModelarArrastre = false;
-Parametros.ModoCurvatura = 'Clotoide';
+Parametros.ModoCurvatura = 'ArcoCircular';
 
 Estado = EstadoDeEnsayo(Parametros);
 [~, Elemento] = ElementoLoopVertical(Estado, Parametros);
@@ -84,7 +84,7 @@ Resultados = Anotar(Resultados, 'Curvatura impuesta contra recuperada', ErrorCur
 % El avance sobre el eje tampoco es un residual: es el objetivo de diseno que
 % evita que el loop se choque consigo mismo.
 Parametros = ParametrosBase;
-Parametros.ModoCurvatura = 'Clotoide';
+Parametros.ModoCurvatura = 'ArcoCircular';
 Estado = EstadoDeEnsayo(Parametros);
 [~, Elemento, Reporte] = ElementoLoopVertical(Estado, Parametros);
 Track = Elemento.Track;
@@ -109,19 +109,19 @@ Resultados = Anotar(Resultados, 'Continuidad en el empalme', ...
     sprintf('posicion %.3e m, tangente %.3e, curvatura %.3e 1/m', ...
             SaltoPosicion, SaltoTangente, SaltoCurvatura));
 
-%% --- Test 5: equivalencia de los metodos en modo clotoide --------------
-% En modo Clotoide kappa no depende de v, y las longitudes de las clotoides se
+%% --- Test 5: equivalencia de los metodos en modo ArcoCircular --------------
+% En modo ArcoCircular kappa no depende de v, y las longitudes de las clotoides se
 % dimensionan con la velocidad real de la marcha y no con el perfil supuesto,
 % asi que la geometria no depende en nada del perfil supuesto: los dos metodos
 % tienen que dar exactamente lo mismo, no parecido.
 Parametros = ParametrosBase;
-Parametros.ModoCurvatura = 'Clotoide';
+Parametros.ModoCurvatura = 'ArcoCircular';
 Parametros.MetodoDeAcoplamiento = 'Ambos';
 Estado = EstadoDeEnsayo(Parametros);
 [~, ~, ReporteAmbos] = ElementoLoopVertical(Estado, Parametros);
 Comparacion = ReporteAmbos.Comparacion;
 
-Resultados = Anotar(Resultados, 'Equivalencia de metodos A y B en modo clotoide', ...
+Resultados = Anotar(Resultados, 'Equivalencia de metodos A y B en modo ArcoCircular', ...
     Comparacion.DiferenciaGeometrica < 1e-12 && Comparacion.DiferenciaGz < 1e-12, ...
     sprintf('geometria %.3e m, Gz %.3e G, %d iteraciones del punto fijo (residuo %.2e m/s)', ...
             Comparacion.DiferenciaGeometrica, Comparacion.DiferenciaGz, ...
@@ -144,7 +144,7 @@ Resultados = Anotar(Resultados, 'Ortonormalidad del marco a lo largo del recorri
 Parametros = ParametrosBase;
 Parametros.CrrPortantes = 0; Parametros.CrrGuia = 0; Parametros.CrrRetencion = 0;
 Parametros.ModelarArrastre = false;
-Parametros.ModoCurvatura = 'Clotoide';
+Parametros.ModoCurvatura = 'ArcoCircular';
 Parametros.PasoGeneracion = 0.001;
 
 Estado = EstadoDeEnsayo(Parametros);
@@ -171,7 +171,7 @@ Resultados = Anotar(Resultados, 'Cierre del loop de 360 grados', ...
 % cierran su giro objetivo y que el empalme con el siguiente no tiene saltos:
 % ese contrato es lo que sostiene todo el layout.
 Parametros = ParametrosBase;
-Parametros.ModoCurvatura = 'Clotoide';
+Parametros.ModoCurvatura = 'ArcoCircular';
 
 Constructores = {@ElementoLoopVertical, @ElementoOverBankedTurn, @ElementoHelice, @ElementoDiveLoop};
 Estado = EstadoInicial([0 0 0.70], [1 0 0], [0 0 1], 6.0, Parametros);
@@ -209,7 +209,7 @@ Resultados = Anotar(Resultados, 'Los cuatro elementos generan y encadenan', ...
 %      transporte inverso de los modos de curvatura: dimensionar el riel para
 %      la G del riel dejaria al pasajero recorriendo un radio d mas chico.
 Parametros = ParametrosBase;
-Parametros.ModoCurvatura = 'Clotoide';
+Parametros.ModoCurvatura = 'ArcoCircular';
 Estado = EstadoDeEnsayo(Parametros);
 [~, ElementoRiel] = ElementoLoopVertical(Estado, Parametros);
 TrackRiel = ElementoRiel.Track;
@@ -247,7 +247,7 @@ Resultados = Anotar(Resultados, 'Derivacion de la heartline desde el riel', ...
 %      eje de roll y el pasajero va a distancia d: si el aporte diera cero,
 %      el modelo estaria diciendo que rolear no se siente, que es falso.
 Parametros = ParametrosBase;
-Parametros.ModoCurvatura = 'Clotoide';
+Parametros.ModoCurvatura = 'ArcoCircular';
 
 ParametrosSinBrazo = Parametros;
 ParametrosSinBrazo.DistanciaHeartline        = 0;
@@ -290,7 +290,7 @@ Resultados = Anotar(Resultados, 'Transporte de cuerpo rigido desde el riel', ...
 %   3. la G lateral que produce esa rotacion es lineal en el brazo: en la
 %      cabeza (2d) vale exactamente el doble que en la heartline (d).
 Parametros = ParametrosBase;
-Parametros.ModoCurvatura = 'Clotoide';
+Parametros.ModoCurvatura = 'ArcoCircular';
 Parametros.DistanciaHeartlineACabeza = Parametros.DistanciaHeartline;
 Estado = EstadoInicial([0 0 1.0], [1 0 0], [0 0 1], VelocidadDeEnsayo, Parametros);
 [~, ElementoRoll] = ElementoDiveLoop(Estado, Parametros);
@@ -559,6 +559,65 @@ Resultados = Anotar(Resultados, 'El loop normativo cumple +Gz (Fig. 10) y su per
              '|peralte| llega a %.1f grados y su salto maximo entre nodos es %.2f grados (limite 10)'], ...
             CriterioMasGz.Valor, ReporteLoop.Normativo.MasGz.NivelCritico, ReporteLoop.Normativo.MasGz.DuracionReal, 0.5*Parametros.TolObjetivoDeG, ...
             GzMaximaLoop, NivelCortoLiteral, DuracionArcoLoop, max(PeralteModulo), SaltoDePeralte));
+
+%% --- Test 17: el modo Clotoide es una clotoide simetrica de verdad ----
+% La curvatura del riel tiene que ser lineal en el arco en cada mitad (sube
+% hasta 1/(R + d) en la mitad del giro y baja hasta cero), sin arco de radio
+% constante, y el giro tiene que cerrar con curvatura nula.
+Parametros = ParametrosBase;
+Parametros.ModoCurvatura = 'Clotoide';
+Estado = EstadoInicial([0 0 1.0], [1 0 0], [0 0 1], 5.0, Parametros);
+[~, ElementoClotoide] = ElementoLoopVertical(Estado, Parametros);
+TrackC = ElementoClotoide.Track;
+ResiduoLineal = 0;
+for k = 1:numel(TrackC.SubTramos)
+    Rango = TrackC.SubTramos(k).IndiceInicio:TrackC.SubTramos(k).IndiceFin;
+    Ajuste = polyfit(TrackC.LongitudArco(Rango), TrackC.Curvatura(Rango), 1);
+    ResiduoLineal = max(ResiduoLineal, max(abs(TrackC.Curvatura(Rango) - polyval(Ajuste, TrackC.LongitudArco(Rango)))));
+end
+Resultados = Anotar(Resultados, 'El modo Clotoide es lineal en el arco y cierra con curvatura cero', ...
+    isequal({TrackC.SubTramos.Nombre}, {'ClotoideEntrada', 'ClotoideSalida'}) && ResiduoLineal < 1e-3 ...
+    && TrackC.Curvatura(end) < 1e-9 && abs(ElementoClotoide.Diagnostico.ResidualCierrePitch) < 1e-6 ...
+    && abs(max(TrackC.Curvatura) - 1/(Parametros.RadioDelLoop + Parametros.DistanciaHeartline)) < 1e-3, ...
+    sprintf('residuo contra la recta %.2e 1/m, curvatura final %.2e, cierre %.2e rad, pico %.4f contra %.4f 1/m', ...
+            ResiduoLineal, TrackC.Curvatura(end), ElementoClotoide.Diagnostico.ResidualCierrePitch, ...
+            max(TrackC.Curvatura), 1/(Parametros.RadioDelLoop + Parametros.DistanciaHeartline)));
+
+%% --- Test 18: peralte alineado al centro de curvatura -------------------
+% U apunta al centro de curvatura: psi = 0 en todo el elemento, y en un giro
+% a nivel eso es un peralte de 90 grados.
+Parametros = ParametrosBase;
+Parametros.ModoCurvatura = 'ArcoCircular';
+Parametros = AjustarParametros(Parametros, struct('AnguloDelGiro', deg2rad(240), ...
+                               'PeralteAlineadoAlCentroDeCurvatura', true), @ElementoOverBankedTurn);
+Estado = EstadoInicial([0 0 1.0], [1 0 0], [0 0 1], 5.0, Parametros);
+[~, ElementoCentro] = ElementoOverBankedTurn(Estado, Parametros);
+PsiMaximo = max(abs(ElementoCentro.Track.AnguloCurvaturaDesdeArriba));
+PeralteMaximo = rad2deg(max(abs(ElementoCentro.Track.AnguloPeralte)));
+Resultados = Anotar(Resultados, 'Peralte alineado al centro de curvatura: psi nulo', ...
+    PsiMaximo < 1e-9 && abs(PeralteMaximo - 90) < 1e-3, ...
+    sprintf('|psi| maximo %.2e rad, peralte maximo %.4f grados', PsiMaximo, PeralteMaximo));
+
+%% --- Test 19: peralte alineado a la fuerza --------------------------------
+% El eje del carro sigue a la fuerza especifica del riel (v^2*kappa + g*z):
+% el desalineo de diseno tiene que ser del orden del error numerico, el
+% onset tiene que quedar dentro del presupuesto (las rampas son C2) y la Gy
+% que queda es la dinamica del roll, acotada.
+Parametros = ParametrosBase;
+Parametros.ModoCurvatura = 'ArcoCircular';
+Parametros = AjustarParametros(Parametros, struct('AnguloDelGiro', deg2rad(240), ...
+                               'PeralteAlineadoALaFuerza', true), @ElementoOverBankedTurn);
+Estado = EstadoInicial([0 0 1.0], [1 0 0], [0 0 1], 5.0, Parametros);
+[~, ElementoFuerza] = ElementoOverBankedTurn(Estado, Parametros);
+DiagnosticoF = ElementoFuerza.Diagnostico;
+Resultados = Anotar(Resultados, 'Peralte alineado a la fuerza: Gy de balance nula y onset en presupuesto', ...
+    DiagnosticoF.ResidualAlineacionPeralte < 1e-5 ...
+    && DiagnosticoF.OnsetLateralGenerado <= 1.01*DiagnosticoF.Escala.OnsetMaximo(2) ...
+    && DiagnosticoF.OnsetVerticalGenerado <= 1.01*DiagnosticoF.Escala.OnsetMaximo(3) ...
+    && max(abs(ElementoFuerza.Sim.Gy)) < 0.5, ...
+    sprintf('desalineo %.2e rad, onset lateral %.1f de %.1f G/s, vertical %.1f de %.1f G/s, |Gy| maxima %.3f G', ...
+            DiagnosticoF.ResidualAlineacionPeralte, DiagnosticoF.OnsetLateralGenerado, DiagnosticoF.Escala.OnsetMaximo(2), ...
+            DiagnosticoF.OnsetVerticalGenerado, DiagnosticoF.Escala.OnsetMaximo(3), max(abs(ElementoFuerza.Sim.Gy))));
 
 %% --- Resumen ----------------------------------------------------------
 fprintf('\n');

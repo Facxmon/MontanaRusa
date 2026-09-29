@@ -22,8 +22,8 @@ function disenoRapido(): EntradaDeDiseno {
 
 describe('modo de curvatura por instancia', () => {
   it('modoEfectivo: el de la instancia si lo pisa, si no el global', () => {
-    expect(modoEfectivo({ ModoCurvatura: 'Clotoide' }, {})).toBe('Clotoide');
-    expect(modoEfectivo({ ModoCurvatura: 'Clotoide' }, { ModoCurvatura: 'FuerzaGConstante' })).toBe('FuerzaGConstante');
+    expect(modoEfectivo({ ModoCurvatura: 'ArcoCircular' }, {})).toBe('ArcoCircular');
+    expect(modoEfectivo({ ModoCurvatura: 'ArcoCircular' }, { ModoCurvatura: 'FuerzaGConstante' })).toBe('FuerzaGConstante');
   });
 
   it('pisar el modo en la instancia da lo mismo que ponerlo global', () => {
@@ -46,10 +46,10 @@ describe('modo de curvatura por instancia', () => {
       { id: 'e2', tipo: 'LoopVertical', ajustes: {} },
     ];
     const layout = calcularLayout(d, 'test');
-    expect(layout.parametros.valores.modoCurvatura).toBe('Clotoide');
+    expect(layout.parametros.valores.modoCurvatura).toBe('ArcoCircular');
     expect(layout.elementos[0]!.ajustes).toEqual({ modoCurvatura: 'FuerzaGConstante' });
     expect(modoDelElemento(layout, 0)).toBe('FuerzaGConstante');
-    expect(modoDelElemento(layout, 1)).toBe('Clotoide');
+    expect(modoDelElemento(layout, 1)).toBe('ArcoCircular');
     expect(elementosConModoPropio(layout)).toBe(1);
     // G constante deja la Gz del arco casi plana; la clotoide no.
     expect(layout.elementos[0]!.resumen.gzMaxima).not.toBeCloseTo(layout.elementos[1]!.resumen.gzMaxima!, 1);

@@ -7,7 +7,7 @@ import { BrazoDeVerificacion, EscalasDeFroude, MarcoTransporteDesdeCarro } from 
 import {
   cruz, linspace, maximo, maximoConIndice, minimo, modulo, norma, normaDe, punto as productoPunto, rad2deg, resta, sprintfF, type Vec3,
 } from './matematica';
-import { algunoEntre, G_MIN_EVALUABLE, limiteNormativo, tramosContiguos, ventanasMasGzReducido, type CurvaNormativa } from './norma';
+import { algunoEntre, G_MIN_EVALUABLE, limiteNormativo, limitesDelEvento, tramosContiguos, ventanasMasGzReducido, type CurvaNormativa } from './norma';
 import type {
   ContextoNormativo, Criterio, Escala, Estado, EventoSostenido, Layout, Normativo, Parametros, Receta, Reversion, SentidoDeCriterio, Sim, Track,
 } from './tipos';
@@ -456,8 +456,8 @@ function SemiejePorSigno(G: number[], CurvaPositiva: CurvaNormativa, CurvaNegati
  * Peor evento sostenido contra la curva. G y Tiempo son la linea de tiempo
  * del layout (tiempo ya en PROTOTIPO); Rango, los nodos del elemento. Los
  * niveles salen del maximo del elemento y se evaluan los eventos que tocan
- * alguno de sus nodos. `Reducida` (solo +Gz): un evento que toca una
- * ventana de 7.1.7.1 se evalua con MasGzReducido.
+ * alguno de sus nodos. `Reducida` (solo +Gz): ventanas de 7.1.7.1, con la
+ * curva reducida adentro y la normal despues, sin resetear la duracion.
  */
 export function PeorEventoSostenido(
   G: ArrayLike<number>, Tiempo: ArrayLike<number>, Rango: [number, number], Curva: CurvaNormativa, Signo: 1 | -1, Reducida: ArrayLike<boolean> | null,
@@ -474,19 +474,19 @@ export function PeorEventoSostenido(
   for (const Nivel of Niveles) {
     for (const [inicio, fin] of tramosContiguos(H.map((h) => h >= Nivel))) {
       if (fin < Rango[0] || inicio > Rango[1]) continue;
-      let DuracionReal = Tiempo[fin]! - Tiempo[inicio]!;
+      const DuracionReal = Tiempo[fin]! - Tiempo[inicio]!;
       if (DuracionReal > Evento.DuracionMasLarga) Evento.DuracionMasLarga = DuracionReal;
       // 7.1.4.2 no cubre los eventos de menos de 200 ms; el proyecto los evalua contra el limite de 200 ms.
-      DuracionReal = Math.max(DuracionReal, 0.2);
-      const CurvaDelEvento: CurvaNormativa = Reducida && algunoEntre(Reducida, inicio, fin) ? 'MasGzReducido' : Curva;
-      const LimiteMagnitud = Signo * limiteNormativo(CurvaDelEvento, DuracionReal);
-      const Exceso = Nivel - LimiteMagnitud;
-      if (Exceso > Evento.Exceso) {
-        Evento.Exceso = Exceso;
-        Evento.NivelCritico = Signo * Nivel;
-        Evento.DuracionReal = DuracionReal;
-        Evento.LimiteAplicado = Signo * LimiteMagnitud;
-        Evento.Curva = CurvaDelEvento;
+      // Con ventanas de 7.1.7.1, un limite por tramo de regimen sin resetear la duracion (limitesDelEvento).
+      for (const Tramo of limitesDelEvento(Tiempo, inicio, fin, Curva, Reducida)) {
+        const Exceso = Nivel - Tramo.limite;
+        if (Exceso > Evento.Exceso) {
+          Evento.Exceso = Exceso;
+          Evento.NivelCritico = Signo * Nivel;
+          Evento.DuracionReal = Tramo.duracion;
+          Evento.LimiteAplicado = Signo * Tramo.limite;
+          Evento.Curva = Tramo.curva;
+        }
       }
     }
   }

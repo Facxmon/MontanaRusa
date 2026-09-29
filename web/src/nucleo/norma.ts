@@ -130,9 +130,9 @@ export function tramosContiguos(mascara: ArrayLike<boolean>): Array<[number, num
  *  - un evento -Gz es un intervalo continuo con -Gz >= G_MIN_EVALUABLE;
  *  - si dura mas de 3 s, la transicion a +Gz es el primer nodo posterior con
  *    Gz >= G_MIN_EVALUABLE, y la ventana son los nodos a 6 s o menos de ella.
- * TODO(7.1.7.1): un evento de +Gz que toca la ventana se evalua entero con
- * MasGzReducido (lo conservador); la norma no dice que hacer con uno que
- * empieza adentro y termina afuera. Ver VentanasMasGzReducido.m.
+ * Un evento de +Gz que empieza dentro de la ventana y termina afuera se
+ * evalua con la reducida adentro y la normal despues, sin resetear su
+ * duracion (limitesDelEvento).
  */
 export function ventanasMasGzReducido(gz: ArrayLike<number>, tiempoPrototipo: ArrayLike<number>): { reducida: boolean[]; enAirtimeLargo: boolean[] } {
   const n = gz.length;
@@ -157,6 +157,40 @@ export function ventanasMasGzReducido(gz: ArrayLike<number>, tiempoPrototipo: Ar
   return { reducida, enAirtimeLargo };
 }
 
+/** Un tramo de un mismo regimen de 7.1.7.1 dentro de un evento, con su limite (modulo). */
+export interface TramoDelEvento {
+  primero: number;
+  ultimo: number;
+  limite: number;
+  duracion: number;
+  curva: CurvaNormativa;
+}
+
+/**
+ * Limites que tiene que cumplir el evento sostenido [inicio, fin]. Port de
+ * LimitesDelEvento.m. Sin ventanas de 7.1.7.1 es uno solo: la curva en la
+ * duracion del evento (0.2 s como minimo). Con ventanas (decision del
+ * usuario): la curva reducida es un "debuff" que rige mientras dura la
+ * ventana y despues vuelven los limites normales, pero la duracion NO se
+ * resetea: cada tramo de un mismo regimen se evalua en su ultimo nodo con la
+ * duracion acumulada desde el inicio del evento. `tiempo` es del prototipo.
+ */
+export function limitesDelEvento(
+  tiempo: ArrayLike<number>, inicio: number, fin: number, curva: CurvaNormativa, reducida: ArrayLike<boolean> | null | undefined,
+): TramoDelEvento[] {
+  const tramos: TramoDelEvento[] = [];
+  let primero = inicio;
+  const enVentana = (i: number) => (reducida ? reducida[i] === true : false);
+  for (let i = inicio; i <= fin; i++) {
+    if (i < fin && enVentana(i + 1) === enVentana(i)) continue;
+    const curvaDelTramo: CurvaNormativa = enVentana(primero) ? 'MasGzReducido' : curva;
+    const duracion = Math.max(tiempo[i]! - tiempo[inicio]!, 0.2);
+    tramos.push({ primero, ultimo: i, limite: Math.abs(limiteNormativo(curvaDelTramo, duracion)), duracion, curva: curvaDelTramo });
+    primero = i + 1;
+  }
+  return tramos;
+}
+
 /**
  * Limite normativo aplicable en cada nodo: la duracion del evento sostenido
  * que lo contiene a su nivel de G (cuantizado en `niveles` escalones), por
@@ -168,7 +202,7 @@ export function ventanasMasGzReducido(gz: ArrayLike<number>, tiempoPrototipo: Ar
  * su evento no cumple. Por debajo de G_MIN_EVALUABLE no hay limite, y la
  * grilla arranca en max(G_MIN_EVALUABLE, maximo/niveles). Para la linea de
  * tiempo del layout se pasa el tiempo del prototipo con factorTiempo = 1;
- * `reducida` (solo +Gz) son las ventanas de 7.1.7.1.
+ * `reducida` (solo +Gz) son las ventanas de 7.1.7.1 (limitesDelEvento).
  */
 export function limitePorPunto(
   g: ArrayLike<number>,
@@ -188,6 +222,7 @@ export function limitePorPunto(
   }
   const limite = new Float64Array(n).fill(NaN);
   if (!(maximo >= G_MIN_EVALUABLE)) return limite;
+  const tiempoEscalado = Float64Array.from({ length: n }, (_, i) => tiempo[i]! * factorTiempo);
 
   // linspace(max(umbral, maximo/niveles), maximo, niveles), de menor a mayor:
   // cada nodo termina con el limite del nivel mas alto que alcanza.
@@ -197,10 +232,9 @@ export function limitePorPunto(
     const mascara = new Array<boolean>(n);
     for (let i = 0; i < n; i++) mascara[i] = h[i]! >= nivel;
     for (const [inicio, fin] of tramosContiguos(mascara)) {
-      const duracion = Math.max((tiempo[fin]! - tiempo[inicio]!) * factorTiempo, 0.2);
-      const curvaDelEvento = reducida && algunoEntre(reducida, inicio, fin) ? 'MasGzReducido' : curva;
-      const valor = signo * Math.abs(limiteNormativo(curvaDelEvento, duracion));
-      for (let i = inicio; i <= fin; i++) limite[i] = valor;
+      for (const t of limitesDelEvento(tiempoEscalado, inicio, fin, curva, reducida)) {
+        for (let i = t.primero; i <= t.ultimo; i++) limite[i] = signo * t.limite;
+      }
     }
   }
   return limite;

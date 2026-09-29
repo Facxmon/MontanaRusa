@@ -13,7 +13,7 @@ import {
 } from '../src/nucleo/parametros';
 
 const layout = analizarLayout(
-  readFileSync(fileURLToPath(new URL('../../golden/loop-clotoide.json', import.meta.url)), 'utf8'),
+  readFileSync(fileURLToPath(new URL('../../golden/loop-arcocircular.json', import.meta.url)), 'utf8'),
 );
 const camel = (nombre: string) => nombre[0]!.toLowerCase() + nombre.slice(1);
 
@@ -43,7 +43,7 @@ describe('declaraciones contra parametros.esquema del golden', () => {
     lista.map((d) => ({ clave: camel(d.Nombre), unidad: d.Unidad, descripcion: d.Descripcion }));
 
   it('modo', () => {
-    const { Lista, Nota } = ParametrosDelModo('Clotoide');
+    const { Lista, Nota } = ParametrosDelModo('ArcoCircular');
     expect(aTernas(Lista)).toEqual(esquema.modo.parametros);
     expect(Nota).toBe(esquema.modo.nota);
   });

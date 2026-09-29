@@ -190,7 +190,7 @@ Dos mitades: los valores y el esquema que los describe.
 ```jsonc
 {
   "valores": {
-    "modoCurvatura": "Clotoide",
+    "modoCurvatura": "ArcoCircular",
     "metodoDeAcoplamiento": "A",
     "radioDelLoop": 0.30,
     "peralteDeLaHelice": 0.9599,        // rad, NO grados
@@ -201,8 +201,8 @@ Dos mitades: los valores y el esquema que los describe.
 
   "esquema": {
     "modo": {
-      "nombre": "Clotoide",
-      "opciones": ["AceleracionNormalConstante","Clotoide","FuerzaGConstante","GNormativaMaxima"],
+      "nombre": "ArcoCircular",
+      "opciones": ["AceleracionNormalConstante","ArcoCircular","Clotoide","FuerzaGConstante","GNormativaMaxima"],
       "nota": "",
       "parametros": [
         { "clave": "radioDeReferencia", "unidad": "m",
@@ -498,17 +498,26 @@ física?" es una opinión; con esto, es un test que corre solo.
 
 | Caso | Elemento | Modo |
 |---|---|---|
-| `loop-clotoide` | LoopVertical | Clotoide |
+| `loop-arcocircular` | LoopVertical | ArcoCircular |
 | `loop-gconstante` | LoopVertical | FuerzaGConstante |
 | `loop-normativa` | LoopVertical | GNormativaMaxima |
 | `loop-anconstante` | LoopVertical | AceleracionNormalConstante |
-| `helice-clotoide` | Helice | Clotoide |
+| `helice-arcocircular` | Helice | ArcoCircular |
 | `helice-normativa` | Helice | GNormativaMaxima |
-| `obt-clotoide` | OverBankedTurn | Clotoide |
+| `obt-arcocircular` | OverBankedTurn | ArcoCircular |
 | `obt-normativa` | OverBankedTurn | GNormativaMaxima |
-| `diveloop-clotoide` | DiveLoop | Clotoide |
+| `diveloop-arcocircular` | DiveLoop | ArcoCircular |
 | `diveloop-normativa` | DiveLoop | GNormativaMaxima |
-| `circuito-demolayout` | los cuatro encadenados | Clotoide |
+| `circuito-demolayout` | los cuatro encadenados | ArcoCircular |
+| `loop-clotoide` | LoopVertical | Clotoide (simétrica, de verdad) |
+| `obt-clotoide` | OverBankedTurn | Clotoide (simétrica, de verdad) |
+| `obt-alineado-centro` | OverBankedTurn | ArcoCircular, peralte alineado al centro de curvatura |
+| `obt-alineado-fuerza` | OverBankedTurn | ArcoCircular, peralte alineado a la fuerza |
+| `obt-relativo-fuerza` | OverBankedTurn | ArcoCircular, peralte relativo a la fuerza con 10° de desvío |
+| `helice-alineado-fuerza` | Helice | ArcoCircular, peralte alineado a la fuerza |
+
+Hasta la 1.2.0 del contrato los casos en `ArcoCircular` se llamaban `*-clotoide` y el modo, `Clotoide`;
+los nombres `loop-clotoide` y `obt-clotoide` son ahora los de la clotoide nueva.
 
 Los genera `GenerarGoldenFiles.m`, que también los valida. El setup de los diez casos sueltos está
 fijado ahí: `ParametrosPorDefecto` con `RadioDelLoop = 0.30`, método A, entrada en `[0 0 1]` a nivel a

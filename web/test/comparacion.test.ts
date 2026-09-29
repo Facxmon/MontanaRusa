@@ -56,7 +56,7 @@ describe('comparacion A/B (fase 4.8)', () => {
 
   it('con dos golden reales, todas las figuras de todas las pestanas se superponen sin perder puntos', () => {
     const leer = (c: string) => analizarLayout(readFileSync(fileURLToPath(new URL(`../../golden/${c}.json`, import.meta.url)), 'utf8'));
-    const [b, a] = [leer('loop-clotoide'), leer('loop-gconstante')];
+    const [b, a] = [leer('loop-arcocircular'), leer('loop-gconstante')];
     for (const pestana of ['g', 'jerk', 'cinematica', 'roll', 'curvatura'] as const) {
       const fb = figurasDePestana(pestana, extraerColumnas(b, null), 'arco');
       const fa = figurasDePestana(pestana, extraerColumnas(a, null), 'arco');

@@ -112,7 +112,7 @@ describe('deserializarDiseno rechaza con un mensaje que dice que campo y que se 
     expect(() => deserializarDiseno({ v: 1, p: { RadioDelLoop: null }, ei, s: [] })).toThrowError(/p\.RadioDelLoop vale null/);
     expect(() => deserializarDiseno({ v: 1, p: { OnsetMaximoModelo: [1, 2] }, ei, s: [] })).toThrowError(/OnsetMaximoModelo vale \[1,2\] y se esperaba un vector de 3 numeros finitos o null/);
     expect(() => deserializarDiseno({ v: 1, p: { SentidoDelGiro: 'Arriba' }, ei, s: [] })).toThrowError(/SentidoDelGiro vale "Arriba" y se esperaba uno de: Derecha, Izquierda/);
-    expect(() => deserializarDiseno({ v: 1, p: { ModoCurvatura: 'Lineal' }, ei, s: [] })).toThrowError(/ModoCurvatura .* AceleracionNormalConstante, Clotoide, FuerzaGConstante, GNormativaMaxima/);
+    expect(() => deserializarDiseno({ v: 1, p: { ModoCurvatura: 'Lineal' }, ei, s: [] })).toThrowError(/ModoCurvatura .* AceleracionNormalConstante, ArcoCircular, Clotoide, FuerzaGConstante, GNormativaMaxima/);
     expect(() => deserializarDiseno({ v: 1, p: { BoundingBoxDisponible: [[1, 2], [1, 2]] }, ei, s: [] })).toThrowError(/BoundingBoxDisponible .* matriz 3x2/);
     expect(() => deserializarDiseno({ v: 1, p: { ModelarArrastre: 1 }, ei, s: [] })).toThrowError(/ModelarArrastre vale 1 y se esperaba true o false/);
   });

@@ -15,6 +15,6 @@ describe('listarCasos', () => {
 
   it('el indice es JSON con la clave casos', () => {
     const indice = JSON.parse(textoDelIndice(CARPETA_GOLDEN)) as { casos: string[] };
-    expect(indice.casos).toContain('loop-clotoide');
+    expect(indice.casos).toContain('loop-arcocircular');
   });
 });

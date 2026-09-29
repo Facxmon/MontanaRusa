@@ -39,8 +39,9 @@ function Limite = LimitePorPunto(G, Tiempo, Curva, FactorTiempo, Signo, NumeroDe
 %
 %   Para la linea de tiempo de todo el layout se pasa el tiempo del
 %   prototipo acumulado con FactorTiempo = 1. Reducida (opcional, solo +Gz)
-%   marca los nodos de las ventanas de 7.1.7.1 (VentanasMasGzReducido): un
-%   evento que toca uno se evalua con MasGzReducido.
+%   marca los nodos de las ventanas de 7.1.7.1 (VentanasMasGzReducido): ahi
+%   rige MasGzReducido y despues la curva normal, con la duracion acumulada
+%   del evento (LimitesDelEvento).
 
     if nargin < 6 || isempty(NumeroDeNiveles)
         NumeroDeNiveles = 40;
@@ -67,15 +68,14 @@ function Limite = LimitePorPunto(G, Tiempo, Curva, FactorTiempo, Signo, NumeroDe
     for Nivel = Niveles
         Tramos = TramosContiguos(H >= Nivel);
         for k = 1:size(Tramos, 1)
-            Duracion = max((Tiempo(Tramos(k,2)) - Tiempo(Tramos(k,1))) * FactorTiempo, 0.2);
-            CurvaDelEvento = Curva;
-            if ~isempty(Reducida) && any(Reducida(Tramos(k,1):Tramos(k,2)))
-                CurvaDelEvento = 'MasGzReducido';
+            % Un limite por tramo de regimen de 7.1.7.1, con la duracion
+            % acumulada desde el inicio del evento (LimitesDelEvento). Las
+            % tablas de las curvas negativas vienen con signo: LimitesDelEvento
+            % devuelve el modulo y aca se le pone el signo del lado evaluado.
+            [Limites, ~, ~, Segmentos] = LimitesDelEvento(Tiempo * FactorTiempo, Tramos(k,1), Tramos(k,2), Curva, Reducida);
+            for j = 1:numel(Limites)
+                Limite(Segmentos(j,1):Segmentos(j,2)) = Signo * Limites(j);
             end
-
-            % Las tablas de las curvas negativas ya vienen con signo, asi que
-            % se toma el modulo y se le pone el signo del lado evaluado.
-            Limite(Tramos(k,1):Tramos(k,2)) = Signo * abs(LimiteNormativo(CurvaDelEvento, Duracion));
         end
     end
 end

@@ -12,7 +12,7 @@ addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'GeneradorDeElementos
 %% ===================== PARAMETROS DE ENTRADA =========================
 Parametros = ParametrosPorDefecto();
 
-Parametros.ModoCurvatura           = 'Clotoide';
+Parametros.ModoCurvatura           = 'ArcoCircular';
 Parametros.MetodoDeAcoplamiento    = 'A';
 Parametros.CalcularVelocidadMinima = false;   % la biseccion no aporta aca y cuesta
 

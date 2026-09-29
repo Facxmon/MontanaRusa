@@ -72,7 +72,7 @@ describe('consistencia grafico-veredicto', () => {
     expect(loop.valor!).toBeCloseTo(0.4224, 3);
   }, 120000);
 
-  it.each(['circuito-demolayout', 'loop-clotoide', 'diveloop-normativa'])('golden %s', (caso) => {
+  it.each(['circuito-demolayout', 'loop-arcocircular', 'diveloop-normativa'])('golden %s', (caso) => {
     expect(comprobar(cargar(caso))).toEqual([]);
   });
 });

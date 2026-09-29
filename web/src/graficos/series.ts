@@ -15,7 +15,7 @@
 import { magnitudPorClave, type ClaveDeMagnitud } from '../contrato/magnitudes';
 import type { Elemento, Layout } from '../contrato/tipos';
 import {
-  algunoEntre, G_MIN_EVALUABLE, limiteNormativo, limitePorPunto, tablaNormativa, tramosContiguos, ventanasMasGzReducido, type CurvaNormativa,
+  algunoEntre, G_MIN_EVALUABLE, limiteNormativo, limitePorPunto, limitesDelEvento, tablaNormativa, tramosContiguos, ventanasMasGzReducido, type CurvaNormativa,
 } from '../nucleo/norma';
 import type { BandaEntreSeries, DatosDeFigura, Franja, SerieDeFigura } from './figura';
 
@@ -560,8 +560,8 @@ export interface PuntoCritico {
  * Curva del recorrido para un lado, con h = signo * G ya armado. Para cada
  * nivel (grilla de `niveles` desde max(G_MIN_EVALUABLE, maximo/niveles)), la
  * duracion del evento mas largo entre los que tocan `rango`, y el punto
- * critico sobre TODOS esos eventos. `reducida` (solo +Gz): un evento que
- * toca una ventana de 7.1.7.1 se compara con MasGzReducido. Puro.
+ * critico sobre TODOS esos eventos. `reducida` (solo +Gz): ventanas de
+ * 7.1.7.1, con la curva reducida adentro y la normal despues (limitesDelEvento). Puro.
  */
 export function curvaDelRecorrido(
   h: ArrayLike<number>,
@@ -587,10 +587,9 @@ export function curvaDelRecorrido(
       if (fin < rango[0] || inicio > rango[1]) continue;
       const real = tiempo[fin]! - tiempo[inicio]!;
       if (real > masLarga) masLarga = real;
-      const duracion = Math.max(real, 0.2);
-      const curvaDelEvento: CurvaNormativa = reducida && algunoEntre(reducida, inicio, fin) ? 'MasGzReducido' : curva;
-      const limite = Math.abs(limiteNormativo(curvaDelEvento, duracion));
-      if (!critico || limite - nivel < critico.margen) critico = { nivel, duracion, limite, margen: limite - nivel, curva: curvaDelEvento };
+      for (const t of limitesDelEvento(tiempo, inicio, fin, curva, reducida)) {
+        if (!critico || t.limite - nivel < critico.margen) critico = { nivel, duracion: t.duracion, limite: t.limite, margen: t.limite - nivel, curva: t.curva };
+      }
     }
     if (masLarga >= 0) puntos.push({ nivel, duracion: Math.max(masLarga, 0.2), duracionReal: masLarga });
   }
