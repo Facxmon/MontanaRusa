@@ -128,8 +128,7 @@ export function ChequeosPosteriores(Track: Track, Sim: Sim, Parametros: Parametr
   ]);
   AgregarCriterio(Criterios, 'Dentro del bounding box disponible', 'MenorOIgual', Sobresale, 0, 'm', 'Maximo desborde sobre cualquiera de las seis caras.');
 
-  const RadioEnvolvente = Math.hypot(Parametros.AnchoVia + 2 * Parametros.Holgura, Parametros.AltoCarro + 2 * Parametros.Holgura) / 2;
-  const SeparacionExigida = 2 * RadioEnvolvente + Parametros.DistanciaMinimaEntreVias;
+  const SeparacionExigida = SeparacionExigidaEntreVias(Parametros);
 
   const [DistanciaPropia, IndicePropioA, IndicePropioB] = DistanciaMinimaEntrePolilineas(
     Track.PuntosRiel, Track.PuntosRiel, Track.LongitudArco, Track.LongitudArco, Parametros.ArcoMinimoAutointerferencia,
@@ -142,12 +141,7 @@ export function ChequeosPosteriores(Track: Track, Sim: Sim, Parametros: Parametr
   }
   AgregarCriterio(Criterios, 'Autointerferencia del loop', 'MayorOIgual', DistanciaPropia, SeparacionExigida, 'm', DetalleOrientado);
 
-  let DistanciaLayout = Infinity;
-  if (Layout && Layout.PuntosRiel.length > 0) {
-    [DistanciaLayout] = DistanciaMinimaEntrePolilineas(Track.PuntosRiel, Layout.PuntosRiel, Track.LongitudArco, Layout.LongitudArcoRiel, Parametros.ArcoMinimoAutointerferencia);
-  }
-  AgregarCriterio(Criterios, 'Interferencia con la via preexistente', 'MayorOIgual', DistanciaLayout, SeparacionExigida, 'm',
-    `Distancia segmento a segmento contra toda la polilinea ya construida, salteando la junta (pares a menos de ${sprintfF(Parametros.ArcoMinimoAutointerferencia, 2)} m de arco).`);
+  Criterios.push(CriterioDeInterferenciaConLaVia(Track, Parametros, Layout, SeparacionExigida));
 
   const Normativo = VerificarLimitesNormativos(Sim, Escala, Parametros);
   const Ejes = ['Gx', 'Gy', 'Gz'] as const;
@@ -168,6 +162,35 @@ export function ChequeosPosteriores(Track: Track, Sim: Sim, Parametros: Parametr
   AgregarCriterio(Criterios, '|Gy| maxima en la cabeza', 'Informativo', maximo(validos(Sim.GyCabeza).map(Math.abs)), NaN, 'G', '');
 
   return [Criterios, Normativo];
+}
+
+/** Nombre de la unica linea de los posteriores que depende de la via ya construida (y no solo del elemento). */
+export const NOMBRE_INTERFERENCIA_CON_LA_VIA = 'Interferencia con la via preexistente';
+
+/**
+ * La linea "Interferencia con la via preexistente" de ChequeosPosteriores:
+ * distancia minima entre el riel del elemento y la polilinea ya construida
+ * (Layout.PuntosRiel). Separada para que el recalculo incremental
+ * (calculoIncremental.ts) la pueda rehacer sola cuando reutiliza un elemento
+ * cacheado sobre una via previa distinta; el calculo es el mismo.
+ */
+export function CriterioDeInterferenciaConLaVia(
+  Track: Track, Parametros: Parametros, Layout: Pick<Layout, 'PuntosRiel' | 'LongitudArcoRiel'> | null, SeparacionExigida: number,
+): Criterio {
+  let DistanciaLayout = Infinity;
+  if (Layout && Layout.PuntosRiel.length > 0) {
+    [DistanciaLayout] = DistanciaMinimaEntrePolilineas(Track.PuntosRiel, Layout.PuntosRiel, Track.LongitudArco, Layout.LongitudArcoRiel, Parametros.ArcoMinimoAutointerferencia);
+  }
+  const Criterios: Criterio[] = [];
+  AgregarCriterio(Criterios, NOMBRE_INTERFERENCIA_CON_LA_VIA, 'MayorOIgual', DistanciaLayout, SeparacionExigida, 'm',
+    `Distancia segmento a segmento contra toda la polilinea ya construida, salteando la junta (pares a menos de ${sprintfF(Parametros.ArcoMinimoAutointerferencia, 2)} m de arco).`);
+  return Criterios[0]!;
+}
+
+/** SeparacionExigida de ChequeosPosteriores: dos envolventes de la seccion mas la distancia minima entre vias. */
+export function SeparacionExigidaEntreVias(Parametros: Parametros): number {
+  const RadioEnvolvente = Math.hypot(Parametros.AnchoVia + 2 * Parametros.Holgura, Parametros.AltoCarro + 2 * Parametros.Holgura) / 2;
+  return 2 * RadioEnvolvente + Parametros.DistanciaMinimaEntreVias;
 }
 
 /**

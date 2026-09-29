@@ -737,3 +737,77 @@ simétrica nueva). Los diseños viejos se migran al leerlos, así que nada guard
 - Contrato 1.2.0 (`cargar.ts`): lo mismo para layouts de contrato anterior a 1.2.0 (valores, defaults,
   esquema y ajustes de cada elemento).
 - Las tarjetas de bienvenida usan el golden `loop-arcocircular`.
+
+---
+
+# Recálculo incremental (2026-09-29)
+
+Optimización sin cambio de comportamiento: el layout que llega al visualizador es **idéntico** al de
+antes. Hasta ahora cada Generar reconstruía toda la vía; ahora el worker conserva una caché por elemento
+y solo reconstruye los elementos cuya entrada cambió.
+
+## Qué se reutiliza y qué no
+
+- **Caché por elemento** (`src/nucleo/calculoIncremental.ts`, clase `CalculadorIncremental`). Clave:
+  tipo + parámetros de la instancia (globales con sus ajustes, ya resueltos por `AjustarParametros`) +
+  estado de entrada completo (posición, versores, curvatura, roll, arco acumulado, velocidad y energía).
+  Valor: lo que devuelve el constructor del elemento (estado de salida, `Elemento`, `Reporte`).
+- Al editar el elemento *k*, los elementos 0..*k*−1 tienen la misma clave y salen de la caché. Desde *k*
+  se reconstruye; si la salida de *k* no cambia (p. ej. se editó un límite de aceptación), los siguientes
+  vuelven a tener la misma clave y tampoco se reconstruyen.
+- **La única dependencia con la vía anterior** dentro del constructor es la línea "Interferencia con la
+  vía preexistente" de `ChequeosPosteriores`. Se separó en `CriterioDeInterferenciaConLaVia`
+  (`verificacion.ts`, mismo cálculo) para rehacerla sola cuando un elemento cacheado se reutiliza sobre una
+  vía previa distinta. Cada polilínea de riel lleva una ficha; si un elemento reconstruido deja el riel
+  idéntico bit a bit al de la corrida anterior, hereda la ficha y los siguientes no rehacen nada.
+- **Siempre completo**: el bloque normativo sobre la línea de tiempo continua del layout
+  (`VerificarLayoutNormativo`, un elemento puede alargar un evento del anterior), la concatenación del
+  riel y la exportación. `calcularLayout` corre `VerificarLayoutNormativo` después de cada elemento; la
+  ruta incremental lo corre una sola vez al final. Da lo mismo porque cada corrida reemplaza por completo
+  las líneas normativas de la anterior.
+- **Dinámica**: queda dentro de la caché, sin aproximación. El modelo es de partícula (el tren de varios
+  carros no está implementado) y la velocidad y la energía de entrada son parte de la clave: si una
+  edición cambia la velocidad a la salida de *k*, todos los siguientes cambian de clave y se reconstruyen.
+  No hizo falta ninguna forma especial de dinámica incremental; medida sobre el DemoLayout,
+  `SimularSobreTrack` es ~2 % del tiempo (el constructor del elemento es ~90 %).
+- **Invalidación**: si cambia cualquier parámetro general se vacía la caché entera. Detener recrea el
+  worker (ver "Por qué Detener es `terminate()`"), así que después de Detener la caché arranca vacía.
+- **Tope**: la caché guarda el diseño actual más `ENTRADAS_EXTRA_EN_CACHE` = 16 elementos (los menos
+  usados se descartan primero), para que deshacer/rehacer e ir y volver entre dos valores no recalculen.
+
+## Invariantes nuevos
+
+- `calcularLayout` sigue siendo la referencia (la que usan el arnés y los tests de paridad) y no cambió.
+  `calculoIncremental.test.ts` hace ediciones aleatorias (semilla fija) sobre el DemoLayout —radios,
+  sentido de giro, límites de aceptación, insertar y quitar elementos, velocidad inicial, un parámetro
+  general— y exige `toStrictEqual` contra el recálculo completo después de cada una (solo se excluye
+  `meta.generadoEn`).
+- Si en el futuro el constructor de un elemento pasa a leer algo más del layout que `PuntosRiel` y
+  `LongitudArcoRiel`, hay que agregarlo a la clave o rehacerlo como la línea de interferencia.
+- Comparación de estados **exacta** (bit a bit, `claveExacta`). Ver pendientes.
+
+## Tiempos (DemoLayout, Node 24, mediana de 5; `npx vite-node scripts/medir-incremental.ts`)
+
+| Edición | Completo | Incremental | Reutilizados / reconstruidos |
+|---|---|---|---|
+| Primer elemento (radio del loop) | 2020 ms | 2052 ms | 0 / 4 |
+| Del medio (radio del over-banked turn, 2.º) | 1943 ms | 1766 ms | 1 / 3 |
+| Del medio (radio de la hélice, 3.º) | 1951 ms | 1541 ms | 2 / 2 |
+| Último (radio del dive loop) | 2027 ms | 627 ms | 3 / 1 |
+| Primer elemento sin cambiar su salida (altura máxima) | 2048 ms | 218 ms | 3 / 1 |
+
+En el navegador (worker de la app, diseño propio a partir del DemoLayout) editar el radio del dive loop
+bajó de 1,19 s a 0,34 s. Editar el primer elemento no mejora: todo lo posterior cambia de estado de
+entrada y se reconstruye, como corresponde.
+
+## Pendientes
+
+- **Tolerancia de reutilización** (TODO en `claveExacta`): la consigna pedía comparar el estado de
+  entrada "dentro de la tolerancia numérica del proyecto", pero también que el resultado incremental sea
+  idéntico al completo; las dos cosas no son compatibles (reutilizar con un estado que difiere en 1e-12
+  devuelve un elemento que el cálculo completo no daría). Se eligió tolerancia cero. Las tolerancias que
+  existen en el proyecto son otras: las del arnés (6e-6 relativo, contra golden redondeados) y
+  `ToleranciaVelocidadDeDiseno` (aviso al re-simular un track con otra velocidad de entrada). Falta
+  decidir si alguna debería usarse acá.
+- La caché se pierde al Detener (el worker se recrea). Conservarla exigiría sacar la caché del worker o
+  interrumpirlo de forma cooperativa; ninguna de las dos se hizo.

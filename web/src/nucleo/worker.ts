@@ -6,8 +6,13 @@
 // No hay forma de interrumpirlo desde afuera (ver ClienteDeCalculo.abortar):
 // el nucleo no chequea ninguna bandera, corre hasta el final o hasta que
 // lo terminen.
+//
+// El calculo es incremental (calculoIncremental.ts): el worker conserva entre
+// pedidos una cache por elemento y solo reconstruye los elementos cuya
+// entrada cambio. El resultado es identico al de calcularLayout.
 
-import { calcularLayout, ErrorDeElemento, type EntradaDeDiseno } from './calcular';
+import { ErrorDeElemento, type EntradaDeDiseno } from './calcular';
+import { CalculadorIncremental } from './calculoIncremental';
 
 export interface PedidoDeCalculo {
   id: number;
@@ -26,11 +31,13 @@ export type RespuestaDeCalculo =
   | { id: number; ok: true; layout: unknown; ms: number }
   | { id: number; ok: false; error: string; elemento: number | null };
 
+const calculador = new CalculadorIncremental();
+
 self.onmessage = (evento: MessageEvent<PedidoDeCalculo>) => {
   const { id, entrada, versionGenerador } = evento.data;
   const inicio = performance.now();
   try {
-    const layout = calcularLayout(entrada, versionGenerador, (hecho, total, tipo) => {
+    const layout = calculador.calcular(entrada, versionGenerador, (hecho, total, tipo) => {
       const progreso: RespuestaDeCalculo = { id, progreso: { hecho, total, tipo } };
       self.postMessage(progreso);
     });
