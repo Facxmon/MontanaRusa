@@ -639,3 +639,44 @@ propuesta, sin aplicar (ver el diagnóstico, A6).
   `ElementoXxx` lo pisa con su radio: A5 del diagnóstico).
 - **Bounding box**: el límite 0 del criterio es de MATLAB (el valor es el desborde); no se tocó ni el
   criterio ni el tamaño de la caja (A3).
+
+---
+
+# Límites normativos (2026-09-29): línea de tiempo del layout y G contra duración
+
+Los cambios de criterio están en MATLAB y en el port, línea por línea (`VerificarLimitesNormativos.m`,
+`verificacion.ts`; memoria de cálculo §5.7). Acá, lo que cambia en los gráficos.
+
+## El límite aplicable se calcula una vez, sobre todo el layout
+
+Antes `series.ts` calculaba el "Límite aplicable" por tramo (un tramo = un elemento), con el tiempo del
+modelo de cada elemento: un evento que cruzaba un empalme quedaba partido en dos, y el límite saltaba
+en cada empalme. Ahora:
+
+- `lineaNormativa(layout)` arma la serie de todo el layout sin repetir los nodos de los empalmes, con el
+  tiempo del prototipo acumulado (lo mismo que `SerieNormativaDelLayout.m`) y las ventanas de 7.1.7.1.
+  Se calcula una vez por layout (`WeakMap`).
+- `limitePorPunto` corre una vez por lado sobre esa serie, con `factorTiempo = 1`, y cada figura toma los
+  nodos que muestra. Con un elemento elegido se **recorta** ese cálculo global: el elemento muestra el
+  mismo límite que acompañado.
+- El límite de 200 ms de +Gz es nodo a nodo: 5,0 G dentro de una ventana de 7.1.7.1, 6,0 G fuera.
+- Mismo criterio que el veredicto (eventos cortos a 0,2 s, umbral de 0,01 G), así que un punto queda por
+  encima de la línea si y solo si su criterio falla. `test/consistenciaNormativa.test.ts` lo comprueba en
+  el DemoLayout recalculado y en tres golden, con el layout entero y con cada elemento solo.
+- La fila "Límite aplicable" de la leyenda lleva una aclaración (atributo `title`, el patrón de ayuda de
+  la barra): es el límite del evento que contiene al punto evaluado a su propio nivel de G, no un margen.
+- La grilla de niveles es de 400 niveles sobre el máximo **del layout** (antes, del elemento): en un
+  elemento de G baja la escalera del límite es algo más gruesa que antes.
+
+## Pestaña "G vs duración"
+
+Las Figs. 6-10 de la norma son nivel de G contra duración del evento. La pestaña nueva las dibuja para
++Gz, −Gz, ±Gy (sobre |Gy|, como la verificación), +Gx y −Gx, con la del recorrido encima: para cada
+nivel, la duración de prototipo del evento continuo **más largo** con G al menos igual a ese nivel, de
+corrido en todo el layout (con un elemento elegido, entre los eventos que tocan sus nodos). Los eventos de
+menos de 0,2 s se dibujan en 0,2 s. El punto de menor margen va marcado, con su valor en la leyenda. Si
+hay ventanas de 7.1.7.1 se agrega la curva reducida.
+
+- Mismo sistema de figuras (tema, zoom, PNG, CSV, comparación A/B). No se liga al cursor del 3D: sus
+  puntos no son nodos. El selector de eje horizontal se oculta en esta pestaña.
+- `curvaDelRecorrido` y `figurasDeDuracion` son puras (`series.ts`) y tienen tests.

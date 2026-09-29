@@ -264,3 +264,74 @@ cruces por cero de esos mismos dos tramos y en bordes de mesetas de −0,05 a �
 - Evento −Gz OBT → Hélice (t ≈ 1,52-1,66 s): partido en dos eventos, uno por elemento; la duración se
   subestima en los dos.
 - 7.1.6 (reversiones en X e Y) no está implementado en ningún lado.
+
+---
+
+## Después: reporte antes/después de la corrección de los límites normativos
+
+Estado después de aplicar, en MATLAB y en el port, las cinco reglas de la memoria de cálculo §5.7:
+**A** eventos de menos de 200 ms contra el límite de 200 ms; **B** eventos de corrido en todo el layout;
+**C** umbral de 0,01 G; **D** reversiones en X e Y (7.1.6); y 7.1.7.1 literal. Golden regenerados con
+`GenerarGoldenFiles.m`.
+
+### Veredictos
+
+En los once golden cambia **un solo** `criterios[].pasa`:
+
+| Caso | Elemento | Criterio | Antes | Después | Causa |
+|---|---|---|---|---|---|
+| circuito-demolayout (= caso de prueba) | LoopVertical | +Gz (Fig. 10) | pasa: 5,887 G / 0,215 s / exceso −0,113 G | **no pasa**: 6,422 G / 0,20 s / exceso **+0,422 G** | A: el pico de 6,42 G dura 0,187 s de prototipo por encima de 6,0 G y ya no se descarta |
+
+Se agregan en todos los elementos `Reversiones de Gx (7.1.6)` y `Reversiones de Gy (7.1.6)`, informativos
+(D): ningún par de eventos sostenidos de signo opuesto baja de 0,2 s entre picos en ningún golden. En el
+caso de prueba el más rápido es 0,381 s (ver abajo). `+Gx (Fig. 6)` de los dos dive loop sueltos pasa de
+`MenorOIgual` a `Informativo` (C: su +Gx máximo es 0,009 G, bajo el umbral); los dos pasan antes y después.
+
+### Valores del DemoLayout que cambian (todos siguen pasando salvo el de arriba)
+
+| Elemento | Criterio | Antes | Después | Causa |
+|---|---|---|---|---|
+| LoopVertical | Gy (Fig. 8) | nivel crítico **0,0014 G**, exceso −2,551 | nivel crítico 0,01 G, exceso −2,637 | C: la grilla arranca en 0,01 G |
+| LoopVertical | −Gx (Fig. 7) | −1,326 | −1,328 | B: el evento sigue en el OBT (duración más larga 3,76 → 4,12 s) |
+| OverBankedTurn | +Gz (Fig. 10) | 0,89 G / 1,44 s → exceso −4,235 | 0,74 G / 2,02 s → −3,258 | B: el evento +Gz que viene del loop sigue en el OBT |
+| OverBankedTurn | −Gz (Fig. 9) | −0,15 G / 0,40 s → −1,513 | −0,12 G / 0,42 s → −1,514 | B y C |
+| OverBankedTurn | +Gx (Fig. 6) | 0,02 G → −5,979 | 0,04 G → −5,956 | C (y A: eventos cortos a 0,2 s) |
+| OverBankedTurn | −Gx (Fig. 7) | −1,395 | −1,394 | B |
+| Hélice | −Gz (Fig. 9) | −0,18 G / 0,32 s → −1,622 | −0,13 G / 0,38 s → −1,560 | B: el −Gz que cruza el empalme OBT → Hélice (1,556 s) es un solo evento (0,398 → 0,448 s) |
+| Hélice | Gy (Fig. 8) | 1,19 G / 0,21 s → −1,810 | 0,93 G / 2,53 s → −1,070 | B: la meseta de −Gy del OBT sigue en la Hélice (evento de 6,05 s) |
+| DiveLoop | +Gz (Fig. 10) | 5,36 G / 0,20 s → −0,641 | 5,74 G / 0,20 s → −0,258 | A: el pico del arco (5,74 G, menos de 0,2 s) ahora se evalúa |
+| DiveLoop | Gy (Fig. 8) | 0,84 G / 0,23 s → −2,160 | 0,90 G / 0,20 s → −2,099 | A |
+| DiveLoop | ±Gx | −5,959 / −1,336 | −5,950 / −1,334 | A, B y C |
+
+### Líneas de los gráficos (tabla B3, después)
+
+| Línea | Antes | Después | Causa |
+|---|---|---|---|
+| Admisible y 200 ms | Constantes por elemento | Iguales en el DemoLayout; la de 200 ms de +Gz pasa a ser nodo a nodo (5,0 G en una ventana de 7.1.7.1) | 7.1.7.1 |
+| +Gz aplicable, empalme Loop → OBT (0,728 s) | 4,85 → 6,00 G | sin salto | B |
+| +Gz aplicable, empalme Hélice → DiveLoop (3,328 s) | 3,00 → 6,00 G | sin salto | B |
+| −Gz aplicable, evento OBT → Hélice (1,539-1,675 s) | dos eventos: −2,00 y −1,67 G | un evento: −1,59 G de corrido | B |
+| +Gz aplicable, valle de la Hélice (1,835 / 2,109 / 2,275 s) | 3,14 → 6,00 → 3,14 → 4,00 G | igual (3,135 → 6,0 → 3,135 → 4,0 G) | Correcto: es el límite a su propio nivel, no una envolvente; la leyenda ahora lo aclara |
+| +Gz aplicable, jorobas de la Hélice (2,67-3,19 s) | escalera fina | escalera en pasos de 0,3-0,4 G | La grilla de 400 niveles es ahora sobre el máximo del layout (6,42 G), no del elemento (1,80 G) |
+| +Gy aplicable, DiveLoop (3,62-3,75 s) | peine de 2,1 a 3,0 G, 77 saltos | sin límite (Gy máxima 2,5e-13 G) | C |
+| +Gy aplicable, todo el layout | 2428 nodos, 424 cambios | 1341 nodos, 100 cambios | C |
+| +Gx aplicable | 366 nodos (Gx ≈ 0,001 G) | 319 nodos, todos con Gx ≥ 0,01 G | C |
+| LoopVertical, +Gz | la curva queda por encima del límite en un elemento que pasa | por encima del límite y el elemento no pasa | A |
+
+### Reversiones (7.1.6) en el caso de prueba
+
+Eventos sostenidos de Gy en la línea de tiempo del layout (tiempo del modelo acumulado; entre paréntesis,
+del prototipo):
+
+| Evento | Intervalo | Pico | Pico a pico con el anterior |
+|---|---|---|---|
+| −Gy (fin del Loop) | 0,648-0,719 s (3,346-3,713 s), 0,367 s | −0,035 G en 0,680 s | — |
+| +Gy (acondicionamiento del OBT) | 0,728-0,816 s (3,758-4,035 s), 0,276 s | +0,326 G en 0,770 s | **0,381 s** |
+| −Gy (OBT y Hélice, de corrido) | 0,818-2,691 s (4,041-10,212 s), 6,17 s | −1,527 G en 1,073 s | 0,959 s |
+
+Ningún par baja de 0,2 s: la reducción no se activa, como se esperaba. **Diferencia con el valor
+esperado de 0,54 s:** ese número mide desde +0,33 G (0,78 s) hasta el mínimo **local** de −1,39 G al final
+del acondicionamiento (0,95 s). La implementación toma el pico del evento, que es el máximo de |Gy| de
+todo el evento continuo, y ese evento sigue por el arco del OBT y la Hélice: su pico es −1,527 G a 1,073 s,
+a 0,959 s. Además, con el umbral de 0,01 G, el −0,035 G del final del loop es un evento sostenido y forma
+con el +0,33 G la reversión más rápida (0,381 s).
