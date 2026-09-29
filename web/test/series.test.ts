@@ -5,6 +5,9 @@ import { analizarLayout } from '../src/contrato/cargar';
 import {
   acompanantesDe,
   columna,
+  curvaDelRecorrido,
+  figurasDeDuracion,
+  esSobreElRecorrido,
   estadisticaDeRango,
   extraerColumnas,
   figurasDePestana,
@@ -62,7 +65,7 @@ describe('figurasDePestana', () => {
     for (const elegido of [null, 0, 3]) {
       const c = extraerColumnas(circuito, elegido);
       for (const ejeX of ['arco', 'tiempo', 'tiempoPrototipo'] as const) {
-        for (const { clave } of PESTANAS) {
+        for (const { clave } of PESTANAS.filter((p) => esSobreElRecorrido(p.clave))) {
           for (const figura of figurasDePestana(clave, c, ejeX)) {
             expect(figura.x.length).toBe(c.cantidad);
             expect(figura.x.every((v) => Number.isFinite(v))).toBe(true);
@@ -147,7 +150,7 @@ describe('nodos globales: el estado que comparten graficos, via 3D y reproductor
   });
 
   it('las figuras llevan el indice global filtrado igual que la x', () => {
-    for (const pestana of PESTANAS) {
+    for (const pestana of PESTANAS.filter((p) => esSobreElRecorrido(p.clave))) {
       const c = extraerColumnas(circuito, 1);
       for (const figura of figurasDePestana(pestana.clave, c, 'tiempo')) {
         expect(figura.nodos?.length, pestana.clave).toBe(figura.x.length);
@@ -211,5 +214,44 @@ describe('toggles de las lineas de limite (cada uno controla solo sus lineas)', 
     expect(acompanantesDe(gz!.series, indice('Límite aplicable (duración del evento sostenido)')).map((j) => gz!.series[j]!.etiqueta)).toEqual(['aplicable, inferior']);
     expect(acompanantesDe(gz!.series, indice('Admisible dure lo que dure (evento largo)')).map((j) => gz!.series[j]!.etiqueta)).toEqual(['evento largo, inferior']);
     expect(acompanantesDe(gz!.series, 0)).toEqual([]);
+  });
+});
+
+describe('G contra duracion sostenida (Figs. 6-10)', () => {
+  it('cinco figuras (+Gz, -Gz, Gy, +Gx, -Gx) con la curva de la norma, la del recorrido y el punto critico', () => {
+    const figuras = figurasDeDuracion(extraerColumnas(circuito, null));
+    expect(figuras.map((f) => f.clave)).toEqual(['duracion-masgz', 'duracion-menosgz', 'duracion-gy', 'duracion-masgx', 'duracion-menosgx']);
+    for (const f of figuras) {
+      for (let i = 1; i < f.x.length; i++) expect(f.x[i]!).toBeGreaterThanOrEqual(f.x[i - 1]!);
+      for (const s of f.series) expect(s.valores.length).toBe(f.x.length);
+      // Nada por debajo de 0.2 s: los eventos mas cortos se llevan a 0.2 s.
+      expect(Math.min(...f.x)).toBeCloseTo(0.2, 12);
+      expect(f.nodos).toBeUndefined();
+    }
+    // +Gz: la curva de la norma arranca en 6 G a 0.2 s y el critico es el pico del loop contra 6 G.
+    const masGz = figuras[0]!;
+    const norma = masGz.series[0]!.valores;
+    expect(norma[masGz.x.indexOf(0.2)]).toBe(6);
+    const critico = masGz.series.find((s) => s.puntos)!;
+    expect(critico.etiqueta).toMatch(/^Punto crítico: 6\.42 G a 0\.20 s, límite 6\.00 G, margen -0\.42 G$/);
+    // -Gz va con signo, como la Fig. 9.
+    expect(figuras[1]!.series[0]!.valores.filter((v): v is number => v !== null).every((v) => v < 0)).toBe(true);
+  });
+
+  it('la curva del recorrido es la duracion del evento MAS LARGO a cada nivel, de corrido en el layout', () => {
+    // Meseta de 1.5 G partida en dos tramos del layout: a 1.5 G el evento dura 4 s.
+    const t = Array.from({ length: 401 }, (_, i) => i * 0.01);
+    const h = t.map((x) => (x < 0.5 ? 1 : 1.5));
+    const { puntos, critico } = curvaDelRecorrido(h, t, [0, 400], 'MasGzTodas', null, 3);
+    expect(puntos.map((p) => p.nivel)).toEqual([0.5, 1, 1.5]);
+    expect(puntos[2]!.duracion).toBeCloseTo(3.5, 12);
+    expect(puntos[0]!.duracion).toBeCloseTo(4, 12);
+    expect(critico!.nivel).toBe(1.5);
+    expect(critico!.limite).toBe(4);
+  });
+
+  it('con un elemento elegido se consideran los eventos que tocan sus nodos', () => {
+    const figuras = figurasDeDuracion(extraerColumnas(circuito, 2));
+    expect(figuras[0]!.series.find((s) => s.puntos)!.etiqueta).not.toMatch(/6\.42/);
   });
 });

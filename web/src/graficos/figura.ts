@@ -46,6 +46,10 @@ export interface SerieDeFigura {
    * otra: cada toggle controla solo sus lineas.
    */
   acompanaA?: number;
+  /** Aclaracion de la serie: se ve al pasar el puntero por su fila de la leyenda. */
+  ayuda?: string;
+  /** Dibuja los puntos (p. ej. un punto marcado solo, sin linea). */
+  puntos?: boolean;
 }
 
 export interface Franja {
@@ -164,7 +168,7 @@ export function opcionesDeFigura(datos: DatosDeFigura, tamano: TamanoDeFigura, c
         width: (s.ancho ?? 1.6) * escala,
         dash: s.trazos?.map((d) => d * escala),
         spanGaps: datos.unirHuecos ?? false,
-        points: { show: false },
+        points: s.puntos ? { show: true, size: 9 * escala, fill: colorDeSerie(s.color) } : { show: false },
         // Con A/B, el valor de la serie en la abscisa del cursor aunque el punto sea del otro diseno.
         value: (_u: uPlot, v: number | null, _serie: number, indice: number | null) => {
           const valor = indice === null || indice === undefined ? v : valorEnElCursor(datos, s.valores, indice);
@@ -375,11 +379,13 @@ export class Figura {
     this.grafico = new uPlot(opciones, [datos.x, ...datos.series.map((s) => s.valores)], this.contenedor);
     this.contenedor.append(this.tooltip);
 
-    // Leyenda: las series marcadas como ocultas no se listan.
+    // Leyenda: las series marcadas como ocultas no se listan, y las que
+    // traen ayuda la muestran al pasar el puntero (el patron `title` de la UI).
     const filas = this.contenedor.querySelectorAll<HTMLElement>('.u-legend .u-series');
     datos.series.forEach((s, i) => {
       const fila = filas[i + 1];
       if (fila && s.ocultarEnLeyenda) fila.style.display = 'none';
+      if (fila && s.ayuda) fila.title = s.ayuda;
     });
 
     const u = this.grafico;

@@ -146,6 +146,11 @@ export function compararLayouts(golden: Contrato.Layout, port: Contrato.Layout):
         }
       });
     }
+    // El bloque normativo entero (eventos, reversiones de 7.1.6, elipses, onsets), hoja por hoja.
+    for (const [ruta, valor] of hojasNumericas(eg.criterios.normativo, `${prefijo}criterios.normativo`)) {
+      const otro = hojasNumericas(ep.criterios.normativo, `${prefijo}criterios.normativo`).get(ruta);
+      diferencias.push(compararColumnas(ruta, [valor], [otro === undefined ? null : otro]));
+    }
     for (const [clave, valor] of Object.entries(eg.estadoSalida)) {
       const otro = (ep.estadoSalida as unknown as Record<string, unknown>)[clave];
       diferencias.push(compararColumnas(`${prefijo}estadoSalida.${clave}`, ([] as (number | null)[]).concat(valor as number), ([] as (number | null)[]).concat(otro as number)));
@@ -157,4 +162,16 @@ export function compararLayouts(golden: Contrato.Layout, port: Contrato.Layout):
     diferencias.push(compararColumnas(`resumenLayout.${clave}`, ([] as (number | null)[]).concat(valor as number), ([] as (number | null)[]).concat(otro as number)));
   }
   return diferencias;
+}
+
+/** Hojas numericas (o null) de un objeto, por ruta; los textos y logicos se comparan aparte. */
+function hojasNumericas(objeto: unknown, prefijo: string, salida = new Map<string, number | null>()): Map<string, number | null> {
+  if (objeto === null || typeof objeto === 'number') {
+    salida.set(prefijo, objeto as number | null);
+  } else if (Array.isArray(objeto)) {
+    objeto.forEach((v, i) => hojasNumericas(v, `${prefijo}[${i}]`, salida));
+  } else if (typeof objeto === 'object' && objeto !== undefined) {
+    for (const [clave, v] of Object.entries(objeto as Record<string, unknown>)) hojasNumericas(v, `${prefijo}.${clave}`, salida);
+  }
+  return salida;
 }
