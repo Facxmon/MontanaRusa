@@ -126,20 +126,20 @@ const EDICIONES: Edicion[] = [
 ];
 
 describe('recalculo incremental', () => {
-  it('ediciones aleatorias sobre el DemoLayout: identico al recalculo completo', () => {
+  describe('ediciones aleatorias sobre el DemoLayout: identico al recalculo completo', () => {
+    // Un it por edicion (en orden, compartiendo el calculador) para no bloquear el hilo de vitest minutos seguidos.
     const azar = aleatorio(20260929);
     const calculador = new CalculadorIncremental();
     let entrada = demoLayout();
-    compararRutas(calculador, entrada);
-    const hechas: string[] = [];
-    for (let paso = 0; paso < 12; paso++) {
-      const edicion = EDICIONES[Math.floor(azar() * EDICIONES.length)]!(entrada, azar);
-      entrada = edicion.entrada;
-      hechas.push(edicion.descripcion);
-      compararRutas(calculador, entrada);
+    it('diseno inicial', () => compararRutas(calculador, entrada), 300000);
+    for (let paso = 1; paso <= 12; paso++) {
+      it(`edicion ${paso}`, () => {
+        const edicion = EDICIONES[Math.floor(azar() * EDICIONES.length)]!(entrada, azar);
+        entrada = edicion.entrada;
+        compararRutas(calculador, entrada);
+      }, 300000);
     }
-    expect(hechas).toHaveLength(12);
-  }, 600000);
+  });
 
   it('editar el ultimo elemento reutiliza todos los anteriores', () => {
     const calculador = new CalculadorIncremental();
@@ -210,6 +210,28 @@ describe('recalculo incremental', () => {
     const linea = (r: { Posteriores: { Nombre: string }[] }) => r.Posteriores.find((c) => c.Nombre === nombre);
     expect(linea(ReporteSinVia)).not.toStrictEqual(linea(ReporteConVia));
     expect(conInterferencia(ReporteSinVia, SinVia, Layout)).toStrictEqual({ ...ReporteSinVia, Posteriores: ReporteConVia.Posteriores });
+  }, 120000);
+
+  it('Detener no pierde la cache: un calculador nuevo sembrado con la copia de la pagina sigue igual', () => {
+    // Lo que hace ClienteDeCalculo: cada entrada nueva se copia afuera (structuredClone = postMessage).
+    const espejo = new Map<string, unknown>();
+    let firmaDelEspejo = '';
+    const copiar = (firma: string, clave: string, entrada: unknown) => {
+      firmaDelEspejo = firma;
+      espejo.set(clave, structuredClone(entrada));
+    };
+    const entrada = demoLayout();
+    new CalculadorIncremental(undefined, copiar).calcular(entrada, 'test');
+    expect(espejo.size).toBe(4);
+
+    // Se edita el ultimo elemento, se toca Generar y se detiene: el worker se descarta sin terminar.
+    // El worker nuevo arranca sembrado y, al volver a Generar, solo reconstruye el elemento editado.
+    const nuevo = new CalculadorIncremental();
+    nuevo.sembrar(firmaDelEspejo, [...espejo] as never);
+    const editada = conAjustes(entrada, 3, { RadioDelDiveLoop: 0.47 });
+    const incremental = nuevo.calcular(editada, 'test');
+    expect(nuevo.estadistica).toEqual({ reutilizados: 3, recalculados: 1, interferenciasRehechas: 0 });
+    expect(sinFecha(incremental)).toStrictEqual(sinFecha(calcularLayout(editada, 'test')));
   }, 120000);
 
   it('la cache tiene tope: el diseno actual mas ENTRADAS_EXTRA_EN_CACHE', () => {

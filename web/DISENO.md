@@ -770,8 +770,14 @@ y solo reconstruye los elementos cuya entrada cambió.
   edición cambia la velocidad a la salida de *k*, todos los siguientes cambian de clave y se reconstruyen.
   No hizo falta ninguna forma especial de dinámica incremental; medida sobre el DemoLayout,
   `SimularSobreTrack` es ~2 % del tiempo (el constructor del elemento es ~90 %).
-- **Invalidación**: si cambia cualquier parámetro general se vacía la caché entera. Detener recrea el
-  worker (ver "Por qué Detener es `terminate()`"), así que después de Detener la caché arranca vacía.
+- **Invalidación**: si cambia cualquier parámetro general se vacía la caché entera.
+- **Detener no pierde la caché.** Detener sigue recreando el worker (ver "Por qué Detener es
+  `terminate()`"), pero el worker copia a la página cada elemento que termina de calcular
+  (`{ cache }`, ~6 ms por elemento) y `ClienteDeCalculo` guarda esa copia. El worker nuevo se siembra con
+  ella (`{ sembrar }`). Ejemplo: se edita solo el 4.º de 4 elementos, Generar y Detener → en pantalla
+  queda el último layout generado, el formulario conserva el valor editado como "cambios sin generar", y
+  al volver a Generar solo se reconstruye el 4.º (en el navegador: 1,45 s contra 4,89 s del cálculo
+  completo en la misma sesión).
 - **Tope**: la caché guarda el diseño actual más `ENTRADAS_EXTRA_EN_CACHE` = 16 elementos (los menos
   usados se descartan primero), para que deshacer/rehacer e ir y volver entre dos valores no recalculen.
 
@@ -809,5 +815,3 @@ entrada y se reconstruye, como corresponde.
   existen en el proyecto son otras: las del arnés (6e-6 relativo, contra golden redondeados) y
   `ToleranciaVelocidadDeDiseno` (aviso al re-simular un track con otra velocidad de entrada). Falta
   decidir si alguna debería usarse acá.
-- La caché se pierde al Detener (el worker se recrea). Conservarla exigiría sacar la caché del worker o
-  interrumpirlo de forma cooperativa; ninguna de las dos se hizo.

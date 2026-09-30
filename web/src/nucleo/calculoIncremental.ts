@@ -31,8 +31,10 @@
 // mismos. No hay ninguna aproximacion.
 //
 // Invalidacion: si cambian los parametros generales (entrada.parametros) se
-// vacia la cache entera. La cache vive en el worker (worker.ts): si el
-// calculo se aborta, el worker se recrea y la cache arranca vacia.
+// vacia la cache entera. La cache vive en el worker (worker.ts), pero cada
+// elemento nuevo se copia a la pagina (alGuardar -> ClienteDeCalculo): si
+// el calculo se detiene, el worker se recrea y se siembra con esa copia
+// (sembrar), asi que lo ya calculado no se pierde.
 
 import type * as Contrato from '../contrato/tipos';
 import { EstadoInicial } from './basicos';
@@ -52,7 +54,7 @@ import { CriterioDeInterferenciaConLaVia, NOMBRE_INTERFERENCIA_CON_LA_VIA, Separ
  */
 export const ENTRADAS_EXTRA_EN_CACHE = 16;
 
-interface EntradaDeCache {
+export interface EntradaDeCache {
   Salida: Estado;
   Elemento: Elemento;
   Reporte: Reporte;
@@ -77,7 +79,32 @@ export class CalculadorIncremental {
   private proximaFicha = 1;
   estadistica: EstadisticaIncremental = { reutilizados: 0, recalculados: 0, interferenciasRehechas: 0 };
 
-  constructor(private readonly entradasExtra = ENTRADAS_EXTRA_EN_CACHE) {}
+  /**
+   * @param alGuardar se llama cada vez que una entrada se agrega o cambia (con la firma de los
+   *   globales a la que pertenece), para llevar una copia fuera del worker.
+   */
+  constructor(
+    private readonly entradasExtra = ENTRADAS_EXTRA_EN_CACHE,
+    private readonly alGuardar?: (firma: string, clave: string, entrada: EntradaDeCache) => void,
+  ) {}
+
+  /**
+   * Carga entradas guardadas afuera (por un worker anterior) para la firma de
+   * globales dada. Las fichas se conservan; las nuevas siguen desde la mayor.
+   */
+  sembrar(firma: string, entradas: Array<[string, EntradaDeCache]>): void {
+    this.invalidar();
+    this.firmaDeGlobales = firma;
+    for (const [clave, entrada] of entradas) {
+      this.cache.set(clave, entrada);
+      this.proximaFicha = Math.max(this.proximaFicha, entrada.Ficha + 1);
+    }
+  }
+
+  /** Claves en cache, de la menos a la mas usada. */
+  claves(): string[] {
+    return [...this.cache.keys()];
+  }
 
   /** Vacia la cache: el proximo calculo es completo. */
   invalidar(): void {
@@ -119,11 +146,14 @@ export class CalculadorIncremental {
         const { Parametros: P, Inertes } = AjustarParametros(entrada.parametros, inst.ajustes, inst.tipo);
         const clave = `${inst.tipo}|${claveExacta(P)}|${claveExacta(Estado)}`;
         let registro = this.cache.get(clave);
+        let nueva = true;
         if (registro) {
+          nueva = false;
           this.cache.delete(clave); // al final del orden de la Map: la menos usada queda primera
           if (registro.Prefijo !== prefijo) {
             registro = { ...registro, Reporte: conInterferencia(registro.Reporte, registro.Elemento, { PuntosRiel, LongitudArcoRiel }), Prefijo: prefijo };
             estadistica.interferenciasRehechas++;
+            nueva = true;
           }
           estadistica.reutilizados++;
         } else {
@@ -134,6 +164,7 @@ export class CalculadorIncremental {
           estadistica.recalculados++;
         }
         this.cache.set(clave, registro);
+        if (nueva) this.alGuardar?.(firma, clave, registro);
         corrida.push(registro);
 
         const { Elemento, Reporte, Salida } = registro;
