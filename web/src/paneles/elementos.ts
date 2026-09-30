@@ -5,6 +5,7 @@
 import { esRecalculo, type Estado } from '../estado';
 import { destellarCambios, el, tarjeta, vaciar, valoresPorClave } from './dom';
 import { formatear } from './formato';
+import { resaltarElemento } from './resaltarElemento';
 
 export function montarElementos(contenedor: HTMLElement, estado: Estado): void {
   const dibujar = (destellar = false) => {
@@ -18,7 +19,7 @@ export function montarElementos(contenedor: HTMLElement, estado: Estado): void {
       {
         type: 'button',
         class: elemento === null ? 'elemento elegido' : 'elemento',
-        onClick: () => estado.set({ elemento: null }),
+        onClick: () => resaltarElemento(estado, null),
       },
       el('span', { class: 'elemento-tipo' }, 'Todo el layout'),
       el('span', { class: 'elemento-datos' }, `${layout.elementos.length} elementos`),
@@ -30,7 +31,7 @@ export function montarElementos(contenedor: HTMLElement, estado: Estado): void {
         {
           type: 'button',
           class: elemento === i ? 'elemento elegido' : 'elemento',
-          onClick: () => estado.set({ elemento: elemento === i ? null : i }),
+          onClick: () => resaltarElemento(estado, elemento === i ? null : i),
         },
         el('span', { class: `semaforo ${e.criterios.todosPasan ? 'pasa' : 'falla'}` }, e.criterios.todosPasan ? '✓' : '✗'),
         el('span', { class: 'elemento-tipo' }, `${i + 1}. ${e.tipo}`),

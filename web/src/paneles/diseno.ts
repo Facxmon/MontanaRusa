@@ -11,6 +11,7 @@ import { CATALOGO_DE_ELEMENTOS } from '../nucleo/parametros';
 import type { NombreDeElemento } from '../nucleo/tipos';
 import { el, marcarErroresEnSecciones, tarjeta, vaciar } from './dom';
 import { descargarArchivo } from './archivo';
+import { elementoDeInstancia, resaltarElemento } from './resaltarElemento';
 
 function contarAjustes(inst: InstanciaDeElemento): number {
   return Object.keys(inst.ajustes).length;
@@ -125,11 +126,14 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
           class: `secuencia-fila${inst.id === instancia ? ' elegida' : ''}${conError ? ' con-error' : ''}`,
           role: 'button',
           'aria-pressed': inst.id === instancia ? 'true' : 'false',
-          title: 'Elegir para editar sus parámetros',
+          title: 'Elegir para editar sus parámetros y resaltarlo en la vista 3D',
           onClick: (e: Event) => {
             // Los controles de la fila (tipo, mover, duplicar, quitar) eligen por su cuenta.
             if ((e.target as HTMLElement).closest('button, select')) return;
             estado.set({ instancia: inst.id });
+            // El mismo resaltado y encuadre que Resultados > Elementos, si el
+            // layout en pantalla ya tiene esta instancia (con cambios sin generar puede no tenerla).
+            const indice = elementoDeInstancia(estado.get().disenoCalculado, inst.id);            if (indice !== null) resaltarElemento(estado, indice);
           },
         },
         el('span', { class: 'secuencia-numero' }, `${i + 1}.`),
