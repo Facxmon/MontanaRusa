@@ -6,7 +6,7 @@
 // le toca, asi cada uno se puede probar y quitar por separado.
 //
 // Los iconos son SVG en linea (trazo con currentColor): no hay libreria de
-// iconos y Plex no trae glifos de flechas. Todo boton con icono lleva
+// iconos y la fuente (Lato) no trae glifos de flechas. Todo boton con icono lleva
 // aria-label y un title que incluye el atajo de teclado.
 
 import { el } from './dom';

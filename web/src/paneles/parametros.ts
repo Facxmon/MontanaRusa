@@ -38,7 +38,7 @@ import type { Declaracion, ModoCurvatura, NombreDeParametro, Parametros } from '
 import { modoEfectivo } from '../contrato/modo';
 import { EscalasDeFroude } from '../nucleo/basicos';
 import { ayudaDeCampo } from './ayuda';
-import { el, tarjeta } from './dom';
+import { el, marcarErroresEnSecciones, tarjeta } from './dom';
 import {
   aSI,
   digitosDeEntrada,
@@ -307,7 +307,8 @@ function grupo(
     'details',
     // Un grupo cerrado que esconde el campo con error se abre solo.
     { open: abierto || conError },
-    el('summary', {}, `${titulo} (${todas.length})`, conError ? el('span', { class: 'summary-error', title: 'Hay un campo con error en este grupo' }, ' ⚠') : null),
+    // El icono de error del encabezado lo agrega marcarErroresEnSecciones, igual que en las tarjetas.
+    el('summary', {}, `${titulo} (${todas.length})`),
     secciones
       .filter((s) => s.lista.length > 0)
       .map((s) =>
@@ -556,6 +557,7 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
         grupo(g.titulo, g.secciones.map((s) => ({ titulo: s.titulo, lista: deLaSeccion(s.clave) })), parametros, actualizarGlobal, false, diagnostico, derivar),
       ),
     ));
+    marcarErroresEnSecciones(contenedor);
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {

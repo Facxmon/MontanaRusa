@@ -33,6 +33,7 @@ import { el, idUnico } from './paneles/dom';
 import { montarElementos } from './paneles/elementos';
 import { montarBarra } from './paneles/barra';
 import { montarCabecera } from './paneles/cabecera';
+import { montarControles3d } from './paneles/controles3d';
 import { montarErrores } from './paneles/errores';
 import { leerAutoGenerar, montarGenerar } from './paneles/generar';
 import { guardadorDeDiseno, haceCuanto, olvidarDiseno, restaurarDiseno } from './paneles/persistencia';
@@ -47,8 +48,12 @@ import { montarSelectorDePanel } from './paneles/selectorDePanel';
 import { montarSelectorDeVista } from './paneles/selectorDeVista';
 import { montarSelectorDeTema } from './paneles/selectorDeTema';
 import { montarVeredicto } from './paneles/veredicto';
+import { resaltarElemento } from './paneles/resaltarElemento';
+import { nodoGlobalDe } from './graficos/series';
 
 const BASE = import.meta.env.BASE_URL;
+/** Al ubicar un punto en el 3D, la camara encuadra un cubo de este medio lado (m) alrededor. */
+const MEDIO_LADO_DEL_ENCUADRE_DE_PUNTO = 0.3;
 const urlDelIndice = `${BASE}golden/indice.json`;
 const urlDelCaso = (caso: string) => `${BASE}golden/${encodeURIComponent(caso)}.json`;
 
@@ -62,7 +67,9 @@ function armarDom() {
   const reproductor = el('div', { class: 'reproductor', 'aria-label': 'Reproducción', hidden: true });
   // El reproductor va DENTRO de la vista 3D y no al lado: con las dos vistas
   // partiendo el area, flotando sobre .principal quedaria sobre los graficos.
-  const vista3d = el('div', { class: 'vista3d', 'aria-label': 'Vista 3D de la vía' }, reproductor);
+  // Arriba a la derecha: reiniciar la camara y lo que se dibuja alrededor de la via.
+  const controles3d = el('div', { class: 'controles-3d', role: 'group', 'aria-label': 'Controles de la vista 3D' });
+  const vista3d = el('div', { class: 'vista3d', 'aria-label': 'Vista 3D de la vía' }, controles3d, reproductor);
   const graficos = el('div', { class: 'graficos', 'aria-label': 'Gráficos', hidden: true });
   const aviso = el('div', { class: 'aviso', role: 'status', hidden: true });
   const principal = el('main', { class: 'principal' }, vista3d, graficos, aviso);
@@ -109,6 +116,7 @@ function armarDom() {
     aviso,
     selectorDeVista,
     vista3d,
+    controles3d,
     reproductor,
     graficos,
     cabecera,
@@ -160,6 +168,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     autoGenerar: leerAutoGenerar(),
     panel: 'resultados',
     nodo: null,
+    reproduciendo: false,
     comparacion: null,
   });
 
@@ -167,6 +176,17 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   const entorno = new Entorno(escena.scene);
   const via = new Via(escena.scene);
   const carro = new Carro(escena.scene);
+  montarControles3d(dom.controles3d, {
+    reiniciarVista: () => {
+      // Des-selecciona el elemento (vuelve el color de toda la via) y encuadra la via entera.
+      resaltarElemento(estado, null);
+      const { layout } = estado.get();
+      if (layout) escena.encuadrar(layout.resumenLayout.boundingBox);
+    },
+    mostrarCaja: (visible) => entorno.mostrarCaja(visible),
+    mostrarProyeccion: (visible) => entorno.mostrarProyeccion(visible),
+    mostrarLimites: (visible) => via.mostrarLimites(visible),
+  });
 
   const zonas = montarBarra(dom.barra);
   zonas.centro.append(dom.selectorDeVista);
@@ -175,7 +195,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   montarErrores(dom.errores, estado);
   montarCabecera(dom.cabecera, estado);
   montarSelectorDeCaso(dom.selectorDeCaso, estado);
-  montarVeredicto(dom.veredicto, estado);
+  montarVeredicto(dom.veredicto, estado, (donde) => ubicarEnEl3d(donde.elemento, donde.nodoLocal));
   montarLeyenda(dom.leyenda, estado);
   montarResumenLayout(dom.resumenLayout, estado);
   montarElementos(dom.elementos, estado);
@@ -189,6 +209,24 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   const reproductor = montarReproductor(dom.reproductor, estado, escena, carro);
   const destruirGraficos = montarPanelDeGraficos(dom.graficos, estado, (nodo) => reproductor.irANodo(nodo));
   montarSelectorDePanel(dom.selectorDePanel, estado, { resultados: dom.panelResultados, diseno: dom.panelDiseno });
+
+  /**
+   * Lleva el 3D a un punto de la via (clic en la ubicacion de un extremo del
+   * veredicto): resalta su elemento con el mismo resaltarElemento de las
+   * listas, pone el carro y el marcador en ese nodo y acerca la camara. Con
+   * la vista de graficos sola, pasa a "Ambos" para que el 3D se vea.
+   */
+  function ubicarEnEl3d(elemento: number, nodoLocal: number): void {
+    const { layout, vista } = estado.get();
+    if (!layout) return;
+    if (vista === 'graficos') estado.set({ vista: 'ambos' });
+    resaltarElemento(estado, elemento);
+    const nodo = nodoGlobalDe(layout, elemento, nodoLocal);
+    reproductor.irANodo(nodo);
+    // Despues del encuadre del elemento (que dispara resaltarElemento): este lo reemplaza.
+    const caja = via.cajaAlrededorDeNodo(nodo, MEDIO_LADO_DEL_ENCUADRE_DE_PUNTO);
+    if (caja) escena.encuadrar(caja);
+  }
   montarDiseno(dom.diseno, estado, abrirDiseno);
   montarParametros(dom.parametros, estado);
 

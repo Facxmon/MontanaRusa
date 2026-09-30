@@ -10,6 +10,12 @@
 //    aceptacion real ("Dentro del bounding box disponible").
 //  - La proyeccion del riel sobre el piso (z = 0): la huella que ocupa.
 //
+// La caja y la proyeccion se prenden y apagan desde los controles de la
+// vista 3D (paneles/controles3d.ts): la caja arranca visible (su tamano es
+// el de BoundingBoxDisponible, no se toca) y la proyeccion apagada. La
+// visibilidad sobrevive a cada construir(): es una preferencia de la vista,
+// no del layout.
+//
 // Todo se reconstruye con cada layout (construir) y los colores salen de
 // tokens.css por tema.ts, como el resto de la escena.
 
@@ -78,7 +84,7 @@ function rotulo(texto: string, color: string): THREE.Sprite {
   const escala = 4;
   const lienzo = document.createElement('canvas');
   const contexto = lienzo.getContext('2d')!;
-  const fuente = `${parseFloat(t.textoXs) * escala}px ${t.mono}`;
+  const fuente = `${parseFloat(t.textoXs) * escala}px ${t.fuente}`;
   contexto.font = fuente;
   const ancho = Math.ceil(contexto.measureText(texto).width) + 4 * escala;
   const alto = Math.ceil(parseFloat(t.textoXs) * escala * 1.4);
@@ -97,15 +103,34 @@ function rotulo(texto: string, color: string): THREE.Sprite {
 
 export class Entorno {
   private readonly grupo = new THREE.Group();
+  /** La caja disponible con su rotulo: un grupo aparte para poder ocultarla. */
+  private readonly grupoDeCaja = new THREE.Group();
+  /** La proyeccion del riel sobre el piso (plano XY). */
+  private readonly grupoDeProyeccion = new THREE.Group();
 
   constructor(scene: THREE.Scene) {
-    scene.add(this.grupo);
+    scene.add(this.grupo, this.grupoDeCaja, this.grupoDeProyeccion);
+    this.grupoDeProyeccion.visible = false;
     this.construir(null);
   }
 
   destruir(): void {
     this.vaciar();
-    this.grupo.removeFromParent();
+    for (const grupo of this.grupos()) grupo.removeFromParent();
+  }
+
+  /** Muestra u oculta la caja disponible (no cambia su tamano). */
+  mostrarCaja(visible: boolean): void {
+    this.grupoDeCaja.visible = visible;
+  }
+
+  /** Muestra u oculta la proyeccion del riel en el plano XY. */
+  mostrarProyeccion(visible: boolean): void {
+    this.grupoDeProyeccion.visible = visible;
+  }
+
+  private grupos(): THREE.Group[] {
+    return [this.grupo, this.grupoDeCaja, this.grupoDeProyeccion];
   }
 
   /** Rehace piso, caja y proyeccion para el layout (o solo un piso de 4 x 4 m sin layout). */
@@ -128,11 +153,11 @@ export class Entorno {
       const aristas = new THREE.Box3Helper(caja, new THREE.Color(color));
       (aristas.material as THREE.LineBasicMaterial).transparent = true;
       (aristas.material as THREE.LineBasicMaterial).opacity = 0.7;
-      this.grupo.add(aristas);
+      this.grupoDeCaja.add(aristas);
       const nombre = rotulo(entra ? 'caja disponible' : 'caja disponible: la vía se sale', color);
       nombre.position.set(disponible[0][0], disponible[1][1], disponible[2][1] + alto / 2);
       nombre.center.set(0, 0);
-      this.grupo.add(nombre);
+      this.grupoDeCaja.add(nombre);
     }
 
     if (layout) {
@@ -142,7 +167,7 @@ export class Entorno {
       for (let k = 0; k < nodos.cantidad; k++) puntos.push(nodos.riel[3 * k]!, nodos.riel[3 * k + 1]!, ALTURA_DE_LA_PROYECCION);
       const geometria = new THREE.BufferGeometry();
       geometria.setAttribute('position', new THREE.Float32BufferAttribute(puntos, 3));
-      this.grupo.add(new THREE.Line(geometria, new THREE.LineBasicMaterial({ color: new THREE.Color(t.escenaProyeccion), transparent: true, opacity: 0.45 })));
+      this.grupoDeProyeccion.add(new THREE.Line(geometria, new THREE.LineBasicMaterial({ color: new THREE.Color(t.escenaProyeccion), transparent: true, opacity: 0.45 })));
     }
   }
 
@@ -178,15 +203,17 @@ export class Entorno {
   }
 
   private vaciar(): void {
-    this.grupo.traverse((objeto) => {
-      const conGeometria = objeto as THREE.Mesh;
-      conGeometria.geometry?.dispose();
-      const material = conGeometria.material as THREE.Material | undefined;
-      if (material) {
-        (material as THREE.SpriteMaterial).map?.dispose();
-        material.dispose();
-      }
-    });
-    this.grupo.clear();
+    for (const grupo of this.grupos()) {
+      grupo.traverse((objeto) => {
+        const conGeometria = objeto as THREE.Mesh;
+        conGeometria.geometry?.dispose();
+        const material = conGeometria.material as THREE.Material | undefined;
+        if (material) {
+          (material as THREE.SpriteMaterial).map?.dispose();
+          material.dispose();
+        }
+      });
+      grupo.clear();
+    }
   }
 }

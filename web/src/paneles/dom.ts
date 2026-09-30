@@ -84,6 +84,33 @@ export function tarjeta(opciones: OpcionesDeTarjeta, ...hijos: (Hijo | Hijo[])[]
   return detalles;
 }
 
+// ---------------------------------------------------------------- errores
+// Un campo con error (.con-error) dentro de una seccion plegada no se ve: el
+// icono de error se repite en el encabezado de cada <details> que lo
+// contiene, del grupo a la tarjeta, para que se sepa donde entrar.
+
+const CLASE_DEL_ICONO_DE_ERROR = 'summary-error';
+
+/** Un "⚠" para el encabezado de una seccion o una pestana que esconde un error. */
+export function iconoDeError(titulo = 'Hay un campo con error adentro'): HTMLElement {
+  return el('span', { class: CLASE_DEL_ICONO_DE_ERROR, title: titulo, 'aria-label': titulo, role: 'img' }, '⚠');
+}
+
+/** Agrega el icono de error al <summary> de cada <details> de `raiz` que contiene un .con-error. */
+export function marcarErroresEnSecciones(raiz: HTMLElement): void {
+  for (const conError of raiz.querySelectorAll<HTMLElement>('.con-error')) {
+    for (let nodo = conError.parentElement; nodo && raiz.contains(nodo); nodo = nodo.parentElement) {
+      if (!(nodo instanceof HTMLDetailsElement)) continue;
+      const resumen = nodo.querySelector<HTMLElement>(':scope > summary');
+      if (!resumen || resumen.querySelector(`:scope > .${CLASE_DEL_ICONO_DE_ERROR}`)) continue;
+      // En una tarjeta va pegado al titulo (antes de la linea de resumen); en un grupo, al final del texto.
+      const titulo = resumen.querySelector(':scope > h2');
+      if (titulo) titulo.after(iconoDeError());
+      else resumen.append(iconoDeError());
+    }
+  }
+}
+
 /** Cambia la linea de resumen de una tarjeta ya armada (sin redibujarla). */
 export function resumirTarjeta(detalles: HTMLDetailsElement, resumen: string): void {
   const linea = detalles.querySelector<HTMLElement>(':scope > summary .tarjeta-resumen');

@@ -3,13 +3,18 @@
 // referencia y bandas entre dos series. Lo que se dibuja lo describe
 // series.ts; aca solo se traduce a opciones de uPlot.
 //
-// Navegacion (fase 3): uPlot ya traia arrastrar-para-hacer-zoom en X y doble
-// clic para volver, pero nada lo indicaba y no habia forma de mirar el eje Y.
-// Se agrega, en un plugin y sin cambiar de libreria (uPlot es mas chica y mas
-// rapida que las alternativas y nada de esto la necesita):
-//  - zoom tambien en Y arrastrando en vertical (cursor.drag.uni decide si el
-//    arrastre fue horizontal, vertical o de caja);
-//  - zoom con la rueda (Shift = eje Y), centrado donde esta el puntero;
+// Navegacion (fase 3, revisada en la tarea 3 de interfaz). En un plugin y sin
+// cambiar de libreria (uPlot es mas chica y mas rapida que las alternativas y
+// nada de esto la necesita):
+//  - arrastrar selecciona un RANGO DEL EJE X, con un rectangulo visible de
+//    todo el alto, y al soltar hace zoom a ese rango (antes el arrastre podia
+//    ser horizontal, vertical o de caja y no se entendia que hacia);
+//  - doble clic, o el boton de reset de la figura (verTodo), vuelve a la
+//    vista completa;
+//  - la rueda SOLA scrollea la pagina; Ctrl + rueda hace zoom (Ctrl + Shift =
+//    eje Y), centrado donde esta el puntero. La primera vez que se usa la
+//    rueda sobre una figura aparece una pista breve ("Ctrl + rueda para
+//    zoom"), una sola vez por navegador (almacen.ts);
 //  - arrastre para desplazarse con la rueda apretada o con Shift.
 // El mousedown del arrastre se escucha en u.root EN FASE DE CAPTURA: uPlot
 // registra el suyo sobre u.over en el constructor, o sea antes que cualquier
@@ -18,6 +23,7 @@
 
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
+import { escribirAlmacen, leerAlmacen } from '../paneles/almacen';
 import { formatearNumero, SIN_DATO, type Notacion } from '../paneles/formato';
 import { fuenteDeCanvas, tema } from '../tema';
 import { acompanantesDe, valorEnElCursor } from './series';
@@ -149,9 +155,10 @@ export function opcionesDeFigura(datos: DatosDeFigura, tamano: TamanoDeFigura, c
       ? {
           sync: { key: claveDeSincronizacion, setSeries: false },
           points: { size: 6 },
-          // uni: si el arrastre supera este umbral en un solo eje, la
-          // seleccion es de ese eje; si supera en los dos, es una caja.
-          drag: { x: true, y: true, uni: 12, dist: 0 },
+          // Solo rangos del eje X: la seleccion ocupa todo el alto del
+          // grafico. dist: con menos de eso es un clic (elegir un punto),
+          // no una seleccion.
+          drag: { x: true, y: false, setScale: true, dist: DISTANCIA_MINIMA_DE_ARRASTRE },
         }
       : { show: false },
     legend: { show: claveDeSincronizacion !== null, live: true },
@@ -212,12 +219,18 @@ export function dibujarFranjas(u: uPlot, franjas: Franja[], escala = 1): void {
 
 /** Cuanto se acerca o se aleja un "click" de la rueda. */
 const FACTOR_DE_RUEDA = 1.25;
+/** Px que hay que arrastrar para que sea una seleccion y no un clic. */
+const DISTANCIA_MINIMA_DE_ARRASTRE = 5;
+/** La pista "Ctrl + rueda para zoom" se muestra una sola vez por navegador. */
+const CLAVE_DE_PISTA = 'pista-ctrl-rueda';
+const DURACION_DE_PISTA_MS = 2500;
 
 /**
- * Zoom con la rueda y desplazamiento arrastrando. Va como plugin para que la
- * exportacion a PNG (que arma su propio uPlot sin cursor) no lo cargue.
+ * Zoom con Ctrl + rueda y desplazamiento arrastrando. Va como plugin para que
+ * la exportacion a PNG (que arma su propio uPlot sin cursor) no lo cargue.
+ * `alRuedaSinCtrl` avisa que se uso la rueda sola (la pagina scrollea).
  */
-function zoomYDesplazamiento(): uPlot.Plugin {
+function zoomYDesplazamiento(alRuedaSinCtrl: () => void): uPlot.Plugin {
   return {
     hooks: {
       ready: [
@@ -227,6 +240,13 @@ function zoomYDesplazamiento(): uPlot.Plugin {
           over.addEventListener(
             'wheel',
             (evento: WheelEvent) => {
+              // Sin Ctrl la rueda es de la pagina: no se toca el evento.
+              // (El gesto de pellizco de un trackpad llega como Ctrl + rueda.)
+              if (!evento.ctrlKey) {
+                alRuedaSinCtrl();
+                return;
+              }
+              // Con Ctrl, sin esto el navegador haria zoom de la pagina entera.
               evento.preventDefault();
               const eje = evento.shiftKey ? 'y' : 'x';
               const escala = u.scales[eje];
@@ -235,7 +255,10 @@ function zoomYDesplazamiento(): uPlot.Plugin {
               // Fraccion del eje donde esta el puntero: el zoom deja ese punto quieto.
               const fraccion =
                 eje === 'x' ? (evento.clientX - caja.left) / caja.width : 1 - (evento.clientY - caja.top) / caja.height;
-              const factor = evento.deltaY < 0 ? 1 / FACTOR_DE_RUEDA : FACTOR_DE_RUEDA;
+              // Con Shift, algunos navegadores mandan el giro en deltaX.
+              const giro = evento.deltaY !== 0 ? evento.deltaY : evento.deltaX;
+              if (giro === 0) return;
+              const factor = giro < 0 ? 1 / FACTOR_DE_RUEDA : FACTOR_DE_RUEDA;
               const centro = escala.min + (escala.max - escala.min) * Math.min(Math.max(fraccion, 0), 1);
               u.setScale(eje, {
                 min: centro - (centro - escala.min) * factor,
@@ -307,6 +330,9 @@ export class Figura {
   private readonly observador: ResizeObserver;
   /** Valores de todas las series en el punto del cursor, al lado del puntero. */
   private readonly tooltip: HTMLElement;
+  /** "Ctrl + rueda para zoom", sobre la figura, la primera vez que se usa la rueda sola. */
+  private readonly pista: HTMLElement;
+  private temporizadorDePista: ReturnType<typeof setTimeout> | null = null;
 
   constructor(contenedor: HTMLElement, opciones: OpcionesDeLaFigura) {
     this.contenedor = contenedor;
@@ -315,6 +341,11 @@ export class Figura {
     this.tooltip = document.createElement('div');
     this.tooltip.className = 'figura-tooltip';
     this.tooltip.hidden = true;
+    this.pista = document.createElement('div');
+    this.pista.className = 'figura-pista';
+    this.pista.setAttribute('role', 'status');
+    this.pista.textContent = 'Ctrl + rueda para zoom';
+    this.pista.hidden = true;
     this.observador = new ResizeObserver(() => this.ajustarTamano());
     this.observador.observe(contenedor);
   }
@@ -356,10 +387,18 @@ export class Figura {
     this.destruir();
     this.datos = datos;
     const opciones = opcionesDeFigura(datos, this.tamano(), this.opciones.claveDeSincronizacion);
-    opciones.plugins = [zoomYDesplazamiento()];
+    opciones.plugins = [zoomYDesplazamiento(() => this.mostrarPista())];
     opciones.hooks = {
       ...opciones.hooks,
-      setCursor: [(u: uPlot) => this.dibujarTooltip(u)],
+      setCursor: [
+        (u: uPlot) => {
+          this.dibujarTooltip(u);
+          this.dibujarBarrido(u);
+        },
+      ],
+      // Barrido: mientras se arrastra, lo de afuera del rango se oscurece y el
+      // rango se va "pintando" con el puntero, con sus extremos rotulados.
+      setSelect: [(u: uPlot) => this.dibujarBarrido(u)],
       // La leyenda solo lista la mitad superior de cada referencia simetrica:
       // el toggle se propaga a sus acompanantes (series.ts, acompanantesDe).
       setSeries: [
@@ -377,7 +416,16 @@ export class Figura {
       ],
     };
     this.grafico = new uPlot(opciones, [datos.x, ...datos.series.map((s) => s.valores)], this.contenedor);
-    this.contenedor.append(this.tooltip);
+    this.contenedor.append(this.tooltip, this.pista);
+    this.veloIzquierdo = document.createElement('div');
+    this.veloDerecho = document.createElement('div');
+    this.rotuloDeRango = document.createElement('div');
+    this.veloIzquierdo.className = this.veloDerecho.className = 'figura-velo';
+    this.rotuloDeRango.className = 'figura-rango-barrido';
+    for (const nodo of [this.veloIzquierdo, this.veloDerecho, this.rotuloDeRango]) {
+      nodo.hidden = true;
+      this.grafico.over.append(nodo);
+    }
 
     // Leyenda: las series marcadas como ocultas no se listan, y las que
     // traen ayuda la muestran al pasar el puntero (el patron `title` de la UI).
@@ -393,12 +441,57 @@ export class Figura {
       this.tooltip.hidden = true;
       this.opciones.alMoverCursor?.(null);
     });
+    // Un clic que termina un arrastre (seleccion de rango o desplazamiento) no elige nada.
+    let desde: { x: number; y: number } | null = null;
+    u.over.addEventListener('mousedown', (evento) => (desde = { x: evento.clientX, y: evento.clientY }));
     u.over.addEventListener('click', (evento) => {
-      // Un clic que termina un arrastre (zoom o desplazamiento) no elige nada.
-      if (evento.shiftKey || u.cursor.idx === null || u.cursor.idx === undefined) return;
+      const arrastro = desde !== null && Math.hypot(evento.clientX - desde.x, evento.clientY - desde.y) >= DISTANCIA_MINIMA_DE_ARRASTRE;
+      desde = null;
+      if (arrastro || evento.shiftKey || u.cursor.idx === null || u.cursor.idx === undefined) return;
       this.opciones.alElegirPunto?.(u.cursor.idx);
     });
     this.avisarDelRango(u);
+  }
+
+  private veloIzquierdo: HTMLElement | null = null;
+  private veloDerecho: HTMLElement | null = null;
+  private rotuloDeRango: HTMLElement | null = null;
+
+  /** El barrido de la seleccion: velos a los costados y los extremos del rango arriba. */
+  private dibujarBarrido(u: uPlot): void {
+    const { left, width } = u.select;
+    const izquierdo = this.veloIzquierdo;
+    const derecho = this.veloDerecho;
+    const rotulo = this.rotuloDeRango;
+    if (!izquierdo || !derecho || !rotulo) return;
+    const activo = width > 0;
+    izquierdo.hidden = derecho.hidden = rotulo.hidden = !activo;
+    if (!activo || !this.datos) return;
+    const total = u.over.clientWidth;
+    izquierdo.style.left = '0px';
+    izquierdo.style.width = `${left}px`;
+    derecho.style.left = `${left + width}px`;
+    derecho.style.width = `${Math.max(0, total - left - width)}px`;
+    const desde = u.posToVal(left, 'x');
+    const hasta = u.posToVal(left + width, 'x');
+    rotulo.textContent = `${formatearNumero(desde, this.datos.decimalesX)} – ${formatearNumero(hasta, this.datos.decimalesX)}`;
+    rotulo.style.left = `${left + width / 2}px`;
+  }
+
+  /** Vuelve a la vista completa en X (el eje Y se reajusta solo), como el doble clic. */
+  verTodo(): void {
+    const u = this.grafico;
+    const x = u?.data[0] as number[] | undefined;
+    if (!u || !x || x.length === 0) return;
+    u.setScale('x', { min: x[0]!, max: x[x.length - 1]! });
+  }
+
+  /** La pista de Ctrl + rueda: una sola vez por navegador, unos segundos. */
+  private mostrarPista(): void {
+    if (leerAlmacen(CLAVE_DE_PISTA) === 'vista') return;
+    escribirAlmacen(CLAVE_DE_PISTA, 'vista');
+    this.pista.hidden = false;
+    this.temporizadorDePista = setTimeout(() => (this.pista.hidden = true), DURACION_DE_PISTA_MS);
   }
 
   private avisarDelRango(u: uPlot): void {
@@ -452,6 +545,7 @@ export class Figura {
   /** destruir() mas soltar el ResizeObserver: la figura no se vuelve a usar. */
   destruirDelTodo(): void {
     this.destruir();
+    if (this.temporizadorDePista) clearTimeout(this.temporizadorDePista);
     this.observador.disconnect();
   }
 }

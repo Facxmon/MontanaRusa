@@ -13,6 +13,7 @@ import type { Estado } from '../estado';
 import { ubicacionDeNodo } from '../graficos/series';
 import { el, resumirTarjeta, tarjeta, vaciar } from './dom';
 import { formatearMagnitud, SIN_DATO } from './formato';
+import { LimitadorDeRefresco } from './refresco';
 
 export function montarValoresDelCursor(contenedor: HTMLElement, estado: Estado): void {
   let celdas: HTMLElement[] = [];
@@ -56,9 +57,14 @@ export function montarValoresDelCursor(contenedor: HTMLElement, estado: Estado):
     });
   };
 
+  // Con el carro andando, a ~8 Hz; al pausar, el nodo exacto donde paro.
+  const limitador = new LimitadorDeRefresco();
   armar();
   estado.suscribir((nuevo, anterior) => {
     if (nuevo.layout !== anterior.layout) armar();
-    else if (nuevo.nodo !== anterior.nodo) escribir();
+    else if (nuevo.reproduciendo !== anterior.reproduciendo) {
+      limitador.reiniciar();
+      escribir();
+    } else if (nuevo.nodo !== anterior.nodo && (!nuevo.reproduciendo || limitador.toca(performance.now()))) escribir();
   });
 }

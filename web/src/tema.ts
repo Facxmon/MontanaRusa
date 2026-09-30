@@ -55,6 +55,7 @@ const TOKENS = {
   escenaPasajero: '--escena-pasajero',
   escenaPasajeroBrillo: '--escena-pasajero-brillo',
   escenaMarcador: '--escena-marcador',
+  escenaLimiteElemento: '--escena-limite-elemento',
 } as const;
 
 export type Tema = { readonly [K in keyof typeof TOKENS]: string };
@@ -126,7 +127,7 @@ export function tema(): Tema {
   return cache;
 }
 
-/** Fuente para un canvas: tamano del token mas la familia (p. ej. "11px IBM Plex Sans, ..."). */
+/** Fuente para un canvas: tamano del token mas la familia (p. ej. "11px Lato, ..."). */
 export function fuenteDeCanvas(escala = 1): string {
   const t = tema();
   return `${parseFloat(t.textoXs) * escala}px ${t.fuente}`;

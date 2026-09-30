@@ -2,7 +2,7 @@
 // el JSON del contrato. Se verifica contra los golden.
 
 import { describe, expect, it } from 'vitest';
-import { veredictoDelLayout } from '../src/contrato/veredicto';
+import { CRITERIO_NORMATIVO, margenNormativo, veredictoDelLayout } from '../src/contrato/veredicto';
 import { cargarGolden } from './arnes';
 
 const circuito = cargarGolden('circuito-demolayout');
@@ -66,5 +66,35 @@ describe('veredictoDelLayout', () => {
 
   it('los golden de MATLAB no traen inertes (los emite solo el port)', () => {
     expect(veredictoDelLayout(circuito).inertes).toEqual([]);
+  });
+});
+
+describe('margen contra la norma por eje', () => {
+  it('el nucleo nombra asi los criterios normativos (si cambia el nombre, el margen desaparece de la tarjeta)', () => {
+    const nombres = new Set(circuito.elementos.flatMap((e) => e.criterios.posteriores.map((c) => c.nombre)));
+    for (const nombre of Object.values(CRITERIO_NORMATIVO)) expect(nombres.has(nombre)).toBe(true);
+  });
+
+  it('es el menor margen evaluable de ese criterio entre todos los elementos', () => {
+    const m = margenNormativo(circuito, CRITERIO_NORMATIVO.gzMaxima)!;
+    const margenes = circuito.elementos.flatMap((e) =>
+      e.criterios.posteriores.filter((c) => c.nombre === CRITERIO_NORMATIVO.gzMaxima && c.sentido !== 'Informativo' && typeof c.margen === 'number').map((c) => c.margen as number),
+    );
+    expect(m.margen).toBe(Math.min(...margenes));
+    expect(m.criterio.pasa).toBe(m.margen >= 0);
+    expect(circuito.elementos[m.elemento]!.tipo).toBe(m.tipo);
+  });
+
+  it('sin ningun criterio evaluable (todos informativos) no hay margen', () => {
+    const informativo = structuredClone(loop);
+    for (const e of informativo.elementos) for (const c of e.criterios.posteriores) if (c.nombre === CRITERIO_NORMATIVO.gzMinima) c.sentido = 'Informativo';
+    expect(margenNormativo(informativo, CRITERIO_NORMATIVO.gzMinima)).toBeNull();
+  });
+
+  it('el veredicto trae el margen de los tres ejes', () => {
+    const v = veredictoDelLayout(circuito);
+    expect(v.margenGzMaxima).toEqual(margenNormativo(circuito, CRITERIO_NORMATIVO.gzMaxima));
+    expect(v.margenGzMinima).toEqual(margenNormativo(circuito, CRITERIO_NORMATIVO.gzMinima));
+    expect(v.margenGyMaxima).toEqual(margenNormativo(circuito, CRITERIO_NORMATIVO.gyMaxima));
   });
 });

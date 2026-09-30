@@ -86,7 +86,11 @@
   --radio-grande: 10px;
 
   /* ---------- tipografia ---------- */
-  --fuente: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fuente: "Lato", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Los numeros van en Lato con cifras tabulares (tarea 3.10; Lato las trae
+     tabulares por defecto). La mono queda para lo que es codigo: claves del
+     JSON, atajos de teclado y los mensajes del nucleo en el banner. */
+  --cifras: var(--fuente);
   --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   --texto-xs: 11px;
   --texto-sm: 12.5px;
@@ -108,7 +112,7 @@
      decimales de la unidad de presentacion (--digitos, ver estilos.css). */
   --ancho-campo-chico: 62px;
   /* HUD del reproductor: un numero con signo y dos decimales ("-99.99") y el nombre del elemento. */
-  --ancho-hud-numero: 6ch;
+  --ancho-hud-numero: 5ch;
   --ancho-hud-elemento: 18ch;
   /* Popover de ayuda del "?" de cada parametro. */
   --ancho-popover: 300px;
@@ -143,6 +147,8 @@
   --escena-pasajero-brillo: var(--rojo-800);
   /* Marcador del nodo bajo el cursor de los graficos. */
   --escena-marcador: var(--azul-400);
+  /* Puntos donde la via pasa de un elemento al siguiente (conmutable). */
+  --escena-limite-elemento: var(--rojo-500);
   /* Caja disponible (entra / se sale), proyeccion al piso y gizmo de ejes. */
   --escena-caja: var(--verde-600);
   --escena-caja-fuera: var(--rojo-500);
@@ -176,6 +182,8 @@
   --acento: var(--azul-400);
   --acento-hover: var(--azul-300);
   --acento-suave: rgba(var(--azul-400-rgb), 0.15);
+  --acento-barrido: rgba(var(--azul-400-rgb), 0.3);
+  --velo-barrido: rgba(var(--gris-950-rgb), 0.55);
   --destello: rgba(var(--azul-400-rgb), 0.35);
   --texto-sobre-acento: var(--gris-950);
   /* Botones: un escalon mas claro que la tarjeta, con borde propio. */
@@ -239,6 +247,8 @@
   --acento: var(--azul-600);
   --acento-hover: var(--azul-700);
   --acento-suave: rgba(var(--azul-400-rgb), 0.18);
+  --acento-barrido: rgba(var(--azul-600-rgb), 0.25);
+  --velo-barrido: rgba(var(--gris-950-rgb), 0.18);
   --destello: rgba(var(--azul-400-rgb), 0.4);
   --texto-sobre-acento: var(--blanco);
   --superficie-boton-hover: var(--gris-200);

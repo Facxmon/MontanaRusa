@@ -11,7 +11,7 @@
 // (tabindex rotativo) y las flechas, Inicio y Fin se mueven entre pestanas
 // y las activan.
 
-import { el, idUnico } from './dom';
+import { el, iconoDeError, idUnico } from './dom';
 
 export interface OpcionDePestana<T extends string> {
   clave: T;
@@ -21,6 +21,8 @@ export interface OpcionDePestana<T extends string> {
 export interface Pestanas<T extends string> {
   /** Marca la activa (sin avisar a alElegir). */
   activar(clave: T): void;
+  /** Pone (o saca, con null) el icono de error en una pestana: hay algo con error adentro. */
+  marcarError(clave: T, titulo: string | null): void;
 }
 
 export function montarPestanas<T extends string>(
@@ -83,12 +85,19 @@ export function montarPestanas<T extends string>(
   };
   activar(activa);
   // La fuente o el ancho del contenedor pueden cambiar despues de montar
-  // (Plex carga tarde, el panel se muestra): se vuelve a ubicar sin animar.
+  // (la fuente carga tarde, el panel se muestra): se vuelve a ubicar sin animar.
   const observador = new ResizeObserver(() => {
     indicador.classList.add('sin-transicion');
     ubicarIndicador();
     requestAnimationFrame(() => indicador.classList.remove('sin-transicion'));
   });
   observador.observe(contenedor);
-  return { activar };
+  const marcarError = (clave: T, titulo: string | null) => {
+    const boton = botones[opciones.findIndex((o) => o.clave === clave)];
+    if (!boton) return;
+    boton.textContent = opciones.find((o) => o.clave === clave)!.etiqueta;
+    if (titulo !== null) boton.append(' ', iconoDeError(titulo));
+    ubicarIndicador();
+  };
+  return { activar, marcarError };
 }

@@ -6,6 +6,7 @@ import { rangoDeMagnitud } from '../src/escena/colores';
 import {
   aplanarNodos,
   coloresPorVertice,
+  juntasEntreElementos,
   lineaHeartline,
   tubo,
   uniones,
@@ -48,6 +49,32 @@ describe('aplanarNodos', () => {
 
   it('el riel empieza en la posicion inicial del layout', () => {
     expect([nodos.riel[0], nodos.riel[1], nodos.riel[2]]).toEqual(circuito.estadoInicial.posicion);
+  });
+});
+
+describe('juntasEntreElementos', () => {
+  const nodos = aplanarNodos(circuito);
+  const juntas = juntasEntreElementos(nodos);
+
+  it('marca solo las juntas entre elementos, una por cada par consecutivo', () => {
+    expect(juntas).toHaveLength(circuito.elementos.length - 1);
+  });
+
+  it('cada junta es el ultimo nodo de un elemento y coincide con el primero del siguiente', () => {
+    juntas.forEach((nodo, i) => {
+      expect(nodos.elemento[nodo]).toBe(i);
+      expect(nodos.elemento[nodo + 1]).toBe(i + 1);
+      const siguiente = circuito.elementos[i + 1]!.nodos;
+      expect(nodos.riel[3 * nodo]).toBeCloseTo(siguiente.xRiel[0]!, 5);
+      expect(nodos.riel[3 * nodo + 1]).toBeCloseTo(siguiente.yRiel[0]!, 5);
+      expect(nodos.riel[3 * nodo + 2]).toBeCloseTo(siguiente.zRiel[0]!, 5);
+    });
+  });
+
+  it('un layout de un solo elemento no tiene juntas (los subtramos no cuentan)', () => {
+    const loop = cargar('loop-clotoide');
+    expect(loop.elementos[0]!.subtramos.length).toBeGreaterThan(1);
+    expect(juntasEntreElementos(aplanarNodos(loop))).toEqual([]);
   });
 });
 
