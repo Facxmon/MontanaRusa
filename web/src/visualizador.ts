@@ -48,8 +48,12 @@ import { montarSelectorDePanel } from './paneles/selectorDePanel';
 import { montarSelectorDeVista } from './paneles/selectorDeVista';
 import { montarSelectorDeTema } from './paneles/selectorDeTema';
 import { montarVeredicto } from './paneles/veredicto';
+import { resaltarElemento } from './paneles/resaltarElemento';
+import { nodoGlobalDe } from './graficos/series';
 
 const BASE = import.meta.env.BASE_URL;
+/** Al ubicar un punto en el 3D, la camara encuadra un cubo de este medio lado (m) alrededor. */
+const MEDIO_LADO_DEL_ENCUADRE_DE_PUNTO = 0.3;
 const urlDelIndice = `${BASE}golden/indice.json`;
 const urlDelCaso = (caso: string) => `${BASE}golden/${encodeURIComponent(caso)}.json`;
 
@@ -189,7 +193,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   montarErrores(dom.errores, estado);
   montarCabecera(dom.cabecera, estado);
   montarSelectorDeCaso(dom.selectorDeCaso, estado);
-  montarVeredicto(dom.veredicto, estado);
+  montarVeredicto(dom.veredicto, estado, (donde) => ubicarEnEl3d(donde.elemento, donde.nodoLocal));
   montarLeyenda(dom.leyenda, estado);
   montarResumenLayout(dom.resumenLayout, estado);
   montarElementos(dom.elementos, estado);
@@ -203,6 +207,24 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   const reproductor = montarReproductor(dom.reproductor, estado, escena, carro);
   const destruirGraficos = montarPanelDeGraficos(dom.graficos, estado, (nodo) => reproductor.irANodo(nodo));
   montarSelectorDePanel(dom.selectorDePanel, estado, { resultados: dom.panelResultados, diseno: dom.panelDiseno });
+
+  /**
+   * Lleva el 3D a un punto de la via (clic en la ubicacion de un extremo del
+   * veredicto): resalta su elemento con el mismo resaltarElemento de las
+   * listas, pone el carro y el marcador en ese nodo y acerca la camara. Con
+   * la vista de graficos sola, pasa a "Ambos" para que el 3D se vea.
+   */
+  function ubicarEnEl3d(elemento: number, nodoLocal: number): void {
+    const { layout, vista } = estado.get();
+    if (!layout) return;
+    if (vista === 'graficos') estado.set({ vista: 'ambos' });
+    resaltarElemento(estado, elemento);
+    const nodo = nodoGlobalDe(layout, elemento, nodoLocal);
+    reproductor.irANodo(nodo);
+    // Despues del encuadre del elemento (que dispara resaltarElemento): este lo reemplaza.
+    const caja = via.cajaAlrededorDeNodo(nodo, MEDIO_LADO_DEL_ENCUADRE_DE_PUNTO);
+    if (caja) escena.encuadrar(caja);
+  }
   montarDiseno(dom.diseno, estado, abrirDiseno);
   montarParametros(dom.parametros, estado);
 

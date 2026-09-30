@@ -1,14 +1,20 @@
 // Bloque de veredicto, arriba del panel de resultados: pasa / no pasa en
 // grande, los tres numeros que se miran siempre (Gz maxima, Gz minima, |Gy|
-// maxima) con el lugar donde ocurren, el criterio que peor esta y los
-// ajustes inertes.
+// maxima), el criterio que peor esta y los ajustes inertes.
 //
-// Los criterios de aceptacion son el diferencial del proyecto (aplican ASTM
-// F2291) y hasta ahora eran una lista al final de un panel al que habia que
-// scrollear, visible solo con un elemento elegido. Esto es presentacion: el
-// calculo esta en contrato/veredicto.ts, que solo lee el JSON.
+// Resumido en la tarea 3 de interfaz (tenia demasiado texto):
+//  - cada G es un valor grande y, en UNA linea debajo, su margen contra la
+//    norma (el criterio normativo de ese eje, ver contrato/veredicto.ts);
+//  - donde ocurre (elemento · subtramo · arco) pasa al tooltip del valor, y
+//    clickear el valor ubica ese punto en el 3D (resalta el elemento, lleva
+//    el carro y el marcador ahi y acerca la camara);
+//  - el criterio peor va en una sola linea: nombre y margen; el detalle
+//    (elemento, valor contra limite) queda en el tooltip.
+//
+// Esto es presentacion: el calculo esta en contrato/veredicto.ts, que solo
+// lee el JSON.
 
-import type { UbicacionDeExtremo } from '../contrato/veredicto';
+import type { MargenNormativo, UbicacionDeExtremo } from '../contrato/veredicto';
 import { veredictoDelLayout } from '../contrato/veredicto';
 import { esRecalculo, type Estado } from '../estado';
 import { destellarCambios, el, vaciar, valoresPorClave } from './dom';
@@ -26,27 +32,79 @@ function textoDeUbicacion(donde: UbicacionDeExtremo | null): string {
   return partes.join(' · ');
 }
 
-function cifra(etiqueta: string, valor: string, donde: string, deA?: string): HTMLElement {
+/** Un margen con signo explicito: "+0.11 G", "−0.33 m". */
+function conSigno(valor: number | null, unidad: string): string {
+  if (valor === null || !Number.isFinite(valor)) return formatear(null, unidad);
+  const signo = valor > 0 ? '+' : valor < 0 ? '−' : '±';
+  return `${signo}${formatear(Math.abs(valor), unidad)}`;
+}
+
+/** La linea del margen contra la norma de un eje, con el detalle del criterio en el tooltip. */
+function lineaDeMargen(margen: MargenNormativo | null): HTMLElement {
+  if (!margen) {
+    return el(
+      'span',
+      { class: 'veredicto-cifra-margen', title: 'El criterio normativo de este eje es informativo en todos los elementos: ningún evento sostenido supera los 200 ms (ASTM F2291, 7.1.4.2).' },
+      'norma: sin evento sostenido',
+    );
+  }
+  const { criterio } = margen;
+  return el(
+    'span',
+    {
+      class: `veredicto-cifra-margen${criterio.pasa ? '' : ' falla'}`,
+      'data-clave': `margen-${criterio.nombre}`,
+      title: `${criterio.nombre}, peor caso en ${margen.elemento + 1}. ${margen.tipo}${criterio.detalle ? `: ${criterio.detalle}` : ''}`,
+    },
+    `margen ${conSigno(margen.margen, criterio.unidad)}`,
+  );
+}
+
+function cifra(
+  etiqueta: string,
+  valor: string,
+  donde: UbicacionDeExtremo | null,
+  margen: MargenNormativo | null,
+  ubicar: ((donde: UbicacionDeExtremo) => void) | undefined,
+  deA?: string,
+): HTMLElement {
+  const lugar = textoDeUbicacion(donde);
+  // El valor es el boton que ubica el punto en el 3D; donde ocurre va en el tooltip.
+  const numero =
+    donde && ubicar
+      ? el(
+          'button',
+          {
+            type: 'button',
+            class: 'veredicto-cifra-valor veredicto-ubicar',
+            'data-clave': etiqueta,
+            title: `${lugar}. Clic: verlo en el 3D.`,
+            'aria-label': `${etiqueta} ${valor}, en ${lugar}. Ver en el 3D`,
+            onClick: () => ubicar(donde),
+          },
+          valor,
+          el('span', { class: 'veredicto-ubicar-icono', 'aria-hidden': 'true' }, '⌖'),
+        )
+      : el('span', { class: 'veredicto-cifra-valor', 'data-clave': etiqueta, title: lugar }, valor);
   return el(
     'div',
     { class: 'veredicto-cifra' },
     el('span', { class: 'veredicto-cifra-etiqueta' }, etiqueta),
-    el('span', { class: 'veredicto-cifra-valor', 'data-clave': etiqueta }, valor),
+    numero,
+    lineaDeMargen(margen),
     // Con una comparacion A/B (fase 4.8): cuanto valia en A y la diferencia.
     deA ? el('span', { class: 'veredicto-cifra-a' }, deA) : null,
-    el('span', { class: 'veredicto-cifra-donde' }, donde),
   );
 }
 
 /** "A 7.23 G (−1.54)": el valor de A y cuanto cambio B respecto de A. */
 function textoDeA(b: number | null, a: number | null): string | undefined {
   if (a === null || b === null) return undefined;
-  const diferencia = b - a;
-  const signo = diferencia > 0 ? '+' : diferencia < 0 ? '−' : '±';
-  return `A ${formatear(a, 'G')} (${signo}${formatear(Math.abs(diferencia), 'G').replace(' G', '')})`;
+  return `A ${formatear(a, 'G')} (${conSigno(b - a, 'G').replace(' G', '')})`;
 }
 
-export function montarVeredicto(contenedor: HTMLElement, estado: Estado): void {
+/** `ubicar` lleva el 3D al punto de un extremo (lo arma visualizador.ts). */
+export function montarVeredicto(contenedor: HTMLElement, estado: Estado, ubicar?: (donde: UbicacionDeExtremo) => void): void {
   const dibujar = (destellar = false) => {
     const antes = destellar ? valoresPorClave(contenedor) : null;
     const { layout } = estado.get();
@@ -58,11 +116,21 @@ export function montarVeredicto(contenedor: HTMLElement, estado: Estado): void {
     const clase = v.pasa ? 'pasa' : 'falla';
 
     const peor = v.peorCriterio;
-    const detalleDelPeor = peor
-      ? `${peor.criterio.nombre} · ${peor.elemento + 1}. ${peor.tipo} · ${formatear(peor.criterio.valor, peor.criterio.unidad)} ${
-          peor.criterio.sentido === 'MenorOIgual' ? '≤' : '≥'
-        } ${formatear(peor.criterio.limite, peor.criterio.unidad)} · margen ${formatear(peor.criterio.margen, peor.criterio.unidad)}`
-      : 'sin criterios evaluables';
+    const falla = peor !== null && !peor.criterio.pasa;
+    const lineaDelPeor = peor
+      ? el(
+          'p',
+          {
+            class: `veredicto-peor${falla ? ' falla' : ''}`,
+            title: `${peor.criterio.nombre} · ${peor.elemento + 1}. ${peor.tipo} · ${formatear(peor.criterio.valor, peor.criterio.unidad)} ${
+              peor.criterio.sentido === 'MenorOIgual' ? '≤' : '≥'
+            } ${formatear(peor.criterio.limite, peor.criterio.unidad)}${peor.criterio.detalle ? ` · ${peor.criterio.detalle}` : ''}`,
+          },
+          el('span', { class: 'veredicto-cifra-etiqueta' }, falla ? 'Peor ' : 'Más ajustado '),
+          el('span', { class: 'veredicto-peor-nombre' }, peor.criterio.nombre),
+          el('span', { class: 'veredicto-peor-margen', 'data-clave': 'margen-peor' }, conSigno(peor.criterio.margen ?? null, peor.criterio.unidad)),
+        )
+      : el('p', { class: 'veredicto-peor' }, 'Sin criterios evaluables');
 
     contenedor.append(
       el(
@@ -82,16 +150,11 @@ export function montarVeredicto(contenedor: HTMLElement, estado: Estado): void {
         el(
           'div',
           { class: 'veredicto-cifras' },
-          cifra('Gz máxima', formatear(v.gzMaxima, 'G'), textoDeUbicacion(v.dondeGzMaxima), a ? textoDeA(v.gzMaxima, a.gzMaxima) : undefined),
-          cifra('Gz mínima', formatear(v.gzMinima, 'G'), textoDeUbicacion(v.dondeGzMinima), a ? textoDeA(v.gzMinima, a.gzMinima) : undefined),
-          cifra('|Gy| máxima', formatear(v.gyMaximaAbsoluta, 'G'), textoDeUbicacion(v.dondeGyMaxima), a ? textoDeA(v.gyMaximaAbsoluta, a.gyMaximaAbsoluta) : undefined),
+          cifra('Gz máx', formatear(v.gzMaxima, 'G'), v.dondeGzMaxima, v.margenGzMaxima, ubicar, a ? textoDeA(v.gzMaxima, a.gzMaxima) : undefined),
+          cifra('Gz mín', formatear(v.gzMinima, 'G'), v.dondeGzMinima, v.margenGzMinima, ubicar, a ? textoDeA(v.gzMinima, a.gzMinima) : undefined),
+          cifra('|Gy| máx', formatear(v.gyMaximaAbsoluta, 'G'), v.dondeGyMaxima, v.margenGyMaxima, ubicar, a ? textoDeA(v.gyMaximaAbsoluta, a.gyMaximaAbsoluta) : undefined),
         ),
-        el(
-          'p',
-          { class: `veredicto-peor ${peor && !peor.criterio.pasa ? 'falla' : ''}` },
-          el('span', { class: 'veredicto-cifra-etiqueta' }, peor && !peor.criterio.pasa ? 'Criterio peor: ' : 'Criterio más ajustado: '),
-          detalleDelPeor,
-        ),
+        lineaDelPeor,
         // Los inertes que la fase 1 dejo en el layout exportado: se aplicaron y no tuvieron efecto.
         v.inertes.map((i) =>
           el(

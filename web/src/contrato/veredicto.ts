@@ -37,6 +37,44 @@ export interface InertesDeElemento {
   nombres: string[];
 }
 
+/**
+ * El margen contra la norma de un eje de G: el MENOR margen, entre todos los
+ * elementos, del criterio normativo de ese eje (ASTM F2291, las curvas de
+ * limite por duracion). Es el mismo numero que decide si el criterio pasa:
+ * no se recalcula, se lee de elementos[].criterios.posteriores.
+ */
+export interface MargenNormativo {
+  /** En G; negativo si el criterio no pasa. */
+  margen: number;
+  elemento: number;
+  tipo: string;
+  criterio: Criterio;
+}
+
+/**
+ * Nombre del criterio normativo de cada eje, tal cual lo escribe el nucleo
+ * (Verificacion.m y su port verificacion.ts, AgregarCriterioNormativo).
+ */
+export const CRITERIO_NORMATIVO = {
+  gzMaxima: '+Gz (Fig. 10)',
+  gzMinima: '-Gz (Fig. 9)',
+  gyMaxima: 'Gy (Fig. 8)',
+} as const;
+
+/** El margen normativo de un eje, o null si en ningun elemento el criterio es evaluable (todos informativos: sin eventos sostenidos). */
+export function margenNormativo(layout: Layout, nombre: string): MargenNormativo | null {
+  let peor: MargenNormativo | null = null;
+  layout.elementos.forEach((elemento, indice) => {
+    for (const criterio of elemento.criterios.posteriores) {
+      if (criterio.nombre !== nombre || criterio.sentido === 'Informativo') continue;
+      const margen = criterio.margen;
+      if (margen === null || margen === undefined || !Number.isFinite(margen)) continue;
+      if (peor === null || margen < peor.margen) peor = { margen, elemento: indice, tipo: elemento.tipo, criterio };
+    }
+  });
+  return peor;
+}
+
 export interface Veredicto {
   pasa: boolean;
   criteriosQueNoPasan: number;
@@ -47,6 +85,10 @@ export interface Veredicto {
   dondeGzMinima: UbicacionDeExtremo | null;
   gyMaximaAbsoluta: number | null;
   dondeGyMaxima: UbicacionDeExtremo | null;
+  /** Margen contra la norma de cada eje (ver MargenNormativo). */
+  margenGzMaxima: MargenNormativo | null;
+  margenGzMinima: MargenNormativo | null;
+  margenGyMaxima: MargenNormativo | null;
   /** El que peor esta: el mas negativo si alguno falla, el mas ajustado si todos pasan. */
   peorCriterio: CriterioDestacado | null;
   inertes: InertesDeElemento[];
@@ -130,6 +172,9 @@ export function veredictoDelLayout(layout: Layout): Veredicto {
     dondeGzMinima: gzMinima.donde,
     gyMaximaAbsoluta: resumen.gyMaximaAbsolutaGlobal ?? (gyMaxima.valor === null ? null : Math.abs(gyMaxima.valor)),
     dondeGyMaxima: gyMaxima.donde,
+    margenGzMaxima: margenNormativo(layout, CRITERIO_NORMATIVO.gzMaxima),
+    margenGzMinima: margenNormativo(layout, CRITERIO_NORMATIVO.gzMinima),
+    margenGyMaxima: margenNormativo(layout, CRITERIO_NORMATIVO.gyMaxima),
     peorCriterio,
     inertes,
   };

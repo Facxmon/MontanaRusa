@@ -184,6 +184,17 @@ export class Via {
     atributoHeartline.needsUpdate = true;
   }
 
+  /** Caja de lado 2 x `medio` centrada en el riel en un nodo global: para acercar la camara a un punto. */
+  cajaAlrededorDeNodo(nodo: number, medio: number): [[number, number], [number, number], [number, number]] | null {
+    if (!this.nodos || nodo < 0 || nodo >= this.nodos.cantidad) return null;
+    const [x, y, z] = [this.nodos.riel[3 * nodo]!, this.nodos.riel[3 * nodo + 1]!, this.nodos.riel[3 * nodo + 2]!];
+    return [
+      [x - medio, x + medio],
+      [y - medio, y + medio],
+      [z - medio, z + medio],
+    ];
+  }
+
   /** Caja [[xmin,xmax],[ymin,ymax],[zmin,zmax]] del riel y la heartline de un elemento. */
   cajaDelElemento(indice: number): [[number, number], [number, number], [number, number]] | null {
     if (!this.nodos) return null;

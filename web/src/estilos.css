@@ -791,9 +791,51 @@ summary { cursor: pointer; font-size: var(--texto-sm); color: var(--texto-1); pa
 .veredicto-cifra { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .veredicto-cifra-etiqueta { font-size: var(--texto-xs); color: var(--texto-3); }
 .veredicto-cifra-valor { font-family: var(--cifras); font-size: var(--texto-lg); font-variant-numeric: tabular-nums; color: var(--texto-1); }
-.veredicto-cifra-donde { font-size: var(--texto-xs); color: var(--texto-2); overflow-wrap: anywhere; }
-.veredicto-peor { margin: var(--esp-3) 0 0; font-size: var(--texto-sm); color: var(--texto-2); }
+/* El valor es un boton: clic ubica el punto en el 3D; donde ocurre, en el tooltip. */
+.veredicto-ubicar {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--esp-1);
+  align-self: flex-start;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: var(--radio-chico);
+  font-weight: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.veredicto-ubicar-icono { font-size: var(--texto-sm); color: var(--texto-3); transition: color var(--dur-rapida) var(--curva); }
+.veredicto-ubicar:hover .veredicto-ubicar-icono { color: var(--acento); }
+.veredicto-ubicar:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+/* El margen contra la norma: una linea, con el detalle del criterio en el tooltip. */
+.veredicto-cifra-margen {
+  font-family: var(--cifras);
+  font-size: var(--texto-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--texto-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: help;
+}
+.veredicto-cifra-margen.falla { color: var(--falla); }
+/* El criterio peor en una sola linea: nombre (recortado si no entra) y margen. */
+.veredicto-peor {
+  display: flex;
+  align-items: baseline;
+  gap: var(--esp-1);
+  margin: var(--esp-3) 0 0;
+  font-size: var(--texto-sm);
+  color: var(--texto-2);
+  white-space: nowrap;
+  cursor: help;
+}
+.veredicto-peor-nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.veredicto-peor-margen { flex: none; font-family: var(--cifras); font-variant-numeric: tabular-nums; }
 .veredicto-peor.falla { color: var(--falla-texto); }
+.veredicto-peor.falla .veredicto-peor-margen { color: var(--falla); }
 
 /* ---------- panel de diseno ---------- */
 .pestanas-panel { align-self: flex-start; }
