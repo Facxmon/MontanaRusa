@@ -38,7 +38,8 @@ import {
 /** Altos ofrecidos, en px CSS. El elegido se recuerda en localStorage. */
 const ALTOS = [240, 360, 480];
 const CLAVE_DE_ALTO = 'alto-figura';
-const CLAVE_DE_AYUDA = 'ayuda-zoom-vista';
+// La navegacion cambio en la tarea 3 de interfaz (Ctrl + rueda, rango en X): clave nueva para que el cartel vuelva a aparecer una vez.
+const CLAVE_DE_AYUDA = 'ayuda-zoom-vista-2';
 
 function altoGuardado(): number {
   const guardado = Number(leerAlmacen(CLAVE_DE_ALTO));
@@ -114,9 +115,9 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
     const cartel = el(
       'p',
       { class: 'graficos-ayuda-zoom', role: 'note' },
-      'Arrastrar hace zoom (horizontal, vertical o en caja), la rueda acerca y aleja (Shift = eje vertical), ',
-      'arrastrar con Shift o con la rueda apretada desplaza y el doble clic vuelve a la vista completa. ',
-      'Como la rueda queda tomada por el zoom, la lista de figuras se recorre con la barra de la derecha o con ⤢.',
+      'Arrastrar sobre una figura marca un rango del eje horizontal y hace zoom a ese rango; ',
+      'doble clic o ⟲ vuelve a la vista completa. La rueda scrollea la página; Ctrl + rueda acerca y aleja ',
+      '(Ctrl + Shift = eje vertical). Arrastrar con Shift o con la rueda apretada desplaza.',
       el(
         'button',
         {
@@ -196,12 +197,15 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
     datos.forEach((d, indice) => {
       const lienzo = el('div', { class: 'figura' });
       const rango = el('div', { class: 'figura-rango', hidden: true });
+      // Deshabilitado mientras la figura muestra el rango completo.
+      const verTodo = el('button', { type: 'button', class: 'boton chico', title: 'Volver a la vista completa (también con doble clic)', 'aria-label': `Vista completa de ${d.titulo}`, disabled: true, onClick: () => figura.verTodo() }, '⟲');
       const caja = el(
         'section',
         { class: 'figura-caja' },
         el(
           'div',
           { class: 'figura-acciones' },
+          verTodo,
           el('button', { type: 'button', class: 'boton chico', title: 'Expandir a todo el panel (Esc vuelve)', 'aria-label': `Expandir ${d.titulo}`, onClick: () => expandir(expandida === indice ? null : indice) }, '⤢'),
           el('button', { type: 'button', class: 'boton chico', title: 'Descargar esta figura en PNG a 2x', onClick: () => void exportarPng(d, indice) }, 'PNG'),
           el('button', { type: 'button', class: 'boton chico', title: 'Descargar los datos de esta figura en CSV', onClick: () => exportarCsv(d, indice) }, 'CSV'),
@@ -224,7 +228,11 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
           estado.set({ nodo });
           alElegirNodo?.(nodo);
         },
-        alCambiarRango: (desde, hasta, completo) => mostrarRango(rango, d, desde, hasta, completo),
+        alCambiarRango: (desde, hasta, completo) => {
+          verTodo.disabled = completo;
+          caja.classList.toggle('con-zoom', !completo);
+          mostrarRango(rango, d, desde, hasta, completo);
+        },
       });
       figura.mostrar(d);
       figuras.push(figura);
@@ -269,7 +277,7 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
     );
     vaciar(contenedorDeRango);
     contenedorDeRango.append(
-      el('p', { class: 'ayuda' }, `Rango elegido: ${numeroX(desde)} a ${numeroX(hasta)} — doble clic vuelve a la vista completa.`),
+      el('p', { class: 'ayuda' }, `Rango elegido: ${numeroX(desde)} a ${numeroX(hasta)} — doble clic o ⟲ vuelve a la vista completa.`),
       el(
         'table',
         { class: 'tabla figura-rango-tabla' },

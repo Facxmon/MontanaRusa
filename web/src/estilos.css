@@ -347,6 +347,7 @@ html, body {
   transition: opacity var(--dur-rapida) var(--curva);
 }
 .figura-caja:hover .figura-acciones,
+.figura-caja.con-zoom .figura-acciones,
 .figura-acciones:focus-within { opacity: 1; }
 
 /* Expandida: ocupa todo el panel de graficos y las demas se esconden. */
@@ -406,7 +407,28 @@ html, body {
 .uplot .u-legend .u-series > * { padding: 0; }
 .uplot .u-legend .u-marker { border-radius: var(--radio-chico); align-self: center; }
 .uplot .u-legend .u-value { display: inline-block; box-sizing: content-box; min-width: var(--ancho-leyenda-valor); text-align: right; color: var(--texto-1); font-family: var(--mono); }
-.u-select { background: var(--acento-suave); }
+/* La seleccion de rango (arrastre en X): de todo el alto y con bordes, que se vea que rango se va a ampliar. */
+.u-select {
+  background: var(--acento-suave);
+  border-left: 1px solid var(--acento);
+  border-right: 1px solid var(--acento);
+}
+/* "Ctrl + rueda para zoom": arriba al centro de la figura, una sola vez. */
+.figura-pista {
+  position: absolute;
+  top: var(--esp-6);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: var(--esp-1) var(--esp-3);
+  background: var(--superficie-flotante);
+  border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio);
+  color: var(--texto-1);
+  font-size: var(--texto-sm);
+  pointer-events: none;
+}
+.figura-pista[hidden] { display: none; }
 .uplot .u-over { cursor: crosshair; }
 
 /* Bloque "valores en el cursor" del panel lateral. */
