@@ -21,6 +21,14 @@ export interface Contexto {
   AnguloGiradoDeReferencia: number;
   FuncionCurvatura: (Punto: Punto) => [number, number];
   FuncionAnguloDeCurvatura: ((Punto: Punto) => number) | null;
+  /** Peralte alineado a la fuerza (RollHaciaLaFuerza.m); null en los demas casos. */
+  PeralteHaciaLaFuerza?: PeralteHaciaLaFuerza | null;
+}
+
+export interface PeralteHaciaLaFuerza {
+  Desvio: number;
+  ArcoInicio: number;
+  LongitudTransicion: number;
 }
 
 const v3 = (y: VectorDeEstado, i: number): Vec3 => [y[i]!, y[i + 1]!, y[i + 2]!];
@@ -73,7 +81,70 @@ export function PuntoCinematico(Arco: number, y: VectorDeEstado, Contexto: Conte
   if (Contexto.PerfilVelocidad) {
     P.VelocidadParaCurvatura = Math.max(Contexto.PerfilVelocidad(Arco), Contexto.VelocidadMinimaDeSeguridad);
   }
+  // Peralte alineado a la fuerza: el roll de la ley base se reemplaza por el que pone el eje del carro sobre la fuerza.
+  if (Contexto.PeralteHaciaLaFuerza) RollHaciaLaFuerza(P, Contexto, Contexto.PeralteHaciaLaFuerza);
   return P;
+}
+
+/** AlEjeDeLaFuerza.m: lleva un angulo a (-pi/2, pi/2] (alinear el eje del carro, no su sentido). */
+export function AlEjeDeLaFuerza(Angulo: number): number {
+  let a = Angulo + Math.PI / 2;
+  a = a - Math.PI * Math.floor(a / Math.PI);
+  a = a - Math.PI / 2;
+  return a === -Math.PI / 2 ? Math.PI / 2 : a;
+}
+
+/**
+ * RollHaciaLaFuerza.m: roll que pone el eje del carro sobre la fuerza
+ * especifica del riel, F = v^2*kappa + g*z, mas el desvio; en el
+ * acondicionamiento se mezcla con la ley base con el smoothstep quintico.
+ * Unas pocas pasadas de punto fijo porque el modulo de la curvatura depende
+ * del roll. phi' y phi'' quedan aproximados (los completa el generador).
+ */
+function RollHaciaLaFuerza(P: Punto, Contexto: Contexto, Alinear: PeralteHaciaLaFuerza): void {
+  const g = Contexto.Parametros.Gravedad;
+  const d = Contexto.Parametros.DistanciaHeartline;
+  const Longitud = Alinear.LongitudTransicion;
+  let Peso = 1;
+  let DerivadaPeso = 0;
+  let SegundaPeso = 0;
+  if (Longitud > 0) {
+    const u = Math.min(Math.max((P.Arco - Alinear.ArcoInicio) / Longitud, 0), 1);
+    Peso = 6 * u ** 5 - 15 * u ** 4 + 10 * u ** 3;
+    DerivadaPeso = (30 * u ** 4 - 60 * u ** 3 + 30 * u ** 2) / Longitud;
+    SegundaPeso = (120 * u ** 3 - 180 * u ** 2 + 60 * u) / Longitud ** 2;
+  }
+  const Base = P.AnguloRoll;
+  const BaseV = P.VelocidadRoll;
+  const BaseA = P.AceleracionRoll;
+  let Roll = Base;
+  let Objetivo = Base;
+  for (let Iteracion = 1; Iteracion <= 4; Iteracion++) {
+    ConRoll(P, Roll, Contexto);
+    const [CurvaturaArriba, CurvaturaLateral] = Contexto.FuncionCurvatura(P);
+    const CurvaturaSobreU = CurvaturaArriba * Math.cos(Roll) + CurvaturaLateral * Math.sin(Roll);
+    const Velocidad = P.VelocidadCentroDeMasa / Math.hypot(1 - d * CurvaturaSobreU, d * BaseV);
+    const FuerzaArriba = Velocidad ** 2 * CurvaturaArriba + g * P.VersorArribaTransporte[2];
+    const FuerzaLateral = Velocidad ** 2 * CurvaturaLateral + g * P.VersorLateralTransporte[2];
+    if (Math.hypot(FuerzaArriba, FuerzaLateral) >= 0.05 * g) {
+      Objetivo = Base + AlEjeDeLaFuerza(Math.atan2(FuerzaLateral, FuerzaArriba) - Base) + Alinear.Desvio;
+    }
+    const RollNuevo = Base + Peso * (Objetivo - Base);
+    if (Math.abs(RollNuevo - Roll) < 1e-12) {
+      Roll = RollNuevo;
+      break;
+    }
+    Roll = RollNuevo;
+  }
+  ConRoll(P, Roll, Contexto);
+  P.VelocidadRoll = (1 - Peso) * BaseV + DerivadaPeso * (Objetivo - Base);
+  P.AceleracionRoll = (1 - Peso) * BaseA - 2 * DerivadaPeso * BaseV + SegundaPeso * (Objetivo - Base);
+}
+
+function ConRoll(P: Punto, Roll: number, Contexto: Contexto): void {
+  P.AnguloRoll = Roll;
+  [P.VersorArribaCarro, P.VersorLateral] = MarcoCarroDesdeTransporte(P.VersorArribaTransporte, P.VersorLateralTransporte, Roll);
+  P.AnguloCurvaturaDesdeArriba = Contexto.FuncionAnguloDeCurvatura ? Contexto.FuncionAnguloDeCurvatura(P) - Roll : 0;
 }
 
 /** Ecuaciones de la via y de la energia, acopladas. Devuelve [dy/ds, Punto completo]. */

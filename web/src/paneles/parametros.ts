@@ -46,6 +46,11 @@ import {
   etiquetaDe,
   fueraDelRango,
   modosQueLoConsumen,
+  CAMBIAN_LA_VISTA,
+  conExclusionDePeralte,
+  GRUPOS_GLOBALES,
+  RADIO_DEL_ELEMENTO,
+  seMuestra,
   textoConUnidad,
   textoDeEntrada,
   type Etiqueta,
@@ -286,26 +291,46 @@ function campoAnulable(nombre: NombreDeParametro, valor: unknown, actualizar: Ac
 }
 
 /**
- * Las tolerancias, los topes de iteracion y los pasos de dibujo no son
- * decisiones de diseno sino del solver, y mezclarlos con los radios es parte
- * de por que el panel abrumaba: van a un desplegable propio, cerrado.
+ * Un grupo plegable del formulario global con sus secciones (auditoria de
+ * categorias, A6): Criterios de aceptacion (Norma; Fabricacion y espacio),
+ * Generales (Tren y carro; Resistencia al avance; Escala) y Avanzado
+ * (Resolucion; Numerico). La seccion de cada parametro la fija etiquetas.ts;
+ * los que no hacen nada con los parametros vigentes no se muestran.
  */
-function esDelSolver(declaracion: DeclaracionDeParametro): boolean {
-  return etiquetaDe(pascal(declaracion.clave)).grupo === 'solver';
-}
-const deDiseno = (lista: DeclaracionDeParametro[]) => lista.filter((d) => !esDelSolver(d));
-const deSolver = (lista: DeclaracionDeParametro[]) => lista.filter(esDelSolver);
-
-function grupo(titulo: string, lista: DeclaracionDeParametro[], parametros: Parametros, actualizar: Actualizar, abierto: boolean, diagnostico: Diagnostico | null, derivar?: Derivar): HTMLElement {
-  const conError = lista.some((d) => diagnostico?.parametros.includes(pascal(d.clave)));
+function grupo(
+  titulo: string, secciones: { titulo: string; lista: DeclaracionDeParametro[] }[], parametros: Parametros, actualizar: Actualizar,
+  abierto: boolean, diagnostico: Diagnostico | null, derivar?: Derivar,
+): HTMLElement {
+  const todas = secciones.flatMap((s) => s.lista);
+  const conError = todas.some((d) => diagnostico?.parametros.includes(pascal(d.clave)));
   return el(
     'details',
     // Un grupo cerrado que esconde el campo con error se abre solo.
     { open: abierto || conError },
     // El icono de error del encabezado lo agrega marcarErroresEnSecciones, igual que en las tarjetas.
-    el('summary', {}, `${titulo} (${lista.length})`),
-    el('div', { class: 'campos' }, lista.map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizar, diagnostico, derivar))),
+    el('summary', {}, `${titulo} (${todas.length})`),
+    secciones
+      .filter((s) => s.lista.length > 0)
+      .map((s) =>
+        el('div', { class: 'grupo-seccion' },
+          el('h4', { class: 'grupo-seccion-titulo' }, s.titulo),
+          el('div', { class: 'campos' }, s.lista.map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizar, diagnostico, derivar))),
+        ),
+      ),
   );
+}
+
+/**
+ * RadioDeReferencia lo pisa cada elemento con su propio radio (A5 del
+ * diagnostico): editarlo no tiene efecto, asi que se muestra de solo lectura.
+ */
+function radioDeReferenciaDeSoloLectura(tipo: InstanciaDeElemento['tipo'] | null, parametros: Parametros): HTMLElement {
+  const { texto, ayuda } = etiquetaVisible('RadioDeReferencia', '', 'radioDeReferencia');
+  const radio = tipo ? RADIO_DEL_ELEMENTO[tipo] : null;
+  const valor = radio
+    ? `= ${etiquetaDe(radio).nombre.toLowerCase()} (${textoConUnidad((parametros as unknown as Record<string, number>)[radio]!, etiquetaDe(radio).unidadDePresentacion)})`
+    : 'lo fija cada elemento con su radio (loop, dive loop, hélice o giro)';
+  return el('div', { class: 'campo campo-solo-lectura' }, texto, el('span', { class: 'ayuda' }, valor), ayuda.popover);
 }
 
 /** Texto de la advertencia de un ajuste inerte: que lo pisaron y quien no lo consume (el modo o el elemento). */
@@ -352,13 +377,17 @@ function ficha(inst: InstanciaDeElemento, orden: number, diseno: EntradaDeDiseno
     e.volver.hidden = !pisado;
   };
 
-  // Editar un campo lo convierte en pisado sin redibujar la ficha (no se pierde el foco).
+  // Editar un campo lo convierte en pisado sin redibujar la ficha (no se pierde el foco),
+  // salvo los que cambian que se muestra (los ticks de peralte, excluyentes entre si).
   const actualizar: Actualizar = (nombre, valor) => {
-    ajustar((ajustes) => ({ ...ajustes, [nombre]: valor }), true);
-    marcar(nombre, true);
+    const redibujar = CAMBIAN_LA_VISTA.includes(nombre);
+    ajustar((ajustes) => ({ ...ajustes, ...conExclusionDePeralte(nombre, valor) }), !redibujar);
+    if (!redibujar) marcar(nombre, true);
   };
 
   const modo = modoEfectivo(globales, inst.ajustes);
+  const vigentes = { ...globales, ...inst.ajustes } as Parametros;
+  const visible = (d: Declaracion) => seMuestra(d.Nombre, [modo], vigentes);
   const filaDe = (d: Declaracion) => {
     const nombre = d.Nombre;
     const pisado = nombre in inst.ajustes;
@@ -375,7 +404,9 @@ function ficha(inst: InstanciaDeElemento, orden: number, diseno: EntradaDeDiseno
     marcar(nombre, pisado);
     return fila;
   };
-  const campos = DECLARACIONES_DE_ELEMENTOS[inst.tipo].map(filaDe);
+  const campos = DECLARACIONES_DE_ELEMENTOS[inst.tipo].filter(visible).map(filaDe);
+  // Globales que se ajustan por instancia (seccion 'ficha' de etiquetas.ts).
+  const avanzados = ParametrosGenerales().filter((d) => etiquetaDe(d.Nombre).seccion === 'ficha').map(filaDe);
 
   // --- modo de curvatura de la instancia ---
   const modoPisado = 'ModoCurvatura' in inst.ajustes;
@@ -398,7 +429,7 @@ function ficha(inst: InstanciaDeElemento, orden: number, diseno: EntradaDeDiseno
   filaDelModo.classList.add(modoPisado ? 'pisado' : 'heredado');
   filaDelModo.append(el('span', { class: 'campo-estado' }, origenDelModo, volverDelModo));
   const delModo = ParametrosDelModo(modo);
-  const camposDelModo = delModo.Lista.map(filaDe);
+  const camposDelModo = delModo.Lista.map((d) => (d.Nombre === 'RadioDeReferencia' ? radioDeReferenciaDeSoloLectura(inst.tipo, vigentes) : filaDe(d)));
 
   const { Inertes } = AjustarParametros(globales, inst.ajustes, inst.tipo);
   const advertencias = Inertes.map((nombre) =>
@@ -428,6 +459,8 @@ function ficha(inst: InstanciaDeElemento, orden: number, diseno: EntradaDeDiseno
     el('div', { class: 'campos' }, filaDelModo, delModo.Nota ? el('p', { class: 'ayuda' }, delModo.Nota) : null, camposDelModo),
     el('h3', { class: 'ficha-subtitulo' }, 'Geometría'),
     el('div', { class: 'campos' }, campos),
+    el('h3', { class: 'ficha-subtitulo' }, 'Geometría avanzada'),
+    el('div', { class: 'campos' }, avanzados),
     advertencias,
   );
 }
@@ -454,8 +487,9 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
     const actualizarGlobal: Actualizar = (nombre, valor) => {
       const actual = estado.get().diseno;
       if (!actual) return;
-      cambioPropio = nombre !== 'ModoCurvatura';
-      estado.set({ diseno: { ...actual, parametros: { ...actual.parametros, [nombre]: valor } } });
+      // Se redibuja solo si el cambio cambia que se muestra (el modo, el arrastre, ...).
+      cambioPropio = !CAMBIAN_LA_VISTA.includes(nombre);
+      estado.set({ diseno: { ...actual, parametros: { ...actual.parametros, ...conExclusionDePeralte(nombre, valor) } } });
       cambioPropio = false;
     };
 
@@ -492,8 +526,13 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
       if (!vigentes || nombre !== 'OnsetMaximoModelo') return null;
       return [...EscalasDeFroude({ ...vigentes, OnsetMaximoModelo: null }).OnsetMaximo];
     };
-    const aceptacion = declaraciones(ParametrosDeAceptacion());
-    const generales = declaraciones(ParametrosGenerales());
+    // Los que solo actuan en ciertos modos (FactorDeSeguridadNormativo) se
+    // muestran si algun elemento del diseno usa ese modo, propio o heredado;
+    // los que dependen de otro parametro (el arrastre), segun su valor.
+    const modosEnUso = [parametros.ModoCurvatura, ...diseno.secuencia.map((i) => modoEfectivo(parametros, i.ajustes))];
+    const globalesVisibles = declaraciones([...ParametrosDeAceptacion(), ...ParametrosGenerales()])
+      .filter((d) => seMuestra(pascal(d.clave), modosEnUso, parametros));
+    const deLaSeccion = (clave: string) => globalesVisibles.filter((d) => etiquetaDe(pascal(d.clave)).seccion === clave);
 
     contenedor.append(tarjeta(
       {
@@ -508,12 +547,15 @@ export function montarParametros(contenedor: HTMLElement, estado: Estado): void 
           campoDelModo(selectorDeModo, diagnostico),
           el('p', { class: 'ayuda' }, 'Es el modo de todas las instancias que no lo pisan; cada una puede elegir el suyo en su ficha.'),
           modo.Nota ? el('p', { class: 'ayuda' }, modo.Nota) : null,
-          declaraciones(modo.Lista).map((d) => campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizarGlobal, diagnostico)),
+          declaraciones(modo.Lista).map((d) =>
+            d.clave === 'radioDeReferencia'
+              ? radioDeReferenciaDeSoloLectura(null, parametros)
+              : campo(d, (parametros as unknown as Record<string, unknown>)[pascal(d.clave)], actualizarGlobal, diagnostico)),
         ),
       ),
-      grupo('Criterios de aceptación', deDiseno(aceptacion), parametros, actualizarGlobal, false, diagnostico, derivar),
-      grupo('Generales', deDiseno(generales), parametros, actualizarGlobal, false, diagnostico, derivar),
-      grupo('Avanzado — numérico', [...deSolver(aceptacion), ...deSolver(generales)], parametros, actualizarGlobal, false, diagnostico),
+      GRUPOS_GLOBALES.map((g) =>
+        grupo(g.titulo, g.secciones.map((s) => ({ titulo: s.titulo, lista: deLaSeccion(s.clave) })), parametros, actualizarGlobal, false, diagnostico, derivar),
+      ),
     ));
     marcarErroresEnSecciones(contenedor);
   };

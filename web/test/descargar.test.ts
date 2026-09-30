@@ -83,7 +83,7 @@ describe('textoDeParametros', () => {
 
   it('es el diseno serializado, legible, y vuelve exacto', () => {
     const texto = textoDeParametros(diseno);
-    expect(texto).toContain('\n  "v": 1');
+    expect(texto).toContain('\n  "v": 2');
     expect(deserializarDiseno(JSON.parse(texto))).toEqual(diseno);
     expect(texto.length).toBeLessThan(2000);
   });

@@ -12,7 +12,7 @@ import { SimularSobreTrack } from './simular';
 import type {
   BusquedaVelocidad, Criterio, Diagnostico, Elemento, Estado, Layout, NombreDeElemento, Parametros, Receta, RegistroDeLayout, Reporte, Resumen, Sim, Track,
 } from './tipos';
-import { AgregarCriterio, ChequeosPosteriores, ChequeosPrevios } from './verificacion';
+import { AgregarCriterio, ChequeosPosteriores, ChequeosPrevios, VerificarLayoutNormativo } from './verificacion';
 
 export type Constructor = (EstadoEntrada: Estado, Parametros: Parametros, Layout?: Layout | null) => [Estado, Elemento, Reporte];
 
@@ -23,23 +23,69 @@ function SignoDelSentido(Texto: string, Elemento: string): 1 | -1 {
   throw new Error(`${Elemento}: SentidoDelGiro tiene que ser 'Derecha' o 'Izquierda', no '${Texto}'.`);
 }
 
+/**
+ * PeralteDelElemento.m: como se para el carro sobre la curva. Con uno de
+ * los dos ticks (excluyentes) el peralte se alinea siempre con el CIR; sin
+ * ellos, el modo propio del elemento ('Constante' o relativo al CIR con un
+ * desvio, ya con el signo del sentido). 'CentroDeCurvatura' es un roll
+ * constante igual al desfasaje mas el desvio; 'Fuerza' parte de
+ * RollBaseFuerza y el roll lo resuelve el generador (RollHaciaLaFuerza).
+ */
+export function PeralteDelElemento(Receta: Receta, P: Parametros, ModoPropio: Parametros['ModoDePeralteDelGiro'], DesvioPropio: number, RollBaseFuerza: number): Receta {
+  if (P.PeralteAlineadoAlCentroDeCurvatura && P.PeralteAlineadoALaFuerza) {
+    throw new Error('PeralteAlineadoAlCentroDeCurvatura y PeralteAlineadoALaFuerza son excluyentes: el peralte se alinea con una definicion del CIR o con la otra, no con las dos.');
+  }
+  let Alineacion: NonNullable<Receta['AlineacionDelPeralte']>;
+  let Desvio: number;
+  if (P.PeralteAlineadoAlCentroDeCurvatura) {
+    Alineacion = 'CentroDeCurvatura';
+    Desvio = 0;
+  } else if (P.PeralteAlineadoALaFuerza) {
+    Alineacion = 'Fuerza';
+    Desvio = 0;
+  } else {
+    switch (ModoPropio) {
+      case 'Constante':
+        Alineacion = 'Constante';
+        break;
+      case 'RelativoAlCentroDeCurvatura':
+        Alineacion = 'CentroDeCurvatura';
+        break;
+      case 'RelativoALaFuerza':
+        Alineacion = 'Fuerza';
+        break;
+      default:
+        throw new Error(`ModoDePeralteDelGiro tiene que ser 'Constante', 'RelativoAlCentroDeCurvatura' o 'RelativoALaFuerza', no '${String(ModoPropio)}'.`);
+    }
+    Desvio = DesvioPropio;
+  }
+  switch (Alineacion) {
+    case 'Constante':
+      return { ...Receta, AlineacionDelPeralte: Alineacion, DesvioDelPeralte: 0 };
+    case 'CentroDeCurvatura':
+      return { ...Receta, AlineacionDelPeralte: Alineacion, DesvioDelPeralte: Desvio, RollDelElemento: Receta.DesfasajeDeCurvatura + Desvio };
+    case 'Fuerza':
+      return { ...Receta, AlineacionDelPeralte: Alineacion, DesvioDelPeralte: Desvio, RollDelElemento: RollBaseFuerza };
+  }
+}
+
 export const ElementoLoopVertical: Constructor = (EstadoEntrada, Parametros, Layout = null) => {
   const P = { ...Parametros, RadioDeReferencia: Parametros.RadioDelLoop };
-  const Receta: Receta = {
+  const Receta = PeralteDelElemento({
     Nombre: 'LoopVertical',
     GiroObjetivo: 2 * Math.PI,
     DesfasajeDeCurvatura: 0,
     RollDelElemento: P.RollExtraDelLoop,
     DesplazamientoObjetivo: P.SeparacionDePatas,
     CurvaLimiteGz: 'MasGzTodas',
-  };
+  }, P, 'Constante', 0, 0);
   return ConstruirElemento(EstadoEntrada, P, Receta, Layout);
 };
 
 export const ElementoDiveLoop: Constructor = (EstadoEntrada, Parametros, Layout = null) => {
   const P = { ...Parametros, RadioDeReferencia: Parametros.RadioDelDiveLoop };
   const Sentido = SignoDelSentido(P.SentidoDelGiro, 'ElementoDiveLoop');
-  const Receta: Receta = {
+  let Receta = PeralteDelElemento({
     Nombre: 'DiveLoop',
     GiroObjetivo: Math.PI,
     DesfasajeDeCurvatura: Math.PI,
@@ -48,35 +94,40 @@ export const ElementoDiveLoop: Constructor = (EstadoEntrada, Parametros, Layout 
     CurvaLimiteGz: 'MasGzTodas',
     CurvaLimiteGy: 'GyBase',
     SentidoDeGy: Sentido,
-  };
+  }, P, 'Constante', 0, Math.PI);
+  // Con el peralte alineado al CIR el modo normativo deja de perseguir Gy (sale de desalinear la curvatura de U).
+  if (Receta.AlineacionDelPeralte !== 'Constante') {
+    const { CurvaLimiteGy: _gy, SentidoDeGy: _sentido, ...Resto } = Receta;
+    Receta = Resto;
+  }
   return ConstruirElemento(EstadoEntrada, P, Receta, Layout);
 };
 
 export const ElementoHelice: Constructor = (EstadoEntrada, Parametros, Layout = null) => {
   const P = { ...Parametros, RadioDeReferencia: Parametros.RadioDeLaHelice };
   const Sentido = SignoDelSentido(P.SentidoDelGiro, 'ElementoHelice');
-  const Receta: Receta = {
+  const Receta = PeralteDelElemento({
     Nombre: 'Helice',
     GiroObjetivo: 2 * Math.PI * P.VueltasDeLaHelice,
     DesfasajeDeCurvatura: (Sentido * Math.PI) / 2,
     RollDelElemento: Sentido * P.PeralteDeLaHelice,
     DesplazamientoObjetivo: -Sentido * P.AvanceDeLaHelice,
     CurvaLimiteGz: 'MasGzTodas',
-  };
+  }, P, 'Constante', 0, 0);
   return ConstruirElemento(EstadoEntrada, P, Receta, Layout);
 };
 
 export const ElementoOverBankedTurn: Constructor = (EstadoEntrada, Parametros, Layout = null) => {
   const P = { ...Parametros, RadioDeReferencia: Parametros.RadioDelGiro };
   const Sentido = SignoDelSentido(P.SentidoDelGiro, 'ElementoOverBankedTurn');
-  const Receta: Receta = {
+  const Receta = PeralteDelElemento({
     Nombre: 'OverBankedTurn',
     GiroObjetivo: P.AnguloDelGiro,
     DesfasajeDeCurvatura: (Sentido * Math.PI) / 2,
     RollDelElemento: Sentido * P.PeralteDelGiro,
     DesplazamientoObjetivo: -Sentido * P.AvanceDelGiro,
     CurvaLimiteGz: 'MasGzTodas',
-  };
+  }, P, P.ModoDePeralteDelGiro, Sentido * P.DesvioDePeralteDelGiro, 0);
   return ConstruirElemento(EstadoEntrada, P, Receta, Layout);
 };
 
@@ -354,12 +405,15 @@ export function LayoutNuevo(EstadoInicialDelLayout: Estado, Parametros: Parametr
 export function LayoutAgregarElemento(Layout: Layout, Elemento: Elemento, EstadoSalida: Estado, Reporte: Reporte): Layout {
   const Registro: RegistroDeLayout = { Elemento, EstadoEntrada: Elemento.EstadoEntrada, EstadoSalida, Reporte };
   const desde = Layout.PuntosRiel.length === 0 ? 0 : 1;
-  return {
+  // Los eventos sostenidos de la norma se miden de corrido en todo el
+  // circuito: el elemento nuevo puede alargar un evento del anterior, asi que
+  // se vuelve a verificar el layout entero (VerificarLayoutNormativo.m).
+  return VerificarLayoutNormativo({
     ...Layout,
     Elementos: [...Layout.Elementos, Registro],
     EstadoActual: EstadoSalida,
     PuntosRiel: [...Layout.PuntosRiel, ...Elemento.Track.PuntosRiel.slice(desde)],
     LongitudArcoRiel: [...Layout.LongitudArcoRiel, ...Array.from(Elemento.Track.LongitudArco.subarray(desde))],
-  };
+  });
 }
 

@@ -6,7 +6,7 @@ import { CRITERIO_NORMATIVO, margenNormativo, veredictoDelLayout } from '../src/
 import { cargarGolden } from './arnes';
 
 const circuito = cargarGolden('circuito-demolayout');
-const loop = cargarGolden('loop-clotoide');
+const loop = cargarGolden('loop-arcocircular');
 
 describe('veredictoDelLayout', () => {
   it('el pasa / no pasa es el del contrato', () => {

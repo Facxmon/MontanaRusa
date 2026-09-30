@@ -125,20 +125,11 @@ function [Criterios, Normativo] = ChequeosPosteriores(Track, Sim, Parametros, La
         Normativo.OnsetDeCarga, Escala.OnsetMaximo(3), 'G/s', ...
         'Alcance literal de la clausula: solo transiciones desde 0 G o menos hacia 2 G o mas.');
 
-    %% --- Limites normativos dependientes de la duracion --------------------
-    Criterios = AgregarCriterioNormativo(Criterios, '+Gz (Fig. 10)',   Normativo.MasGz);
-    Criterios = AgregarCriterioNormativo(Criterios, '-Gz (Fig. 9)',    Normativo.MenosGz);
-    Criterios = AgregarCriterioNormativo(Criterios, 'Gy (Fig. 8)',     Normativo.Gy);
-    Criterios = AgregarCriterioNormativo(Criterios, '+Gx (Fig. 6)',    Normativo.MasGx);
-    Criterios = AgregarCriterioNormativo(Criterios, '-Gx (Fig. 7)',    Normativo.MenosGx);
-
-    Criterios = AgregarCriterio(Criterios, 'Elipse de dos ejes Gy-Gz (7.1.5.1)', 'MenorOIgual', ...
-        Normativo.Elipse.ValorMaximoGyGz, 1, '-', ...
-        'Semiejes iguales a los limites de 200 ms multiplicados por 1.1.');
-    Criterios = AgregarCriterio(Criterios, 'Elipse de dos ejes Gx-Gz (7.1.5.1)', 'MenorOIgual', ...
-        Normativo.Elipse.ValorMaximoGxGz, 1, '-');
-    Criterios = AgregarCriterio(Criterios, 'Elipse de dos ejes Gx-Gy (7.1.5.1)', 'MenorOIgual', ...
-        Normativo.Elipse.ValorMaximoGxGy, 1, '-');
+    %% --- Limites normativos: duracion, reversiones y elipses ---------------
+    % Para el elemento suelto. Si el elemento entra a un layout,
+    % VerificarLayoutNormativo recalcula este bloque sobre la linea de tiempo
+    % continua del circuito y reemplaza estas mismas lineas.
+    Criterios = [Criterios, CriteriosNormativos(Normativo)];
 
     %% --- Cabeza: informativo -----------------------------------------------
     % La norma no se aplica en la cabeza, pero es la parte mas sensible a las
@@ -153,17 +144,6 @@ function [Criterios, Normativo] = ChequeosPosteriores(Track, Sim, Parametros, La
 end
 
 %% ========================= auxiliares =====================================
-function Criterios = AgregarCriterioNormativo(Criterios, Nombre, Evento)
-    if ~isfinite(Evento.Exceso)
-        Criterios = AgregarCriterio(Criterios, Nombre, 'Informativo', Evento.PicoG, NaN, 'G', ...
-            'Ningun evento sostenido supera los 200 ms: fuera del alcance de la norma (7.1.4.2).');
-        return
-    end
-    Criterios = AgregarCriterio(Criterios, Nombre, 'MenorOIgual', Evento.Exceso, 0, 'G', ...
-        sprintf('Nivel critico %.2f G sostenido %.2f s equivalentes reales; limite %.2f G.', ...
-                Evento.NivelCritico, Evento.DuracionReal, Evento.LimiteAplicado));
-end
-
 function Separacion = SeparacionOrientada(Track, IndiceA, IndiceB, Parametros)
 %SEPARACIONORIENTADA Separacion que exigiria la seccion orientada en un par
 %   de segmentos, en vez del cilindro circunscripto. La seccion es una caja

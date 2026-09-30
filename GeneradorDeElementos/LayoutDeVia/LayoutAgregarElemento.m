@@ -22,4 +22,9 @@ function Layout = LayoutAgregarElemento(Layout, Elemento, EstadoSalida, Reporte)
         Layout.PuntosRiel       = [Layout.PuntosRiel;       Elemento.Track.PuntosRiel(2:end, :)];
         Layout.LongitudArcoRiel = [Layout.LongitudArcoRiel; Elemento.Track.LongitudArco(2:end)];
     end
+
+    % Los eventos sostenidos de la norma se miden de corrido en todo el
+    % circuito: el elemento nuevo puede alargar un evento del anterior, asi
+    % que se vuelve a verificar el layout entero.
+    Layout = VerificarLayoutNormativo(Layout);
 end

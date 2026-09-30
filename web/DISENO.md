@@ -618,3 +618,227 @@ campos que ya existían).
 - **"Nombre corto" del criterio peor**: se muestra el nombre del criterio tal cual lo escribe el núcleo,
   recortado con puntos suspensivos si no entra; no hay una tabla de nombres cortos.
 - Los pesos de Lato subseteados pesan ~32 kB cada uno contra ~21 kB de Plex: la portada precarga dos.
+
+---
+
+# Correcciones (2026-09-29): toggles de límites, comparación A/B y parámetros condicionales
+
+Arreglos de interfaz, sin cambios de física ni de contrato. Los diagnósticos que se hicieron en la misma
+tanda (bounding box, radio de referencia, auditoría de categorías, clotoides, peralte del over-banked turn
+y línea de base de los límites normativos) están en
+[`Diagnostico/DiagnosticosDeVerificacion.md`](../Diagnostico/DiagnosticosDeVerificacion.md).
+
+## Cada toggle de límite controla solo sus líneas
+
+Las tres referencias de los gráficos de G (admisible dure lo que dure, límite a 200 ms y límite aplicable)
+son simétricas: una serie arriba y otra abajo, y la de abajo no va en la leyenda para no duplicarla. Al
+apagar una desde la leyenda de uPlot se apagaba **solo la de arriba**: la de abajo quedaba dibujada, con el
+mismo color que las otras dos, y no se sabía cuál era cuál (típicamente, el −2 G punteado de 200 ms parecía
+el límite aplicable).
+
+- `SerieDeFigura.acompanaA` (figura.ts): índice de la serie de la leyenda a la que acompaña.
+- `acompanantesDe` (series.ts, puro) y el hook `setSeries` de `Figura`: prender o apagar una serie de la
+  leyenda hace lo mismo con sus acompañantes y con nada más. La banda admisible se apaga con sus dos bordes.
+- Se aplica también al presupuesto de onset de los gráficos de jerk.
+- Test: `series.test.ts`, "toggles de las líneas de límite": toda serie oculta en la leyenda tiene un líder
+  visible y el de 200 ms no arrastra al aplicable (ni al revés).
+
+## Comparación A/B: los dos valores en la misma abscisa
+
+El eje x de una figura comparada es la unión de los de A y B, y cada serie tiene `null` en los puntos del
+otro diseño (fase 4.8). El tooltip y la leyenda leían el valor crudo del punto, así que al mover el cursor
+alternaban entre A y B. Ahora `valorEnElCursor` (series.ts, puro) interpola linealmente en x entre los
+puntos vecinos de la misma serie cuando la figura une huecos: es lo que la línea dibujada muestra en esa
+abscisa. Fuera del rango de una serie no se inventa valor. Los datos de la figura (CSV, estadística del
+rango) no cambian. Test en `comparacion.test.ts`.
+
+## Parámetros condicionales al modo
+
+`FactorDeSeguridadNormativo` está en los criterios de aceptación (así lo declara MATLAB y así viaja en el
+contrato), pero solo lo lee el objetivo de `GNormativaMaxima`. El formulario global lo muestra solo si
+**algún elemento** usa ese modo, heredado del global o propio de la instancia (`seMuestraConModos` en
+`etiquetas.ts`). El valor no se toca al ocultarlo. El resto de la auditoría de categorías quedó como
+propuesta, sin aplicar (ver el diagnóstico, A6).
+
+## Lo que no se cambió
+
+- **Radio de referencia**: no se movió a Parámetros generales porque en el modelo es por elemento (cada
+  `ElementoXxx` lo pisa con su radio: A5 del diagnóstico).
+- **Bounding box**: el límite 0 del criterio es de MATLAB (el valor es el desborde); no se tocó ni el
+  criterio ni el tamaño de la caja (A3).
+
+---
+
+# Límites normativos (2026-09-29): línea de tiempo del layout y G contra duración
+
+Los cambios de criterio están en MATLAB y en el port, línea por línea (`VerificarLimitesNormativos.m`,
+`verificacion.ts`; memoria de cálculo §5.7). Acá, lo que cambia en los gráficos.
+
+## El límite aplicable se calcula una vez, sobre todo el layout
+
+Antes `series.ts` calculaba el "Límite aplicable" por tramo (un tramo = un elemento), con el tiempo del
+modelo de cada elemento: un evento que cruzaba un empalme quedaba partido en dos, y el límite saltaba
+en cada empalme. Ahora:
+
+- `lineaNormativa(layout)` arma la serie de todo el layout sin repetir los nodos de los empalmes, con el
+  tiempo del prototipo acumulado (lo mismo que `SerieNormativaDelLayout.m`) y las ventanas de 7.1.7.1.
+  Se calcula una vez por layout (`WeakMap`).
+- `limitePorPunto` corre una vez por lado sobre esa serie, con `factorTiempo = 1`, y cada figura toma los
+  nodos que muestra. Con un elemento elegido se **recorta** ese cálculo global: el elemento muestra el
+  mismo límite que acompañado.
+- El límite de 200 ms de +Gz es nodo a nodo: 5,0 G dentro de una ventana de 7.1.7.1, 6,0 G fuera.
+- Mismo criterio que el veredicto (eventos cortos a 0,2 s, umbral de 0,01 G), así que un punto queda por
+  encima de la línea si y solo si su criterio falla. `test/consistenciaNormativa.test.ts` lo comprueba en
+  el DemoLayout recalculado y en tres golden, con el layout entero y con cada elemento solo.
+- La fila "Límite aplicable" de la leyenda lleva una aclaración (atributo `title`, el patrón de ayuda de
+  la barra): es el límite del evento que contiene al punto evaluado a su propio nivel de G, no un margen.
+- La grilla de niveles es de 400 niveles sobre el máximo **del layout** (antes, del elemento): en un
+  elemento de G baja la escalera del límite es algo más gruesa que antes.
+
+## Pestaña "G vs duración"
+
+Las Figs. 6-10 de la norma son nivel de G contra duración del evento. La pestaña nueva las dibuja para
++Gz, −Gz, ±Gy (sobre |Gy|, como la verificación), +Gx y −Gx, con la del recorrido encima: para cada
+nivel, la duración de prototipo del evento continuo **más largo** con G al menos igual a ese nivel, de
+corrido en todo el layout (con un elemento elegido, entre los eventos que tocan sus nodos). Los eventos de
+menos de 0,2 s se dibujan en 0,2 s. El punto de menor margen va marcado, con su valor en la leyenda. Si
+hay ventanas de 7.1.7.1 se agrega la curva reducida.
+
+- Mismo sistema de figuras (tema, zoom, PNG, CSV, comparación A/B). No se liga al cursor del 3D: sus
+  puntos no son nodos. El selector de eje horizontal se oculta en esta pestaña.
+- `curvaDelRecorrido` y `figurasDeDuracion` son puras (`series.ts`) y tienen tests.
+- Con ventanas de 7.1.7.1, la curva del recorrido usa `limitesDelEvento` (norma.ts): un evento que empieza
+  dentro de la ventana y termina afuera se compara con la curva reducida y después con la normal, siempre
+  con la duración acumulada desde el inicio del evento (el límite no se resetea al salir de la ventana).
+
+---
+
+# Panel por secciones, modos de curvatura y peralte al CIR (2026-09-29)
+
+Los cambios de física están en MATLAB y en el port (`documentacion_generador_elementos.md` §5.2 y §5.3,
+memoria de cálculo §5.7 y §7.9). Acá, lo que cambia en la interfaz.
+
+## Secciones del formulario global (A6 aplicado)
+
+`Etiqueta.seccion` reemplaza a `grupo`. `GRUPOS_GLOBALES` (etiquetas.ts) fija el orden:
+
+| Grupo plegable | Secciones |
+|---|---|
+| Criterios de aceptación | Norma · Fabricación y espacio |
+| Generales | Tren y carro · Resistencia al avance · Escala (prototipo) |
+| Avanzado | Resolución · Numérico |
+
+- `'ficha'`: un global que se edita en la ficha de la instancia, en la sección nueva "Geometría avanzada"
+  (`InclinacionHelicoidalImpuesta`, los dos ticks de peralte al CIR).
+- `'oculto'`: no se muestra en la web (`VersoresEnGrafico3D`, que solo leen los gráficos de MATLAB).
+- `DiametroRueda` sigue visible en "Tren y carro"; su ayuda aclara que no entra en ningún cálculo.
+
+## Qué se muestra: `seMuestra(nombre, modosEnUso, parametros)`
+
+Reemplaza a `seMuestraConModos`. Dos tablas declarativas; un parámetro oculto conserva su valor.
+
+- `SOLO_EN_MODOS`: `FactorDeSeguridadNormativo` con `GNormativaMaxima` en uso; `TolObjetivoDeG` con
+  `FuerzaGConstante` o `GNormativaMaxima`.
+- `SOLO_SI`: arrastre (`RhoAire`, `CoefArrastre`, `AreaFrontal`) con `ModelarArrastre`; `FactorTren` además
+  con más de un carro; `PasoBusquedaVelocidad` con `CalcularVelocidadMinima`. El peralte propio del
+  elemento se oculta con el peralte alineado al CIR, y en el over-banked turn `PeralteDelGiro` solo en modo
+  `'Constante'` y `DesvioDePeralteDelGiro` solo en los relativos.
+- En el formulario global las condiciones se evalúan con los globales; en la ficha, con globales más
+  ajustes de la instancia. El formulario se redibuja solo al editar un parámetro de `CAMBIAN_LA_VISTA`.
+- El radio de referencia del modo (`ArcoCircular`, `Clotoide`) se muestra de solo lectura como "= radio
+  del elemento" (`RADIO_DEL_ELEMENTO`): lo pisa cada elemento (A5).
+
+## Ticks de peralte excluyentes
+
+`PeralteAlineadoAlCentroDeCurvatura` y `PeralteAlineadoALaFuerza` son dos casillas en la ficha de cada
+instancia. `conExclusionDePeralte` convierte "prendí una" en "prendí una y apagué la otra" en el mismo
+ajuste, así que el núcleo nunca recibe las dos (si las recibiera, `PeralteDelElemento` lanza un error).
+
+## Modos: `Clotoide` pasa a llamarse `ArcoCircular`
+
+El selector de modo lista `ArcoCircular` (el arco de radio constante de siempre) y `Clotoide` (la clotoide
+simétrica nueva). Los diseños viejos se migran al leerlos, así que nada guardado cambia de geometría:
+
+- Serialización v2 (`serializar.ts`): un diseño v1 con `Clotoide`, global o por instancia, se lee como
+  `ArcoCircular`.
+- Contrato 1.2.0 (`cargar.ts`): lo mismo para layouts de contrato anterior a 1.2.0 (valores, defaults,
+  esquema y ajustes de cada elemento).
+- Las tarjetas de bienvenida usan el golden `loop-arcocircular`.
+
+---
+
+# Recálculo incremental (2026-09-29)
+
+Optimización sin cambio de comportamiento: el layout que llega al visualizador es **idéntico** al de
+antes. Hasta ahora cada Generar reconstruía toda la vía; ahora el worker conserva una caché por elemento
+y solo reconstruye los elementos cuya entrada cambió.
+
+## Qué se reutiliza y qué no
+
+- **Caché por elemento** (`src/nucleo/calculoIncremental.ts`, clase `CalculadorIncremental`). Clave:
+  tipo + parámetros de la instancia (globales con sus ajustes, ya resueltos por `AjustarParametros`) +
+  estado de entrada completo (posición, versores, curvatura, roll, arco acumulado, velocidad y energía).
+  Valor: lo que devuelve el constructor del elemento (estado de salida, `Elemento`, `Reporte`).
+- Al editar el elemento *k*, los elementos 0..*k*−1 tienen la misma clave y salen de la caché. Desde *k*
+  se reconstruye; si la salida de *k* no cambia (p. ej. se editó un límite de aceptación), los siguientes
+  vuelven a tener la misma clave y tampoco se reconstruyen.
+- **La única dependencia con la vía anterior** dentro del constructor es la línea "Interferencia con la
+  vía preexistente" de `ChequeosPosteriores`. Se separó en `CriterioDeInterferenciaConLaVia`
+  (`verificacion.ts`, mismo cálculo) para rehacerla sola cuando un elemento cacheado se reutiliza sobre una
+  vía previa distinta. Cada polilínea de riel lleva una ficha; si un elemento reconstruido deja el riel
+  idéntico bit a bit al de la corrida anterior, hereda la ficha y los siguientes no rehacen nada.
+- **Siempre completo**: el bloque normativo sobre la línea de tiempo continua del layout
+  (`VerificarLayoutNormativo`, un elemento puede alargar un evento del anterior), la concatenación del
+  riel y la exportación. `calcularLayout` corre `VerificarLayoutNormativo` después de cada elemento; la
+  ruta incremental lo corre una sola vez al final. Da lo mismo porque cada corrida reemplaza por completo
+  las líneas normativas de la anterior.
+- **Dinámica**: queda dentro de la caché, sin aproximación. El modelo es de partícula (el tren de varios
+  carros no está implementado) y la velocidad y la energía de entrada son parte de la clave: si una
+  edición cambia la velocidad a la salida de *k*, todos los siguientes cambian de clave y se reconstruyen.
+  No hizo falta ninguna forma especial de dinámica incremental; medida sobre el DemoLayout,
+  `SimularSobreTrack` es ~2 % del tiempo (el constructor del elemento es ~90 %).
+- **Invalidación**: si cambia cualquier parámetro general se vacía la caché entera.
+- **Detener no pierde la caché.** Detener sigue recreando el worker (ver "Por qué Detener es
+  `terminate()`"), pero el worker copia a la página cada elemento que termina de calcular
+  (`{ cache }`, ~6 ms por elemento) y `ClienteDeCalculo` guarda esa copia. El worker nuevo se siembra con
+  ella (`{ sembrar }`). Ejemplo: se edita solo el 4.º de 4 elementos, Generar y Detener → en pantalla
+  queda el último layout generado, el formulario conserva el valor editado como "cambios sin generar", y
+  al volver a Generar solo se reconstruye el 4.º (en el navegador: 1,45 s contra 4,89 s del cálculo
+  completo en la misma sesión).
+- **Tope**: la caché guarda el diseño actual más `ENTRADAS_EXTRA_EN_CACHE` = 16 elementos (los menos
+  usados se descartan primero), para que deshacer/rehacer e ir y volver entre dos valores no recalculen.
+
+## Invariantes nuevos
+
+- `calcularLayout` sigue siendo la referencia (la que usan el arnés y los tests de paridad) y no cambió.
+  `calculoIncremental.test.ts` hace ediciones aleatorias (semilla fija) sobre el DemoLayout —radios,
+  sentido de giro, límites de aceptación, insertar y quitar elementos, velocidad inicial, un parámetro
+  general— y exige `toStrictEqual` contra el recálculo completo después de cada una (solo se excluye
+  `meta.generadoEn`).
+- Si en el futuro el constructor de un elemento pasa a leer algo más del layout que `PuntosRiel` y
+  `LongitudArcoRiel`, hay que agregarlo a la clave o rehacerlo como la línea de interferencia.
+- Comparación de estados **exacta** (bit a bit, `claveExacta`). Ver pendientes.
+
+## Tiempos (DemoLayout, Node 24, mediana de 5; `npx vite-node scripts/medir-incremental.ts`)
+
+| Edición | Completo | Incremental | Reutilizados / reconstruidos |
+|---|---|---|---|
+| Primer elemento (radio del loop) | 2020 ms | 2052 ms | 0 / 4 |
+| Del medio (radio del over-banked turn, 2.º) | 1943 ms | 1766 ms | 1 / 3 |
+| Del medio (radio de la hélice, 3.º) | 1951 ms | 1541 ms | 2 / 2 |
+| Último (radio del dive loop) | 2027 ms | 627 ms | 3 / 1 |
+| Primer elemento sin cambiar su salida (altura máxima) | 2048 ms | 218 ms | 3 / 1 |
+
+En el navegador (worker de la app, diseño propio a partir del DemoLayout) editar el radio del dive loop
+bajó de 1,19 s a 0,34 s. Editar el primer elemento no mejora: todo lo posterior cambia de estado de
+entrada y se reconstruye, como corresponde.
+
+## Pendientes
+
+- **Tolerancia de reutilización** (TODO en `claveExacta`): la consigna pedía comparar el estado de
+  entrada "dentro de la tolerancia numérica del proyecto", pero también que el resultado incremental sea
+  idéntico al completo; las dos cosas no son compatibles (reutilizar con un estado que difiere en 1e-12
+  devuelve un elemento que el cálculo completo no daría). Se eligió tolerancia cero. Las tolerancias que
+  existen en el proyecto son otras: las del arnés (6e-6 relativo, contra golden redondeados) y
+  `ToleranciaVelocidadDeDiseno` (aviso al re-simular un track con otra velocidad de entrada). Falta
+  decidir si alguna debería usarse acá.

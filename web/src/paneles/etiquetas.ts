@@ -1,5 +1,6 @@
 // Como se MUESTRA cada parametro del nucleo: nombre humano, ayuda, unidad de
-// presentacion, rango sugerido y a que grupo del formulario va. Nada de esto
+// presentacion, rango sugerido, en que seccion del formulario va y cuando
+// se muestra (auditoria de categorias, A6 del diagnostico). Nada de esto
 // toca el contrato ni el nucleo: el JSON sigue en SI y radianes (regla dura
 // de CONTRATO_VISUALIZADOR.md), y la conversion es de presentacion, igual
 // que el rad -> grados que ya existia en formato.ts.
@@ -33,7 +34,7 @@ import {
   ParametrosDelModo,
   ParametrosGenerales,
 } from '../nucleo/parametros';
-import type { NombreDeParametro } from '../nucleo/tipos';
+import type { ModoCurvatura, NombreDeElemento, NombreDeParametro, Parametros } from '../nucleo/tipos';
 
 /**
  * Unidad con la que se muestra y se edita un parametro.
@@ -57,8 +58,31 @@ export interface Etiqueta {
   unidadDePresentacion?: UnidadDePresentacion;
   /** En UNIDADES DE PRESENTACION, no en SI: es contra lo que se compara lo que se tipea. */
   rangoSugerido?: [number, number];
-  grupo?: 'diseno' | 'solver';
+  /**
+   * Seccion del formulario global (auditoria de categorias, A6). Los del
+   * modo y los de la geometria de cada elemento no llevan: van en la
+   * seccion del modo y en la ficha. 'ficha' es un global que se edita en la
+   * ficha de la instancia; 'oculto' no se muestra en la web.
+   */
+  seccion?: Seccion;
 }
+
+/** Secciones del formulario global, en el orden en que se dibujan dentro de su grupo. */
+export type Seccion = 'norma' | 'fabricacion' | 'carro' | 'resistencia' | 'escala' | 'resolucion' | 'numerico' | 'ficha' | 'oculto';
+
+/** Grupos plegables del formulario global y sus secciones. */
+export const GRUPOS_GLOBALES: { titulo: string; secciones: { clave: Seccion; titulo: string }[] }[] = [
+  { titulo: 'Criterios de aceptación', secciones: [{ clave: 'norma', titulo: 'Norma' }, { clave: 'fabricacion', titulo: 'Fabricación y espacio' }] },
+  {
+    titulo: 'Generales',
+    secciones: [
+      { clave: 'carro', titulo: 'Tren y carro' },
+      { clave: 'resistencia', titulo: 'Resistencia al avance' },
+      { clave: 'escala', titulo: 'Escala (prototipo)' },
+    ],
+  },
+  { titulo: 'Avanzado', secciones: [{ clave: 'resolucion', titulo: 'Resolución' }, { clave: 'numerico', titulo: 'Numérico' }] },
+];
 
 // Unidades usadas, una sola vez cada una: el factor y el simbolo no se repiten campo a campo.
 const cm = (decimales: number, paso: number): UnidadDePresentacion => ({ simbolo: 'cm', factor: 100, decimales, paso });
@@ -94,64 +118,68 @@ const DECLARADAS: Record<NombreDeParametro, Declarada> = {
   AnguloDelGiro: { nombre: 'Ángulo del giro', unidadDePresentacion: grados(1, 5), rangoSugerido: [5, 360] },
   PeralteDelGiro: { nombre: 'Peralte del giro', unidadDePresentacion: grados(1, 1), rangoSugerido: [0, 180] },
   AvanceDelGiro: { nombre: 'Avance del giro', unidadDePresentacion: cm(1, 0.5), rangoSugerido: [-100, 100] },
+  ModoDePeralteDelGiro: { nombre: 'Modo de peralte del giro' },
+  DesvioDePeralteDelGiro: { nombre: 'Desvío del peralte respecto del CIR', unidadDePresentacion: grados(1, 1), rangoSugerido: [-90, 90] },
+  PeralteAlineadoAlCentroDeCurvatura: { nombre: 'Peralte siempre alineado al CIR (centro de curvatura)' },
+  PeralteAlineadoALaFuerza: { nombre: 'Peralte siempre alineado al CIR (fuerza resultante)' },
   SentidoDelGiro: { nombre: 'Sentido del giro' },
   RadioDeReferencia: { nombre: 'Radio de referencia', unidadDePresentacion: cm(1, 0.5), rangoSugerido: [5, 200] },
   SeparacionDePatas: { nombre: 'Separación de patas', unidadDePresentacion: cm(1, 0.5), rangoSugerido: [0, 100] },
-  InclinacionHelicoidalImpuesta: { nombre: 'Inclinación helicoidal impuesta (tan α)', unidadDePresentacion: tal('-', 3, 0.01), rangoSugerido: [-2, 2] },
+  InclinacionHelicoidalImpuesta: { nombre: 'Inclinación helicoidal impuesta (tan α)', unidadDePresentacion: tal('-', 3, 0.01), rangoSugerido: [-2, 2], seccion: 'ficha' },
 
   // ---------- criterios de aceptacion ----------
-  GMinimaCuspide: { nombre: 'G mínima en la cúspide', unidadDePresentacion: tal('G', 2, 0.05), rangoSugerido: [0, 2] },
-  PuntoDeVerificacionNormativa: { nombre: 'Punto de verificación normativa' },
-  OnsetNormativoPorEje: { nombre: 'Onset normativo por eje (prototipo)', unidadDePresentacion: tal('G/s', 1, 0.5), rangoSugerido: [1, 30] },
-  OnsetMaximoModelo: { nombre: 'Onset máximo del modelo', unidadDePresentacion: tal('G/s', 1, 0.5), rangoSugerido: [1, 200] },
-  TolObjetivoDeG: { nombre: 'Tolerancia del objetivo de G', unidadDePresentacion: tal('G', 3, 0.01), rangoSugerido: [0.001, 0.5] },
-  FactorDeSeguridadNormativo: { nombre: 'Factor de seguridad normativo', unidadDePresentacion: tal('-', 2, 0.05), rangoSugerido: [1, 3] },
-  AlturaMaximaDelElemento: { nombre: 'Altura máxima del elemento', unidadDePresentacion: cm(1, 1), rangoSugerido: [10, 300] },
-  RadioMinimoFabricable: { nombre: 'Radio mínimo fabricable', unidadDePresentacion: cm(1, 0.5), rangoSugerido: [1, 50] },
-  AlturaMinimaSuelo: { nombre: 'Altura mínima sobre el suelo', unidadDePresentacion: cm(1, 0.5), rangoSugerido: [0, 50] },
-  BoundingBoxDisponible: { nombre: 'Caja disponible', unidadDePresentacion: cm(1, 5) },
-  ArcoMinimoAutointerferencia: { nombre: 'Arco mínimo de autointerferencia', unidadDePresentacion: cm(1, 1), rangoSugerido: [5, 100] },
-  DistanciaMinimaEntreVias: { nombre: 'Distancia mínima entre vías', unidadDePresentacion: mm(1, 1), rangoSugerido: [1, 200] },
+  GMinimaCuspide: { nombre: 'G mínima en la cúspide', unidadDePresentacion: tal('G', 2, 0.05), rangoSugerido: [0, 2], seccion: 'norma' },
+  PuntoDeVerificacionNormativa: { nombre: 'Punto de verificación normativa', seccion: 'norma' },
+  OnsetNormativoPorEje: { nombre: 'Onset normativo por eje (prototipo)', unidadDePresentacion: tal('G/s', 1, 0.5), rangoSugerido: [1, 30], seccion: 'norma' },
+  OnsetMaximoModelo: { nombre: 'Onset máximo del modelo', unidadDePresentacion: tal('G/s', 1, 0.5), rangoSugerido: [1, 200], seccion: 'resolucion' },
+  TolObjetivoDeG: { nombre: 'Tolerancia del objetivo de G', unidadDePresentacion: tal('G', 3, 0.01), rangoSugerido: [0.001, 0.5], seccion: 'norma' },
+  FactorDeSeguridadNormativo: { nombre: 'Factor de seguridad normativo', unidadDePresentacion: tal('-', 2, 0.05), rangoSugerido: [1, 3], seccion: 'norma' },
+  AlturaMaximaDelElemento: { nombre: 'Altura máxima del elemento', unidadDePresentacion: cm(1, 1), rangoSugerido: [10, 300], seccion: 'fabricacion' },
+  RadioMinimoFabricable: { nombre: 'Radio mínimo fabricable', unidadDePresentacion: cm(1, 0.5), rangoSugerido: [1, 50], seccion: 'fabricacion' },
+  AlturaMinimaSuelo: { nombre: 'Altura mínima sobre el suelo', unidadDePresentacion: cm(1, 0.5), rangoSugerido: [0, 50], seccion: 'fabricacion' },
+  BoundingBoxDisponible: { nombre: 'Caja disponible', unidadDePresentacion: cm(1, 5), seccion: 'fabricacion' },
+  ArcoMinimoAutointerferencia: { nombre: 'Arco mínimo de autointerferencia', unidadDePresentacion: cm(1, 1), rangoSugerido: [5, 100], seccion: 'numerico' },
+  DistanciaMinimaEntreVias: { nombre: 'Distancia mínima entre vías', unidadDePresentacion: mm(1, 1), rangoSugerido: [1, 200], seccion: 'fabricacion' },
 
   // ---------- generales ----------
-  Gravedad: { nombre: 'Gravedad', unidadDePresentacion: tal('m/s²', 3, 0.01), rangoSugerido: [9, 10] },
-  RhoAire: { nombre: 'Densidad del aire', unidadDePresentacion: tal('kg/m³', 3, 0.01), rangoSugerido: [0.5, 2] },
-  CrrPortantes: { nombre: 'Rodadura de las ruedas portantes', unidadDePresentacion: tal('-', 4, 0.005), rangoSugerido: [0, 0.2] },
-  CrrGuia: { nombre: 'Rodadura de las ruedas guía', unidadDePresentacion: tal('-', 4, 0.005), rangoSugerido: [0, 0.2] },
-  CrrRetencion: { nombre: 'Rodadura de las ruedas de retención', unidadDePresentacion: tal('-', 4, 0.005), rangoSugerido: [0, 0.2] },
-  ModelarArrastre: { nombre: 'Modelar el arrastre aerodinámico' },
-  CoefArrastre: { nombre: 'Coeficiente de arrastre', unidadDePresentacion: tal('-', 3, 0.05), rangoSugerido: [0.1, 2] },
-  FactorTren: { nombre: 'Factor de tren', unidadDePresentacion: tal('-', 3, 0.05), rangoSugerido: [0, 1] },
-  NumeroDeCarros: { nombre: 'Número de carros', unidadDePresentacion: tal('-', 0, 1), rangoSugerido: [1, 10] },
-  Masa: { nombre: 'Masa del carro con el pasajero', unidadDePresentacion: { simbolo: 'g', factor: 1000, decimales: 1, paso: 1 }, rangoSugerido: [10, 2000] },
-  LargoCarro: { nombre: 'Largo del carro', unidadDePresentacion: cm(1, 0.5), rangoSugerido: [2, 50] },
-  AltoCarro: { nombre: 'Alto del carro', unidadDePresentacion: cm(1, 0.5), rangoSugerido: [2, 30] },
-  AnchoVia: { nombre: 'Ancho de vía (trocha)', unidadDePresentacion: cm(1, 0.5), rangoSugerido: [2, 30] },
-  Holgura: { nombre: 'Holgura', unidadDePresentacion: mm(1, 1), rangoSugerido: [0, 100] },
-  DiametroRueda: { nombre: 'Diámetro de rueda', unidadDePresentacion: mm(1, 0.1), rangoSugerido: [3, 60] },
-  AreaFrontal: { nombre: 'Área frontal', unidadDePresentacion: { simbolo: 'cm²', factor: 1e4, decimales: 1, paso: 0.5 }, rangoSugerido: [1, 500] },
-  DistanciaHeartline: { nombre: 'Distancia del riel a la heartline', unidadDePresentacion: cm(1, 0.1), rangoSugerido: [0.5, 20] },
-  DistanciaHeartlineACabeza: { nombre: 'Distancia de la heartline a la cabeza', unidadDePresentacion: cm(1, 0.1), rangoSugerido: [0.5, 20] },
-  MetodoDeAcoplamiento: { nombre: 'Método de acoplamiento' },
-  CalcularVelocidadMinima: { nombre: 'Calcular la velocidad inicial mínima' },
+  Gravedad: { nombre: 'Gravedad', unidadDePresentacion: tal('m/s²', 3, 0.01), rangoSugerido: [9, 10], seccion: 'numerico' },
+  RhoAire: { nombre: 'Densidad del aire', unidadDePresentacion: tal('kg/m³', 3, 0.01), rangoSugerido: [0.5, 2], seccion: 'resistencia' },
+  CrrPortantes: { nombre: 'Rodadura de las ruedas portantes', unidadDePresentacion: tal('-', 4, 0.005), rangoSugerido: [0, 0.2], seccion: 'resistencia' },
+  CrrGuia: { nombre: 'Rodadura de las ruedas guía', unidadDePresentacion: tal('-', 4, 0.005), rangoSugerido: [0, 0.2], seccion: 'resistencia' },
+  CrrRetencion: { nombre: 'Rodadura de las ruedas de retención', unidadDePresentacion: tal('-', 4, 0.005), rangoSugerido: [0, 0.2], seccion: 'resistencia' },
+  ModelarArrastre: { nombre: 'Modelar el arrastre aerodinámico', seccion: 'resistencia' },
+  CoefArrastre: { nombre: 'Coeficiente de arrastre', unidadDePresentacion: tal('-', 3, 0.05), rangoSugerido: [0.1, 2], seccion: 'resistencia' },
+  FactorTren: { nombre: 'Factor de tren', unidadDePresentacion: tal('-', 3, 0.05), rangoSugerido: [0, 1], seccion: 'resistencia' },
+  NumeroDeCarros: { nombre: 'Número de carros', unidadDePresentacion: tal('-', 0, 1), rangoSugerido: [1, 10], seccion: 'carro' },
+  Masa: { nombre: 'Masa del carro con el pasajero', unidadDePresentacion: { simbolo: 'g', factor: 1000, decimales: 1, paso: 1 }, rangoSugerido: [10, 2000], seccion: 'carro' },
+  LargoCarro: { nombre: 'Largo del carro', unidadDePresentacion: cm(1, 0.5), rangoSugerido: [2, 50], seccion: 'carro' },
+  AltoCarro: { nombre: 'Alto del carro', unidadDePresentacion: cm(1, 0.5), rangoSugerido: [2, 30], seccion: 'carro' },
+  AnchoVia: { nombre: 'Ancho de vía (trocha)', unidadDePresentacion: cm(1, 0.5), rangoSugerido: [2, 30], seccion: 'carro' },
+  Holgura: { nombre: 'Holgura', unidadDePresentacion: mm(1, 1), rangoSugerido: [0, 100], seccion: 'carro' },
+  DiametroRueda: { nombre: 'Diámetro de rueda', unidadDePresentacion: mm(1, 0.1), rangoSugerido: [3, 60], seccion: 'carro' },
+  AreaFrontal: { nombre: 'Área frontal', unidadDePresentacion: { simbolo: 'cm²', factor: 1e4, decimales: 1, paso: 0.5 }, rangoSugerido: [1, 500], seccion: 'resistencia' },
+  DistanciaHeartline: { nombre: 'Distancia del riel a la heartline', unidadDePresentacion: cm(1, 0.1), rangoSugerido: [0.5, 20], seccion: 'carro' },
+  DistanciaHeartlineACabeza: { nombre: 'Distancia de la heartline a la cabeza', unidadDePresentacion: cm(1, 0.1), rangoSugerido: [0.5, 20], seccion: 'carro' },
+  MetodoDeAcoplamiento: { nombre: 'Método de acoplamiento', seccion: 'resolucion' },
+  CalcularVelocidadMinima: { nombre: 'Calcular la velocidad inicial mínima', seccion: 'resolucion' },
   // Los dos del prototipo: en METROS a proposito (ver la cabecera de este archivo).
-  RadioDeReferenciaReal: { nombre: 'Radio de referencia real (prototipo)', unidadDePresentacion: tal('m', 2, 0.1), rangoSugerido: [1, 50] },
-  LargoCarroReal: { nombre: 'Largo del carro real (prototipo)', unidadDePresentacion: tal('m', 2, 0.1), rangoSugerido: [1, 20] },
-  PasoGeneracion: { nombre: 'Paso de generación', unidadDePresentacion: mm(2, 0.1), rangoSugerido: [0.2, 20] },
-  PasoSimulacion: { nombre: 'Paso de simulación', unidadDePresentacion: mm(2, 0.1), rangoSugerido: [0.5, 50] },
-  PasoBusquedaVelocidad: { nombre: 'Paso de búsqueda de velocidad', unidadDePresentacion: mm(1, 1), rangoSugerido: [1, 100] },
+  RadioDeReferenciaReal: { nombre: 'Radio de referencia real (prototipo)', unidadDePresentacion: tal('m', 2, 0.1), rangoSugerido: [1, 50], seccion: 'escala' },
+  LargoCarroReal: { nombre: 'Largo del carro real (prototipo)', unidadDePresentacion: tal('m', 2, 0.1), rangoSugerido: [1, 20], seccion: 'escala' },
+  PasoGeneracion: { nombre: 'Paso de generación', unidadDePresentacion: mm(2, 0.1), rangoSugerido: [0.2, 20], seccion: 'numerico' },
+  PasoSimulacion: { nombre: 'Paso de simulación', unidadDePresentacion: mm(2, 0.1), rangoSugerido: [0.5, 50], seccion: 'numerico' },
+  PasoBusquedaVelocidad: { nombre: 'Paso de búsqueda de velocidad', unidadDePresentacion: mm(1, 1), rangoSugerido: [1, 100], seccion: 'resolucion' },
 
   // ---------- avanzado: numerico (decisiones del solver, no de diseno) ----------
-  TolCierrePitch: { nombre: 'Tolerancia de cierre del pitch', unidadDePresentacion: grados(4, 0.001), rangoSugerido: [0.0001, 1], grupo: 'solver' },
-  TolNorma: { nombre: 'Tolerancia de norma nula', unidadDePresentacion: tal('m', 2, 1e-12), grupo: 'solver' },
-  TolPuntoFijo: { nombre: 'Tolerancia del punto fijo', unidadDePresentacion: tal('m/s', 2, 1e-9), grupo: 'solver' },
-  MaxIteracionesPuntoFijo: { nombre: 'Máximo de iteraciones del punto fijo', unidadDePresentacion: tal('-', 0, 1), rangoSugerido: [5, 500], grupo: 'solver' },
-  MaxIteracionesCierre: { nombre: 'Máximo de iteraciones de cierre', unidadDePresentacion: tal('-', 0, 1), rangoSugerido: [1, 50], grupo: 'solver' },
-  MaxIteracionesAjuste: { nombre: 'Máximo de iteraciones de ajuste', unidadDePresentacion: tal('-', 0, 1), rangoSugerido: [1, 50], grupo: 'solver' },
-  MargenDeOnset: { nombre: 'Margen de onset', unidadDePresentacion: tal('-', 4, 0.001), rangoSugerido: [0, 0.1], grupo: 'solver' },
-  PasosEntreOrtonormalizaciones: { nombre: 'Pasos entre ortonormalizaciones', unidadDePresentacion: tal('-', 0, 1), rangoSugerido: [1, 200], grupo: 'solver' },
-  VersoresEnGrafico3D: { nombre: 'Versores en el gráfico 3D', unidadDePresentacion: tal('-', 0, 5), rangoSugerido: [0, 200], grupo: 'solver' },
-  ToleranciaVelocidadDeDiseno: { nombre: 'Tolerancia de velocidad de diseño', unidadDePresentacion: tal('m/s', 2, 0.01), rangoSugerido: [0.01, 1], grupo: 'solver' },
+  TolCierrePitch: { nombre: 'Tolerancia de cierre del pitch', unidadDePresentacion: grados(4, 0.001), rangoSugerido: [0.0001, 1], seccion: 'numerico' },
+  TolNorma: { nombre: 'Tolerancia de norma nula', unidadDePresentacion: tal('m', 2, 1e-12), seccion: 'numerico' },
+  TolPuntoFijo: { nombre: 'Tolerancia del punto fijo', unidadDePresentacion: tal('m/s', 2, 1e-9), seccion: 'numerico' },
+  MaxIteracionesPuntoFijo: { nombre: 'Máximo de iteraciones del punto fijo', unidadDePresentacion: tal('-', 0, 1), rangoSugerido: [5, 500], seccion: 'numerico' },
+  MaxIteracionesCierre: { nombre: 'Máximo de iteraciones de cierre', unidadDePresentacion: tal('-', 0, 1), rangoSugerido: [1, 50], seccion: 'numerico' },
+  MaxIteracionesAjuste: { nombre: 'Máximo de iteraciones de ajuste', unidadDePresentacion: tal('-', 0, 1), rangoSugerido: [1, 50], seccion: 'numerico' },
+  MargenDeOnset: { nombre: 'Margen de onset', unidadDePresentacion: tal('-', 4, 0.001), rangoSugerido: [0, 0.1], seccion: 'numerico' },
+  PasosEntreOrtonormalizaciones: { nombre: 'Pasos entre ortonormalizaciones', unidadDePresentacion: tal('-', 0, 1), rangoSugerido: [1, 200], seccion: 'numerico' },
+  VersoresEnGrafico3D: { nombre: 'Versores en el gráfico 3D', unidadDePresentacion: tal('-', 0, 5), rangoSugerido: [0, 200], seccion: 'oculto' },
+  ToleranciaVelocidadDeDiseno: { nombre: 'Tolerancia de velocidad de diseño', unidadDePresentacion: tal('m/s', 2, 0.01), rangoSugerido: [0.01, 1], seccion: 'numerico' },
 };
 
 /**
@@ -187,6 +215,76 @@ export const ETIQUETAS: Record<NombreDeParametro, Etiqueta> = construir();
 export function etiquetaDe(nombre: NombreDeParametro): Etiqueta {
   return ETIQUETAS[nombre] ?? { nombre, ayuda: '' };
 }
+
+/**
+ * Parametros que solo tienen efecto en algunos modos de curvatura aunque no
+ * los declare ParametrosDelModo (estan en otro bloque del contrato y ahi se
+ * quedan: esto es solo presentacion). El formulario los muestra si al menos
+ * una instancia del diseno usa uno de esos modos.
+ *
+ * FactorDeSeguridadNormativo solo lo lee el objetivo de GNormativaMaxima;
+ * TolObjetivoDeG, ese objetivo y el criterio "Gz objetivo del modo
+ * alcanzado", que existe en FuerzaGConstante y GNormativaMaxima.
+ */
+const SOLO_EN_MODOS: Partial<Record<NombreDeParametro, readonly ModoCurvatura[]>> = {
+  FactorDeSeguridadNormativo: ['GNormativaMaxima'],
+  TolObjetivoDeG: ['FuerzaGConstante', 'GNormativaMaxima'],
+};
+
+const alineado = (p: Parametros) => p.PeralteAlineadoAlCentroDeCurvatura || p.PeralteAlineadoALaFuerza;
+
+/**
+ * Condiciones sobre los parametros vigentes (los globales en el formulario
+ * global; globales mas ajustes en la ficha de una instancia): un parametro
+ * que en ese estado no hace nada no se muestra. El valor no se toca.
+ */
+const SOLO_SI: Partial<Record<NombreDeParametro, (p: Parametros) => boolean>> = {
+  RhoAire: (p) => p.ModelarArrastre,
+  CoefArrastre: (p) => p.ModelarArrastre,
+  AreaFrontal: (p) => p.ModelarArrastre,
+  FactorTren: (p) => p.ModelarArrastre && p.NumeroDeCarros > 1,
+  PasoBusquedaVelocidad: (p) => p.CalcularVelocidadMinima,
+  // Con el peralte alineado al CIR, el peralte propio del elemento no se usa.
+  PeralteDelGiro: (p) => !alineado(p) && p.ModoDePeralteDelGiro === 'Constante',
+  ModoDePeralteDelGiro: (p) => !alineado(p),
+  DesvioDePeralteDelGiro: (p) => !alineado(p) && p.ModoDePeralteDelGiro !== 'Constante',
+  PeralteDeLaHelice: (p) => !alineado(p),
+  RollExtraDelLoop: (p) => !alineado(p),
+};
+
+/** Parametros cuyo cambio cambia que se muestra: el formulario se redibuja al editarlos. */
+export const CAMBIAN_LA_VISTA: readonly NombreDeParametro[] = [
+  'ModoCurvatura', 'ModelarArrastre', 'NumeroDeCarros', 'CalcularVelocidadMinima',
+  'ModoDePeralteDelGiro', 'PeralteAlineadoAlCentroDeCurvatura', 'PeralteAlineadoALaFuerza',
+];
+
+/** true si el parametro se muestra con estos modos en uso y estos parametros vigentes. */
+export function seMuestra(nombre: NombreDeParametro, modosEnUso: readonly ModoCurvatura[], parametros: Parametros): boolean {
+  if (ETIQUETAS[nombre]?.seccion === 'oculto') return false;
+  const modos = SOLO_EN_MODOS[nombre];
+  if (modos && !modosEnUso.some((m) => modos.includes(m))) return false;
+  const condicion = SOLO_SI[nombre];
+  return !condicion || condicion(parametros);
+}
+
+/**
+ * Los dos ticks de peralte alineado al CIR son excluyentes: prender uno
+ * apaga el otro. Devuelve los ajustes a aplicar junto con el cambio.
+ */
+export function conExclusionDePeralte(nombre: NombreDeParametro, valor: unknown): Partial<Parametros> {
+  const cambio = { [nombre]: valor } as Partial<Parametros>;
+  if (nombre === 'PeralteAlineadoAlCentroDeCurvatura' && valor === true) cambio.PeralteAlineadoALaFuerza = false;
+  if (nombre === 'PeralteAlineadoALaFuerza' && valor === true) cambio.PeralteAlineadoAlCentroDeCurvatura = false;
+  return cambio;
+}
+
+/** El radio de cada elemento: el que copia en RadioDeReferencia antes de generar (A5). */
+export const RADIO_DEL_ELEMENTO: Record<NombreDeElemento, NombreDeParametro> = {
+  LoopVertical: 'RadioDelLoop',
+  DiveLoop: 'RadioDelDiveLoop',
+  Helice: 'RadioDeLaHelice',
+  OverBankedTurn: 'RadioDelGiro',
+};
 
 /** En que modos de curvatura se consume este parametro (vacio si no es del modo). */
 export function modosQueLoConsumen(nombre: NombreDeParametro): string[] {

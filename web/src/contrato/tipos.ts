@@ -50,7 +50,8 @@ export interface Parametros {
    * ParametrosPorDefecto() con los overrides de esta corrida, aplanado y en camelCase.
    */
   valores: {
-    modoCurvatura: 'AceleracionNormalConstante' | 'Clotoide' | 'FuerzaGConstante' | 'GNormativaMaxima';
+    modoCurvatura:
+      'AceleracionNormalConstante' | 'ArcoCircular' | 'Clotoide' | 'FuerzaGConstante' | 'GNormativaMaxima';
     metodoDeAcoplamiento: 'A' | 'B' | 'Ambos';
     [k: string]: unknown;
   };

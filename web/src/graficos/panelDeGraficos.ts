@@ -25,6 +25,7 @@ import { csvDeFigura } from '../nucleo/descargar';
 import { figuraAPng, nombreDeFigura } from './exportarFigura';
 import { Figura, type DatosDeFigura } from './figura';
 import {
+  esSobreElRecorrido,
   estadisticaDeRango,
   indiceDeNodo,
   ETIQUETA_DE_EJE,
@@ -95,18 +96,24 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
         return opcion;
       }),
     );
+    // G contra duracion tiene su propio eje x (la duracion): el selector no aplica y se oculta.
+    const etiquetaDelEje = el('label', { class: 'graficos-eje' }, 'Eje horizontal ', selector);
+    // Con display y no con `hidden`: el estilo de .graficos-eje le gana al atributo.
+    const mostrarEje = (p: Pestana) => (etiquetaDelEje.style.display = esSobreElRecorrido(p) ? '' : 'none');
+    mostrarEje(pestana as Pestana);
     barra.append(
       contenedorDePestanas,
       el(
         'div',
         { class: 'graficos-opciones' },
-        el('label', { class: 'graficos-eje' }, 'Eje horizontal ', selector),
+        etiquetaDelEje,
         el('label', { class: 'graficos-eje' }, 'Alto ', selectorDeAlto),
       ),
     );
     return (e: { pestana: string; ejeX: EjeX }) => {
       pestanas.activar(e.pestana as Pestana);
       if (selector.value !== e.ejeX) selector.value = e.ejeX;
+      mostrarEje(e.pestana as Pestana);
     };
   };
 
@@ -185,9 +192,13 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
       el(
         'p',
         { class: 'ayuda graficos-ayuda' },
-        elemento === null
-          ? 'Todo el layout: las franjas son los elementos. Elegir un elemento en el panel para ver sus subtramos.'
-          : `Elemento ${elemento + 1}: ${layout.elementos[elemento]?.tipo ?? ''}. Las franjas son los subtramos.`,
+        !esSobreElRecorrido(pestana as Pestana)
+          ? 'Curva de la norma (Figs. 6 a 10) y, para cada nivel de G, la duración del evento continuo más largo del ' +
+              `${elemento === null ? 'recorrido' : `recorrido que toca el elemento ${elemento + 1}`}, en tiempo del prototipo y de corrido a través de los empalmes. ` +
+              'Los eventos de menos de 0,2 s se llevan a 0,2 s. Donde la curva del recorrido pasa por encima de la de la norma, no cumple.'
+          : elemento === null
+            ? 'Todo el layout: las franjas son los elementos. Elegir un elemento en el panel para ver sus subtramos.'
+            : `Elemento ${elemento + 1}: ${layout.elementos[elemento]?.tipo ?? ''}. Las franjas son los subtramos.`,
       ),
     );
     const franja = franjaDeComparacion(estado);

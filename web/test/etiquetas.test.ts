@@ -13,10 +13,13 @@ import {
   etiquetaDe,
   fueraDelRango,
   modosQueLoConsumen,
+  conExclusionDePeralte,
+  GRUPOS_GLOBALES,
+  seMuestra,
   textoConUnidad,
   textoDeEntrada,
 } from '../src/paneles/etiquetas';
-import { OPCIONES_DE_PARAMETRO, ParametrosPorDefecto } from '../src/nucleo/parametros';
+import { OPCIONES_DE_PARAMETRO, ParametrosDeAceptacion, ParametrosGenerales, ParametrosPorDefecto } from '../src/nucleo/parametros';
 import type { NombreDeParametro } from '../src/nucleo/tipos';
 
 const defaults = ParametrosPorDefecto();
@@ -151,27 +154,77 @@ describe('rango sugerido', () => {
 describe('de que depende cada parametro', () => {
   it('los del modo dicen en cuales se consumen', () => {
     expect(modosQueLoConsumen('FuerzaGObjetivo')).toEqual(['FuerzaGConstante']);
-    expect(modosQueLoConsumen('RadioDeReferencia')).toEqual(['Clotoide']);
+    expect(modosQueLoConsumen('RadioDeReferencia')).toEqual(['ArcoCircular', 'Clotoide']);
     expect(modosQueLoConsumen('RadioDeLaHelice')).toEqual([]);
   });
 });
 
-describe('grupo avanzado', () => {
-  it('las tolerancias numericas van al grupo solver y los radios no', () => {
-    const solver = nombres.filter((n) => etiquetaDe(n).grupo === 'solver');
-    expect(solver.sort()).toEqual(
+describe('parametros condicionales (A6)', () => {
+  const con = (cambios: Partial<typeof defaults>) => ({ ...defaults, ...cambios });
+
+  it('el factor de seguridad normativo solo se muestra si algun elemento usa GNormativaMaxima', () => {
+    expect(seMuestra('FactorDeSeguridadNormativo', ['ArcoCircular'], defaults)).toBe(false);
+    expect(seMuestra('FactorDeSeguridadNormativo', ['ArcoCircular', 'FuerzaGConstante'], defaults)).toBe(false);
+    expect(seMuestra('FactorDeSeguridadNormativo', ['GNormativaMaxima'], defaults)).toBe(true);
+    // Global en ArcoCircular pero una instancia con modo propio normativo: se muestra.
+    expect(seMuestra('FactorDeSeguridadNormativo', ['ArcoCircular', 'GNormativaMaxima'], defaults)).toBe(true);
+  });
+
+  it('la tolerancia del objetivo de G solo con FuerzaGConstante o GNormativaMaxima', () => {
+    expect(seMuestra('TolObjetivoDeG', ['ArcoCircular', 'Clotoide'], defaults)).toBe(false);
+    expect(seMuestra('TolObjetivoDeG', ['FuerzaGConstante'], defaults)).toBe(true);
+  });
+
+  it('el arrastre, el tren y la busqueda de velocidad dependen de sus interruptores', () => {
+    for (const n of ['RhoAire', 'CoefArrastre', 'AreaFrontal'] as const) {
+      expect(seMuestra(n, ['ArcoCircular'], con({ ModelarArrastre: true }))).toBe(true);
+      expect(seMuestra(n, ['ArcoCircular'], con({ ModelarArrastre: false }))).toBe(false);
+    }
+    expect(seMuestra('FactorTren', ['ArcoCircular'], con({ NumeroDeCarros: 1 }))).toBe(false);
+    expect(seMuestra('FactorTren', ['ArcoCircular'], con({ NumeroDeCarros: 3 }))).toBe(true);
+    expect(seMuestra('PasoBusquedaVelocidad', ['ArcoCircular'], con({ CalcularVelocidadMinima: false }))).toBe(false);
+    expect(seMuestra('PasoBusquedaVelocidad', ['ArcoCircular'], con({ CalcularVelocidadMinima: true }))).toBe(true);
+  });
+
+  it('el peralte propio se esconde con el peralte alineado al CIR, y el desvio solo en los modos relativos', () => {
+    expect(seMuestra('PeralteDelGiro', ['ArcoCircular'], defaults)).toBe(true);
+    expect(seMuestra('DesvioDePeralteDelGiro', ['ArcoCircular'], defaults)).toBe(false);
+    expect(seMuestra('PeralteDelGiro', ['ArcoCircular'], con({ ModoDePeralteDelGiro: 'RelativoALaFuerza' }))).toBe(false);
+    expect(seMuestra('DesvioDePeralteDelGiro', ['ArcoCircular'], con({ ModoDePeralteDelGiro: 'RelativoALaFuerza' }))).toBe(true);
+    for (const n of ['PeralteDelGiro', 'ModoDePeralteDelGiro', 'DesvioDePeralteDelGiro', 'PeralteDeLaHelice', 'RollExtraDelLoop'] as const) {
+      expect(seMuestra(n, ['ArcoCircular'], con({ PeralteAlineadoALaFuerza: true }))).toBe(false);
+    }
+  });
+
+  it('los dos ticks de peralte alineado son excluyentes', () => {
+    expect(conExclusionDePeralte('PeralteAlineadoALaFuerza', true)).toEqual({ PeralteAlineadoALaFuerza: true, PeralteAlineadoAlCentroDeCurvatura: false });
+    expect(conExclusionDePeralte('PeralteAlineadoAlCentroDeCurvatura', true)).toEqual({ PeralteAlineadoAlCentroDeCurvatura: true, PeralteAlineadoALaFuerza: false });
+    expect(conExclusionDePeralte('PeralteAlineadoALaFuerza', false)).toEqual({ PeralteAlineadoALaFuerza: false });
+  });
+
+  it('los versores del grafico 3D de MATLAB no se muestran en la web', () => {
+    expect(seMuestra('VersoresEnGrafico3D', ['ArcoCircular'], defaults)).toBe(false);
+  });
+});
+
+describe('secciones del formulario global (A6)', () => {
+  it('todo parametro de aceptacion y generales tiene seccion, y es una de las declaradas', () => {
+    const validas = new Set([...GRUPOS_GLOBALES.flatMap((g) => g.secciones.map((s) => s.clave)), 'ficha', 'oculto']);
+    for (const d of [...ParametrosDeAceptacion(), ...ParametrosGenerales()]) {
+      expect(validas.has(etiquetaDe(d.Nombre).seccion!), d.Nombre).toBe(true);
+    }
+  });
+
+  it('las tolerancias numericas van a Avanzado y los radios no tienen seccion global', () => {
+    const numericos = nombres.filter((n) => etiquetaDe(n).seccion === 'numerico');
+    expect(numericos.sort()).toEqual(
       [
-        'MargenDeOnset',
-        'MaxIteracionesAjuste',
-        'MaxIteracionesCierre',
-        'MaxIteracionesPuntoFijo',
-        'PasosEntreOrtonormalizaciones',
-        'TolCierrePitch',
-        'TolNorma',
-        'TolPuntoFijo',
-        'ToleranciaVelocidadDeDiseno',
-        'VersoresEnGrafico3D',
+        'ArcoMinimoAutointerferencia', 'Gravedad', 'MargenDeOnset', 'MaxIteracionesAjuste', 'MaxIteracionesCierre', 'MaxIteracionesPuntoFijo',
+        'PasoGeneracion', 'PasoSimulacion', 'PasosEntreOrtonormalizaciones', 'TolCierrePitch', 'TolNorma', 'TolPuntoFijo', 'ToleranciaVelocidadDeDiseno',
       ].sort(),
     );
+    expect(etiquetaDe('RadioDelLoop').seccion).toBeUndefined();
+    expect(etiquetaDe('InclinacionHelicoidalImpuesta').seccion).toBe('ficha');
+    expect(etiquetaDe('RadioDeReferenciaReal').seccion).toBe('escala');
   });
 });

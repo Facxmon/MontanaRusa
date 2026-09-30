@@ -1,8 +1,12 @@
 %% Golden files del contrato del visualizador
-% Genera golden/<caso>.json para los once casos canonicos de la seccion 8 de
-% CONTRATO_VISUALIZADOR.md: diez elementos sueltos (cada elemento en Clotoide y
-% en GNormativaMaxima, y el loop ademas en FuerzaGConstante y en
-% AceleracionNormalConstante) mas el circuito de DemoLayout.m. Se versionan en
+% Genera golden/<caso>.json para los casos canonicos de la seccion 8 de
+% CONTRATO_VISUALIZADOR.md: diez elementos sueltos (cada elemento en
+% ArcoCircular y en GNormativaMaxima, y el loop ademas en FuerzaGConstante y
+% en AceleracionNormalConstante), el circuito de DemoLayout.m y seis casos de
+% las opciones nuevas: el modo Clotoide de verdad (loop y over-banked turn) y
+% el peralte referido al CIR (alineado al centro de curvatura, alineado a la
+% fuerza y relativo a la fuerza en el over-banked turn; alineado a la fuerza
+% en la helice). Se versionan en
 % el repo y son el arnes de validacion del port a JS: el nucleo porteado tiene
 % que reproducir estos archivos campo por campo, con las tolerancias de la
 % seccion 8 del contrato.
@@ -14,14 +18,14 @@
 %     velocidad minima;
 %   - estado de entrada sintetico: riel en [0 0 1], a nivel, carro derecho, a
 %     5.0 m/s. Se eligio midiendo: a 6.0 m/s (test 12) las transiciones del
-%     dive loop en Clotoide dejan un arco de 8 nodos, y a 4.6 m/s (DemoElemento)
+%     dive loop en ArcoCircular dejan un arco de 8 nodos, y a 4.6 m/s (DemoElemento)
 %     el loop normativo no cierra el giro con RadioDelLoop = 0.30. A 5.0 los
 %     diez casos tienen arco principal y ninguno se queda sin energia;
 %   - el over-banked turn gira 240 grados en vez de los 120 por defecto, en
 %     los dos modos: con 120 las rampas consumen todo el giro en modo
 %     normativo y el arco queda vacio (mismo motivo que en el test 12).
 % No todos los criterios pasan en todos los casos: el loop de 0.30 m en
-% Clotoide supera los 6 G de la Fig. 10 y varios elementos salen del bounding
+% ArcoCircular supera los 6 G de la Fig. 10 y varios elementos salen del bounding
 % box arrancando en z = 1. Es a proposito -- un golden file con criterios que
 % fallan verifica que el port tambien los haga fallar, y el veredicto `pasa`
 % se compara sin tolerancia.
@@ -51,16 +55,23 @@ PosicionDeEntrada  = [0, 0, 1.00];
 SinAjustes = struct();
 GiroDelOBT = struct('AnguloDelGiro', deg2rad(240));
 Casos = { ...
-    'loop-clotoide',     @ElementoLoopVertical,   'Clotoide',                   SinAjustes; ...
+    'loop-arcocircular', @ElementoLoopVertical,   'ArcoCircular',               SinAjustes; ...
     'loop-gconstante',   @ElementoLoopVertical,   'FuerzaGConstante',           SinAjustes; ...
     'loop-normativa',    @ElementoLoopVertical,   'GNormativaMaxima',           SinAjustes; ...
     'loop-anconstante',  @ElementoLoopVertical,   'AceleracionNormalConstante', SinAjustes; ...
-    'helice-clotoide',   @ElementoHelice,         'Clotoide',                   SinAjustes; ...
+    'helice-arcocircular', @ElementoHelice,       'ArcoCircular',               SinAjustes; ...
     'helice-normativa',  @ElementoHelice,         'GNormativaMaxima',           SinAjustes; ...
-    'obt-clotoide',      @ElementoOverBankedTurn, 'Clotoide',                   GiroDelOBT; ...
+    'obt-arcocircular',  @ElementoOverBankedTurn, 'ArcoCircular',               GiroDelOBT; ...
     'obt-normativa',     @ElementoOverBankedTurn, 'GNormativaMaxima',           GiroDelOBT; ...
-    'diveloop-clotoide', @ElementoDiveLoop,       'Clotoide',                   SinAjustes; ...
-    'diveloop-normativa',@ElementoDiveLoop,       'GNormativaMaxima',           SinAjustes};
+    'diveloop-arcocircular', @ElementoDiveLoop,   'ArcoCircular',               SinAjustes; ...
+    'diveloop-normativa',@ElementoDiveLoop,       'GNormativaMaxima',           SinAjustes; ...
+    'loop-clotoide',     @ElementoLoopVertical,   'Clotoide',                   SinAjustes; ...
+    'obt-clotoide',      @ElementoOverBankedTurn, 'Clotoide',                   GiroDelOBT; ...
+    'obt-alineado-centro',  @ElementoOverBankedTurn, 'ArcoCircular', ConCampo(GiroDelOBT, 'PeralteAlineadoAlCentroDeCurvatura', true); ...
+    'obt-alineado-fuerza',  @ElementoOverBankedTurn, 'ArcoCircular', ConCampo(GiroDelOBT, 'PeralteAlineadoALaFuerza', true); ...
+    'obt-relativo-fuerza',  @ElementoOverBankedTurn, 'ArcoCircular', ConCampo(ConCampo(GiroDelOBT, 'ModoDePeralteDelGiro', 'RelativoALaFuerza'), ...
+                                                                               'DesvioDePeralteDelGiro', deg2rad(10)); ...
+    'helice-alineado-fuerza', @ElementoHelice,       'ArcoCircular', struct('PeralteAlineadoALaFuerza', true)};
 
 fprintf('%-20s %-15s %-27s %6s %8s %8s %s\n', 'Caso', 'Elemento', 'Modo', 'nodos', 'Gz max', 'bytes', 'criterios');
 fprintf('%s\n', repmat('-', 1, 100));
@@ -87,7 +98,7 @@ end
 %% ===================== CIRCUITO DE DEMOLAYOUT ==========================
 % Espejo exacto del setup de DemoLayout.m. Si cambia alla, cambia aca.
 Parametros = ParametrosPorDefecto();
-Parametros.ModoCurvatura           = 'Clotoide';
+Parametros.ModoCurvatura           = 'ArcoCircular';
 Parametros.MetodoDeAcoplamiento    = 'A';
 Parametros.CalcularVelocidadMinima = false;
 Parametros.RadioDelLoop     = 0.30;
@@ -105,7 +116,7 @@ end
 
 Archivos{end} = fullfile(CarpetaTemporal, 'circuito-demolayout.json');
 Documento = LayoutAJson(Layout, Archivos{end});
-ImprimirFila('circuito-demolayout', 'los cuatro', 'Clotoide', Documento, Archivos{end});
+ImprimirFila('circuito-demolayout', 'los cuatro', 'ArcoCircular', Documento, Archivos{end});
 
 %% ===================== COPIA A golden/ =================================
 for i = 1:numel(Archivos)
@@ -130,6 +141,10 @@ else
 end
 
 %% ========================= auxiliares =================================
+function Estructura = ConCampo(Estructura, Campo, Valor)
+    Estructura.(Campo) = Valor;
+end
+
 function ImprimirFila(Caso, Elemento, Modo, Documento, Archivo)
     Info = dir(Archivo);
     NoPasan = 0;

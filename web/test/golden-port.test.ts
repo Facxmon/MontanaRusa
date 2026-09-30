@@ -27,6 +27,17 @@ describe('el port reproduce los golden files', () => {
         expect(ep.criterios.previos.map((c) => [c.nombre, c.pasa])).toEqual(eg.criterios.previos.map((c) => [c.nombre, c.pasa]));
         expect(ep.criterios.posteriores.map((c) => [c.nombre, c.pasa])).toEqual(eg.criterios.posteriores.map((c) => [c.nombre, c.pasa]));
         expect(ep.criterios.todosPasan).toBe(eg.criterios.todosPasan);
+        // Textos y logicos del bloque normativo (curva aplicada, 7.1.7.1, reversion reducida): exactos.
+        const normativoG = eg.criterios.normativo as Record<string, unknown>;
+        const normativoP = ep.criterios.normativo as Record<string, unknown>;
+        expect(normativoP.curvaMasGzAplicada).toBe(normativoG.curvaMasGzAplicada);
+        expect(normativoP.huboAirtimeSostenido).toBe(normativoG.huboAirtimeSostenido);
+        for (const eje of ['reversionGx', 'reversionGy']) {
+          expect((normativoP[eje] as { reducida: boolean }).reducida).toBe((normativoG[eje] as { reducida: boolean }).reducida);
+        }
+        for (const lado of ['masGz', 'menosGz', 'gy', 'masGx', 'menosGx']) {
+          expect((normativoP[lado] as { curva: string }).curva).toBe((normativoG[lado] as { curva: string }).curva);
+        }
         expect(ep.nodos.puntoDeParada ?? null).toBe(eg.nodos.puntoDeParada ?? null);
       });
       expect(port.resumenLayout.todosLosCriteriosPasan).toBe(golden.resumenLayout.todosLosCriteriosPasan);

@@ -7,13 +7,13 @@ import { calcularLayout, ErrorDeElemento, instanciasDesdeTipos, nuevoIdDeInstanc
 import { textoDelLayout } from '../src/nucleo/descargar';
 import { ParametrosPorDefecto } from '../src/nucleo/parametros';
 
-const golden = analizarLayout(readFileSync(fileURLToPath(new URL('../../golden/loop-clotoide.json', import.meta.url)), 'utf8'));
+const golden = analizarLayout(readFileSync(fileURLToPath(new URL('../../golden/loop-arcocircular.json', import.meta.url)), 'utf8'));
 
 describe('parametrosDesdeContrato', () => {
   it('recupera los Parametros del nucleo desde parametros.valores (los vacios vuelven a null)', () => {
     const p = parametrosDesdeContrato(golden.parametros.valores as Record<string, unknown>);
     expect(p.RadioDelLoop).toBe(0.3);
-    expect(p.ModoCurvatura).toBe('Clotoide');
+    expect(p.ModoCurvatura).toBe('ArcoCircular');
     expect(p.OnsetMaximoModelo).toBeNull();
     expect(p.InclinacionHelicoidalImpuesta).toBeNull();
     expect(p.BoundingBoxDisponible).toEqual(ParametrosPorDefecto().BoundingBoxDisponible);

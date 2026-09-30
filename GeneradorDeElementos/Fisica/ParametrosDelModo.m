@@ -14,11 +14,11 @@ function [Lista, Nota] = ParametrosDelModo(Modo)
 %   Lo que NO esta aca a proposito: RadioDeReferencia es la longitud
 %   caracteristica de Froude en todos los modos (fija lambda, el presupuesto
 %   de onset y la conversion de duraciones) y lo pisa cada elemento con su
-%   radio, asi que es un parametro geometrico del elemento; solo en Clotoide
-%   es ademas el radio que la curvatura efectivamente toma. GMinimaCuspide
+%   radio, asi que es un parametro geometrico del elemento; solo en ArcoCircular
+%   y Clotoide es ademas el radio que la curvatura efectivamente toma. GMinimaCuspide
 %   tampoco: es un criterio de aceptacion valido en todos los modos.
 
-    Modos = {'AceleracionNormalConstante', 'Clotoide', 'FuerzaGConstante', 'GNormativaMaxima'};
+    Modos = {'AceleracionNormalConstante', 'ArcoCircular', 'Clotoide', 'FuerzaGConstante', 'GNormativaMaxima'};
     if nargin == 0
         Lista = Modos;
         Nota = '';
@@ -30,9 +30,12 @@ function [Lista, Nota] = ParametrosDelModo(Modo)
         case 'AceleracionNormalConstante'
             Lista = Fila('AceleracionNormalObjetivo', 'm/s^2', ...
                          'aceleracion centripeta del pasajero sobre U, sin la gravedad, constante en el arco');
-        case 'Clotoide'
+        case 'ArcoCircular'
             Lista = Fila('RadioDeReferencia', 'm', ...
                          'radio de la heartline en el arco (el riel va d*cos(psi) mas afuera); lo pisa cada elemento con su radio');
+        case 'Clotoide'
+            Lista = Fila('RadioDeReferencia', 'm', ...
+                         'radio minimo de la heartline, en la mitad del giro (el riel va d*cos(psi) mas afuera); lo pisa cada elemento con su radio');
         case 'FuerzaGConstante'
             Lista = Fila('FuerzaGObjetivo', 'G', ...
                          'Gz neta del pasajero, incluida la gravedad, constante en el arco');

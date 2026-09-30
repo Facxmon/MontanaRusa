@@ -29,7 +29,7 @@ import { CATALOGO_DE_ELEMENTOS, OPCIONES_DE_PARAMETRO, PARAMETROS_ANULABLES, Par
 import type { NombreDeElemento, NombreDeParametro, Parametros } from './tipos';
 
 export interface DisenoSerializado {
-  v: 1;
+  v: 2;
   /** Solo los parametros globales que difieren de ParametrosPorDefecto(), por nombre del nucleo. */
   p: Record<string, unknown>;
   /** Estado inicial: posicion del riel, tangente, arriba, velocidad del centro de masa. */
@@ -38,7 +38,22 @@ export interface DisenoSerializado {
   s: { t: string; a: Record<string, unknown> }[];
 }
 
-const VERSION = 1;
+// v = 2 desde que el modo de curvatura 'Clotoide' paso a llamarse
+// 'ArcoCircular' y 'Clotoide' es la clotoide simetrica de verdad: un diseno
+// v = 1 que dice 'Clotoide' se lee como 'ArcoCircular' (migrarDesdeV1).
+const VERSION = 2;
+
+/** v = 1 -> v = 2: 'Clotoide' era el arco circular. Devuelve una copia; lo demas no cambio. */
+function migrarDesdeV1(d: Record<string, unknown>): Record<string, unknown> {
+  const renombrar = (bloque: unknown) =>
+    esObjetoPlano(bloque) && bloque.ModoCurvatura === 'Clotoide' ? { ...bloque, ModoCurvatura: 'ArcoCircular' } : bloque;
+  return {
+    ...d,
+    v: VERSION,
+    p: renombrar(d.p),
+    s: Array.isArray(d.s) ? d.s.map((inst) => (esObjetoPlano(inst) ? { ...inst, a: renombrar(inst.a) } : inst)) : d.s,
+  };
+}
 
 // ------------------------------------------------------------ utilidades
 /** Igualdad profunda para valores de parametro: numeros, logicos, textos, null, vectores y matrices. */
@@ -168,8 +183,9 @@ interface Analizado {
 }
 
 /** Valida campo por campo y devuelve copias ya tipadas; el mensaje de error dice que campo fallo y que se esperaba. */
-function analizar(d: unknown): Analizado {
-  if (!esObjetoPlano(d)) throw new Error(`El diseno serializado tiene que ser un objeto y es ${describir(d)}.`);
+function analizar(entrada: unknown): Analizado {
+  if (!esObjetoPlano(entrada)) throw new Error(`El diseno serializado tiene que ser un objeto y es ${describir(entrada)}.`);
+  const d = entrada.v === 1 ? migrarDesdeV1(entrada) : entrada;
   if (d.v !== VERSION) {
     throw new Error(`El diseno serializado tiene v = ${describir(d.v)} y esta version del visualizador entiende v = ${VERSION}.`);
   }
@@ -206,7 +222,7 @@ function analizar(d: unknown): Analizado {
 /** Rechaza cualquier cosa que no sea un DisenoSerializado valido, con el campo y lo esperado en el mensaje. */
 export function validarDisenoSerializado(d: unknown): DisenoSerializado {
   analizar(d);
-  return d as DisenoSerializado;
+  return (esObjetoPlano(d) && d.v === 1 ? migrarDesdeV1(d) : d) as DisenoSerializado;
 }
 
 /** Completa con ParametrosPorDefecto() lo que no viene; ids `e1..eN` en el orden de la secuencia. */

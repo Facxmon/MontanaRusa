@@ -190,7 +190,7 @@ Dos mitades: los valores y el esquema que los describe.
 ```jsonc
 {
   "valores": {
-    "modoCurvatura": "Clotoide",
+    "modoCurvatura": "ArcoCircular",
     "metodoDeAcoplamiento": "A",
     "radioDelLoop": 0.30,
     "peralteDeLaHelice": 0.9599,        // rad, NO grados
@@ -201,8 +201,8 @@ Dos mitades: los valores y el esquema que los describe.
 
   "esquema": {
     "modo": {
-      "nombre": "Clotoide",
-      "opciones": ["AceleracionNormalConstante","Clotoide","FuerzaGConstante","GNormativaMaxima"],
+      "nombre": "ArcoCircular",
+      "opciones": ["AceleracionNormalConstante","ArcoCircular","Clotoide","FuerzaGConstante","GNormativaMaxima"],
       "nota": "",
       "parametros": [
         { "clave": "radioDeReferencia", "unidad": "m",
@@ -403,24 +403,46 @@ diseñar nada: el modelo de datos de la verificación ya está bien.
 #### 6.4.1 `normativo`
 
 Volcado de `Reporte.Normativo` (`VerificarLimitesNormativos.m`) en camelCase. Es el detalle detrás de
-los criterios `+Gz (Fig. 10)`, `-Gz (Fig. 9)`, `Gy (Fig. 8)`, `+Gx (Fig. 6)`, `-Gx (Fig. 7)`, las tres
-elipses de 7.1.5.1 y los onsets, que ya están resumidos como `criterio` en `posteriores`.
+los criterios `+Gz (Fig. 10)`, `-Gz (Fig. 9)`, `Gy (Fig. 8)`, `+Gx (Fig. 6)`, `-Gx (Fig. 7)`,
+`Reversiones de Gx (7.1.6)`, `Reversiones de Gy (7.1.6)`, las tres elipses de 7.1.5.1 y los onsets, que
+ya están resumidos como `criterio` en `posteriores`.
+
+**Se calcula sobre la línea de tiempo del layout** (desde 2026-09-29). Los eventos sostenidos se miden
+de corrido en todo el circuito, en tiempo del prototipo (cada tramo escalado con el `factorTiempo` de su
+elemento): un evento que cruza un empalme es uno solo. `VerificarLayoutNormativo.m` recalcula este
+bloque, y las líneas normativas de `posteriores`, para cada elemento cada vez que el layout cambia. Cada
+elemento reporta los eventos que tocan al menos uno de sus nodos, con la duración completa, así que el
+bloque sigue siendo por elemento. Un layout de un solo elemento da lo mismo que el elemento suelto.
+Reglas del criterio (memoria de cálculo §5.7): los eventos de menos de 0,2 s se evalúan contra el límite
+de 200 ms; por debajo de 0,01 G (`GMinimaEvaluable`) no se evalúa; 7.1.7.1 se aplica literal (6 s después
+de un −Gz de más de 3 s).
 
 ```jsonc
 {
   "factorTiempo": 5.16,                 // sqrt(lambda_loop): duración modelo → duración real
   "duracionModelo": 0.597,              // s, del elemento, en tiempo del modelo
   "duracionRealEquivalente": 3.08,      // s reales
-  "huboAirtimeSostenido": false,        // -Gz sostenido > 3 s (7.1.7.1)
-  "curvaMasGzAplicada": "MasGzTodas",   // o "MasGzReducido" si hubo airtime sostenido
+  "huboAirtimeSostenido": false,        // algún nodo del elemento está en un -Gz de más de 3 s de prototipo (7.1.7.1)
+  "curvaMasGzAplicada": "MasGzTodas",   // "MasGzReducido" si al menos un nodo del elemento cae en una
+                                        // ventana de 7.1.7.1 (los 6 s de prototipo que siguen a ese -Gz)
 
   // Un evento sostenido por eje y sentido. Es el peor nivel G* contra la curva límite:
   "masGz":   { "curva": "MasGzTodas",  "signo":  1, "nivelCritico": 8.18, "duracionReal": 0.205,
                "limiteAplicado": 6.0, "exceso": 2.18, "duracionMasLarga": 3.08, "picoG": 8.47 },
-  "menosGz": { /* idem, signo -1; limiteAplicado y exceso son null si no hubo evento de ese signo */ },
+  "menosGz": { /* idem, signo -1; limiteAplicado y exceso son null si no hay G evaluable de ese signo */ },
   "gy":      { /* sobre |Gy| */ },
   "masGx":   { /* ... */ },
   "menosGx": { /* ... */ },
+  // curva: la del evento crítico (MasGzReducido si ese evento toca una ventana de 7.1.7.1).
+  // duracionReal: la evaluada, nunca menor que 0,2 s; duracionMasLarga: la real, sin acotar.
+
+  // 7.1.6: reversiones entre eventos sostenidos consecutivos de signo opuesto (desde 2026-09-29).
+  "reversionGx": { "tiempoPicoAPicoMinimo": 2.38,  // s de prototipo, el par más rápido que toca el elemento; null si no hay
+                   "reducida": false,              // algún par con menos de 0,2 s entre picos: límite del pico al 50 %
+                   "tiempoPicoAPico": null,        // del par del pico crítico; null si no hay reducción
+                   "picoG": null, "duracionReal": null, "limiteReducido": null,
+                   "exceso": null },               // > 0 si el pico supera su límite reducido (el criterio falla)
+  "reversionGy": { /* idem, sobre Gy */ },
 
   "elipse": { "valorMaximoGyGz": 1.65, "valorMaximoGxGz": 1.67, "valorMaximoGxGy": 0.02,   // ≤ 1 pasa
               "semiejes": [6.6, 3.3, 6.6] },                                             // [Gx, Gy, Gz], límites de 200 ms × 1.1
@@ -432,7 +454,9 @@ elipses de 7.1.5.1 y los onsets, que ya están resumidos como `criterio` en `pos
 ```
 
 `exceso` **positivo** es cuánto se pasó de la curva de la norma en el peor evento; `-Inf` (sin evento
-de ese signo) llega como `null`. Para la UI alcanza con los `criterio` de `posteriores`; este bloque es
+de ese signo) llega como `null`. Los criterios `Reversiones de Gx/Gy (7.1.6)` de `posteriores` son
+`Informativo` (valor: `tiempoPicoAPicoMinimo` en s, límite 0,2) mientras ningún par baje de 0,2 s, y
+`MenorOIgual` sobre `exceso` en G cuando alguno baja. Para la UI alcanza con los `criterio` de `posteriores`; este bloque es
 para el panel de detalle normativo y para el arnés de golden files.
 
 ---
@@ -474,17 +498,26 @@ física?" es una opinión; con esto, es un test que corre solo.
 
 | Caso | Elemento | Modo |
 |---|---|---|
-| `loop-clotoide` | LoopVertical | Clotoide |
+| `loop-arcocircular` | LoopVertical | ArcoCircular |
 | `loop-gconstante` | LoopVertical | FuerzaGConstante |
 | `loop-normativa` | LoopVertical | GNormativaMaxima |
 | `loop-anconstante` | LoopVertical | AceleracionNormalConstante |
-| `helice-clotoide` | Helice | Clotoide |
+| `helice-arcocircular` | Helice | ArcoCircular |
 | `helice-normativa` | Helice | GNormativaMaxima |
-| `obt-clotoide` | OverBankedTurn | Clotoide |
+| `obt-arcocircular` | OverBankedTurn | ArcoCircular |
 | `obt-normativa` | OverBankedTurn | GNormativaMaxima |
-| `diveloop-clotoide` | DiveLoop | Clotoide |
+| `diveloop-arcocircular` | DiveLoop | ArcoCircular |
 | `diveloop-normativa` | DiveLoop | GNormativaMaxima |
-| `circuito-demolayout` | los cuatro encadenados | Clotoide |
+| `circuito-demolayout` | los cuatro encadenados | ArcoCircular |
+| `loop-clotoide` | LoopVertical | Clotoide (simétrica, de verdad) |
+| `obt-clotoide` | OverBankedTurn | Clotoide (simétrica, de verdad) |
+| `obt-alineado-centro` | OverBankedTurn | ArcoCircular, peralte alineado al centro de curvatura |
+| `obt-alineado-fuerza` | OverBankedTurn | ArcoCircular, peralte alineado a la fuerza |
+| `obt-relativo-fuerza` | OverBankedTurn | ArcoCircular, peralte relativo a la fuerza con 10° de desvío |
+| `helice-alineado-fuerza` | Helice | ArcoCircular, peralte alineado a la fuerza |
+
+Hasta la 1.2.0 del contrato los casos en `ArcoCircular` se llamaban `*-clotoide` y el modo, `Clotoide`;
+los nombres `loop-clotoide` y `obt-clotoide` son ahora los de la clotoide nueva.
 
 Los genera `GenerarGoldenFiles.m`, que también los valida. El setup de los diez casos sueltos está
 fijado ahí: `ParametrosPorDefecto` con `RadioDelLoop = 0.30`, método A, entrada en `[0 0 1]` a nivel a

@@ -18,6 +18,26 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
 %   lateral no da escalones. Se las sigue llamando clotoides por su rol,
 %   no por su ley; ver MezclaDeClotoide y RampaDeSalida.
 %
+%   El modo 'Clotoide' es la excepcion: el elemento entero es una clotoide
+%   simetrica de verdad (RecorrerClotoide). La curvatura crece linealmente
+%   con el arco desde la de entrada hasta la del radio del elemento en la
+%   mitad del giro (sub-tramo ClotoideEntrada) y baja linealmente hasta cero
+%   (ClotoideSalida); no hay ArcoPrincipal. dkappa/ds salta en la entrada, en
+%   el pico y en la salida: con roll helicoidal eso es un escalon de Gy
+%   (memoria de calculo, 7.8), el precio de la clotoide literal.
+%
+%   PERALTE ALINEADO A LA FUERZA (Receta.AlineacionDelPeralte = 'Fuerza',
+%   PeralteDelElemento). El roll deja de ser una ley fija: en cada punto se
+%   calcula del estado (PuntoCinematico, RollHaciaLaFuerza) para que el eje
+%   del carro quede sobre la linea de la fuerza especifica del riel,
+%   v^2*kappa + g*z, mas el desvio pedido; en el acondicionamiento se pasa
+%   del roll de entrada a ese con el smoothstep quintico. Dentro del paso phi'
+%   y phi'' son aproximados (los de la ley base); sobre la polilinea ya
+%   construida se derivan del phi registrado y se corrige la G
+%   (CompletarRollAlineado), igual que CompletarAceleracionRoll hace con la
+%   parte helicoidal. La Gy que queda es la de la dinamica del roll (brazo
+%   b), no la del balance de fuerzas.
+%
 %   Todos los elementos son el mismo objeto geometrico: un giro de un angulo
 %   dado alrededor de un eje, con una ley de roll encima. Lo que los distingue
 %   entra por la Receta:
@@ -111,6 +131,21 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
     % longitud dimensionada para 0.37 rad y phi' saldria fuera de todo
     % presupuesto (pasaba al encadenar tras un dive loop que sale peraltado).
     DeltaRollCrudo = Beta + Receta.RollDelElemento - EstadoEntrada.AnguloRoll;
+    if isfield(Receta, 'AlineacionDelPeralte') && strcmp(Receta.AlineacionDelPeralte, 'Fuerza')
+        % Alineado a la fuerza: la transicion de entrada va al roll que alinea
+        % el carro con la fuerza del estado de entrada (mas el desvio), no al
+        % roll base; si no, con el carro ya alineado el acondicionamiento
+        % tendria largo cero y el roll saltaria al objetivo en s = 0.
+        RollBaseTransporte = Beta + Receta.RollDelElemento;
+        Fuerza = EstadoEntrada.Velocidad^2 * EstadoEntrada.VectorCurvatura + [0 0 Parametros.Gravedad];
+        FuerzaArriba  = dot(Fuerza, VersorArribaTransporteEntrada);
+        FuerzaLateral = dot(Fuerza, VersorLateralTransporteEntrada);
+        RollAlineado = RollBaseTransporte + Receta.DesvioDelPeralte;
+        if hypot(FuerzaArriba, FuerzaLateral) >= 0.05*Parametros.Gravedad
+            RollAlineado = RollAlineado + AlEjeDeLaFuerza(atan2(FuerzaLateral, FuerzaArriba) - RollBaseTransporte);
+        end
+        DeltaRollCrudo = RollAlineado - EstadoEntrada.AnguloRoll;
+    end
     if abs(DeltaRollCrudo) <= pi + 1e-9
         DeltaRoll = DeltaRollCrudo;
     else
@@ -139,6 +174,17 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
     ResidualCierre   = NaN;
     InclinacionUsada = 0;
     FactorUsado      = 1;
+
+    % Peralte alineado a la fuerza: el roll sale del estado (RollHaciaLaFuerza).
+    if isfield(Receta, 'AlineacionDelPeralte') && strcmp(Receta.AlineacionDelPeralte, 'Fuerza')
+        Plan.PeralteHaciaLaFuerza = struct('Desvio', Receta.DesvioDelPeralte, ...
+            'ArcoInicio', EstadoEntrada.LongitudAcumulada, 'LongitudTransicion', 0);
+    else
+        Plan.PeralteHaciaLaFuerza = [];
+    end
+    % Con el roll siguiendo a la fuerza, phi'' hereda kappa'': las rampas de
+    % curvatura tienen que ser C2 o la G lateral da un escalon (ver Suavizado).
+    Plan.RampasC2 = ~isempty(Plan.PeralteHaciaLaFuerza);
     for IteracionAjuste = 1:Parametros.MaxIteracionesAjuste
         Plan.Onset       = Escala.OnsetMaximo / FactorLongitud;
         Plan.Inclinacion = Inclinacion;
@@ -154,6 +200,9 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
         end
         Plan.FuncionRoll = @(Arco, AnguloGirado) PerfilRollDelElemento(Arco, AnguloGirado, ...
                                EstadoEntrada, RollObjetivo, Plan.LongitudAcondicionamiento, Inclinacion);
+        if ~isempty(Plan.PeralteHaciaLaFuerza)
+            Plan.PeralteHaciaLaFuerza.LongitudTransicion = Plan.LongitudAcondicionamiento;
+        end
 
         AjusteCierre = 0;
         for IteracionCierre = 1:Parametros.MaxIteracionesCierre
@@ -167,6 +216,10 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
 
         % phi'' completo y G lateral corregida sobre la polilinea, antes de
         % medir el onset: el lazo tiene que ver la misma G que la simulacion.
+        % Con el peralte alineado a la fuerza, antes phi' (ver la cabecera).
+        if ~isempty(Plan.PeralteHaciaLaFuerza)
+            Recorrido.Registro = CompletarRollAlineado(Recorrido.Registro, Parametros);
+        end
         Recorrido.Registro = CompletarAceleracionRoll(Recorrido.Registro, Parametros);
         [OnsetMedido, OnsetLateralMedido] = OnsetDelRecorrido(Recorrido.Registro);
         if ~isempty(Recorrido.Aviso)
@@ -179,8 +232,23 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
         % aunque los dos esten bien. Realimenta el eje que peor esta respecto
         % de su presupuesto: el vertical (clotoides) o el lateral (transicion
         % de roll y sub-peralte).
-        OnsetRelativo = max(OnsetMedido / Escala.OnsetMaximo(3), OnsetLateralMedido / Escala.OnsetMaximo(2));
+        OnsetRelativoLateral = OnsetLateralMedido / Escala.OnsetMaximo(2);
+        if ~isempty(Plan.PeralteHaciaLaFuerza)
+            % Con el peralte alineado a la fuerza el onset lateral lo pone
+            % sobre todo el roll de las rampas, b*v^3*phi'''/g, que escala
+            % como 1/L^3 (igual que en LongitudTransicionDeRoll) y no como
+            % 1/L: realimentado lineal sobrecorrige y no converge.
+            OnsetRelativoLateral = OnsetRelativoLateral^(1/3);
+        end
+        OnsetRelativo = max(OnsetMedido / Escala.OnsetMaximo(3), OnsetRelativoLateral);
         FactorSiguiente = (1 + Parametros.MargenDeOnset) * FactorLongitud * OnsetRelativo;
+        if ~isempty(Plan.PeralteHaciaLaFuerza)
+            % Con el roll alineado el onset lateral medido no es una funcion
+            % suave del largo de las rampas (el maximo salta de nodo) y el
+            % punto fijo oscila; el factor solo puede crecer, asi que el lazo
+            % se detiene en el primer largo que cumple.
+            FactorSiguiente = max(FactorSiguiente, FactorLongitud);
+        end
 
         InclinacionSiguiente = Inclinacion;
         if AjustarInclinacion && Recorrido.LongitudDelGiro > 0
@@ -266,6 +334,10 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
     Diagnostico.FactorLongitudTransicion   = FactorLongitud;
     Diagnostico.OnsetVerticalGenerado      = OnsetMedido;
     Diagnostico.OnsetLateralGenerado       = OnsetLateralMedido;
+    % Desalineo maximo entre el eje del carro y la fuerza especifica del
+    % riel pasado el acondicionamiento, con el peralte alineado a la fuerza
+    % (0 en los demas casos). Es el error del calculo, no un criterio.
+    Diagnostico.ResidualAlineacionPeralte  = ResidualDeAlineacion(Registro, Plan, Parametros);
 
     % Perfil de velocidad que salio de la marcha acoplada. Es lo que el
     % metodo B realimenta en la iteracion siguiente.
@@ -320,6 +392,7 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     % transporte. Hasta que arranca el arco es la del plano de entrada; el
     % arco la reemplaza por la suya, que ademas gira con la helice.
     Contexto.FuncionAnguloDeCurvatura   = @(Punto) Plan.Beta + Plan.Receta.DesfasajeDeCurvatura;
+    Contexto.PeralteHaciaLaFuerza       = Plan.PeralteHaciaLaFuerza;
 
     y    = Plan.EstadoInicialY;
     Arco = Plan.EstadoEntrada.LongitudAcumulada;
@@ -403,6 +476,15 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     VectorCurvatura = CurvaturaArriba*y(7:9) + CurvaturaLateral*y(10:12);
     CurvaturaInicialArco = dot(VectorCurvatura, Recorrido.DireccionDeGiro);
     Recorrido.CurvaturaResidualFueraPlano = dot(VectorCurvatura, Recorrido.EjeDeLaHelice);
+
+    if strcmp(Parametros.ModoCurvatura, 'Clotoide')
+        [Recorrido, y, Arco] = RecorrerClotoide(Recorrido, Plan, Contexto, y, Arco, AjusteCierre, ...
+                                                CurvaturaInicialArco, AnguloDeCurvatura, AnguloGiradoInicio);
+        if isempty(Recorrido.Aviso)
+            Recorrido = CerrarRecorrido(Recorrido, Plan, Arco, ArcoInicioLoop);
+        end
+        return
+    end
 
     %% --- ClotoideEntrada ---
     % Las longitudes de las transiciones se dimensionan con la velocidad REAL
@@ -501,7 +583,7 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     ArcoInicio = Arco;
     Contexto.FuncionCurvatura = @(Punto) ProyectarCurvatura( ...
         RampaDeSalida(FraccionDeTramo(Punto.Arco, ArcoInicio, LongitudSalida), ...
-                      CurvaturaFinArco, DerivadaCurvaturaFinArco, LongitudSalida), ...
+                      CurvaturaFinArco, DerivadaCurvaturaFinArco, LongitudSalida, Plan.RampasC2), ...
         AnguloDeCurvatura(Punto) + DesvioFinArco);
 
     Indice = Recorrido.Registro.NumeroDeNodos + 1;
@@ -512,6 +594,11 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     Recorrido.SubTramos(end+1) = struct('Nombre', 'ClotoideSalida', ...
         'IndiceInicio', Indice, 'IndiceFin', Recorrido.Registro.NumeroDeNodos);
 
+    Recorrido = CerrarRecorrido(Recorrido, Plan, Arco, ArcoInicioLoop);
+end
+
+function Recorrido = CerrarRecorrido(Recorrido, Plan, Arco, ArcoInicioLoop)
+%CERRARRECORRIDO Residual de cierre, desplazamiento lateral y longitud del giro.
     % El cierre se mide sobre la rotacion DENTRO DEL PLANO DE GIRO, no sobre el
     % angulo total girado: con torsion la tangente sale con una componente
     % fuera de plano chica y el angulo total ya no vuelve al objetivo cuando el
@@ -528,6 +615,126 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     % T.B = sin(alfa) constante, el desplazamiento lateral vale sin(alfa) por
     % esta longitud: es la pendiente exacta para el paso de Newton.
     Recorrido.LongitudDelGiro = Arco - ArcoInicioLoop;
+end
+
+%% ========================= clotoide simetrica =============================
+function [Recorrido, y, Arco] = RecorrerClotoide(Recorrido, Plan, Contexto, y, Arco, AjusteCierre, ...
+                                                  CurvaturaInicial, AnguloDeCurvatura, AnguloGiradoInicio)
+%RECORRERCLOTOIDE Modo Clotoide: el giro entero es una clotoide simetrica.
+%   La curvatura es lineal en el arco: sube con pendiente constante desde la
+%   de entrada K0 hasta la del pico Kp (la del radio del elemento, que da
+%   CurvaturaDelModo) en la mitad del giro, y baja con pendiente constante
+%   hasta cero. Como dtheta/ds = kappa, kappa lineal en s es lo mismo que
+%   kappa^2 lineal en el angulo girado theta, y eso fija las pendientes para
+%   que cada mitad gire Giro/2:
+%       subida:  kappa = K0 + A*(s - s0),                A = (Kp^2 - K0^2)/Giro
+%       bajada:  kappa^2 = 2*B*(Giro - theta),           B = Kp^2/Giro
+%   con Giro el giro objetivo menos la correccion de cierre. La subida se
+%   escribe en el arco (con K0 = 0 la forma en theta no arranca nunca: theta
+%   = 0 es un punto fijo) y la bajada en theta, que es lo que garantiza que
+%   el giro cierre exactamente con kappa = 0. Cada tramo se corta donde la
+%   ley llega a su extremo: (Kp - kappa)/A de arco en la subida y kappa/B en
+%   la bajada. La direccion es la
+%   del elemento (AnguloDeCurvatura, con la helice). No usa las transiciones
+%   dimensionadas por onset: la pendiente la fija la geometria, y el onset
+%   que resulte lo reporta la verificacion.
+    Parametros = Plan.Parametros;
+    Giro = Plan.Receta.GiroObjetivo - AjusteCierre;
+
+    [~, PuntoInicial] = DerivadaDeVia(Arco, y, Contexto);
+    CurvaturaPico = CurvaturaDelModo(PuntoInicial, Parametros, Plan.Escala, PuntoInicial.Tiempo, Plan.Receta);
+    K0 = max(CurvaturaInicial, 0);
+    PendienteSubida = (CurvaturaPico^2 - K0^2) / Giro;
+    PendienteBajada = CurvaturaPico^2 / Giro;
+    Girado = @(Punto) Punto.AnguloGirado - AnguloGiradoInicio;
+
+    %% --- ClotoideEntrada: sube ---
+    ArcoInicio = Arco;
+    Contexto.FuncionCurvatura = @(Punto) ProyectarCurvatura( ...
+        min(K0 + PendienteSubida*(Punto.Arco - ArcoInicio), CurvaturaPico), AnguloDeCurvatura(Punto));
+    ArcoQueFalta = @(Punto, ~) (CurvaturaPico - Punto.Curvatura) / max(PendienteSubida, eps);
+    Indice = Recorrido.Registro.NumeroDeNodos + 1;
+    if PendienteSubida > 0
+        [Recorrido.Registro, y, Arco] = IntegrarTramo(Recorrido.Registro, y, Arco, Contexto, 50, ArcoQueFalta);
+    end
+    Recorrido.LongitudClotoideEntrada = Arco - ArcoInicio;
+    Recorrido.SubTramos(end+1) = struct('Nombre', 'ClotoideEntrada', ...
+        'IndiceInicio', Indice, 'IndiceFin', Recorrido.Registro.NumeroDeNodos);
+    if y(13) <= 0
+        Recorrido = TerminarSinEnergia(Recorrido, y, Arco, Contexto, 'la clotoide de entrada');
+        return
+    end
+
+    %% --- ClotoideSalida: baja hasta cero ---
+    Contexto.FuncionCurvatura = @(Punto) ProyectarCurvatura( ...
+        sqrt(max(2*PendienteBajada*(Giro - Girado(Punto)), 0)), AnguloDeCurvatura(Punto));
+    ArcoQueFalta = @(Punto, ~) Punto.Curvatura / PendienteBajada;
+    ArcoInicio = Arco;
+    Indice = Recorrido.Registro.NumeroDeNodos + 1;
+    [Recorrido.Registro, y, Arco] = IntegrarTramo(Recorrido.Registro, y, Arco, Contexto, 50, ArcoQueFalta);
+    Recorrido.LongitudClotoideSalida = Arco - ArcoInicio;
+    if y(13) <= 0
+        Recorrido = TerminarSinEnergia(Recorrido, y, Arco, Contexto, 'la clotoide de salida');
+        return
+    end
+    [~, Recorrido.PuntoFinal] = DerivadaDeVia(Arco, y, Contexto);
+    Recorrido.Registro = AgregarNodo(Recorrido.Registro, Recorrido.PuntoFinal);
+    Recorrido.SubTramos(end+1) = struct('Nombre', 'ClotoideSalida', ...
+        'IndiceInicio', Indice, 'IndiceFin', Recorrido.Registro.NumeroDeNodos);
+end
+
+%% ========================= peralte alineado a la fuerza ===================
+function Residual = ResidualDeAlineacion(Registro, Plan, Parametros)
+%RESIDUALDEALINEACION Desalineo maximo [rad] entre el eje del carro y la linea
+%   de la fuerza especifica del riel, v^2*kappa + g*z, descontado el desvio
+%   pedido, pasado el acondicionamiento. 0 si el peralte no se alinea.
+    Residual = 0;
+    if isempty(Plan.PeralteHaciaLaFuerza)
+        return
+    end
+    g = Parametros.Gravedad;
+    Desde = Plan.EstadoEntrada.LongitudAcumulada + Plan.LongitudAcondicionamiento;
+    for i = 1:numel(Registro.Arco)
+        if Registro.Arco(i) < Desde
+            continue
+        end
+        Fuerza = Registro.Velocidad(i)^2 * Registro.VectorCurvatura(i,:) + [0 0 g];
+        FuerzaArriba  = dot(Fuerza, Registro.VersorArribaCarro(i,:));
+        FuerzaLateral = dot(Fuerza, Registro.VersorLateral(i,:));
+        if hypot(FuerzaArriba, FuerzaLateral) < 0.05*g
+            continue
+        end
+        Angulo = AlEjeDeLaFuerza(atan2(FuerzaLateral, FuerzaArriba));
+        Residual = max(Residual, abs(Angulo + Plan.PeralteHaciaLaFuerza.Desvio));
+    end
+end
+
+function Registro = CompletarRollAlineado(Registro, Parametros)
+%COMPLETARROLLALINEADO phi' del peralte alineado a la fuerza, sobre la polilinea.
+%   Dentro del paso el roll alineado es exacto pero su derivada no se conoce
+%   (depende de como cambian v y kappa). Aca se la saca derivando el phi
+%   registrado y se corrigen los dos terminos de la G que dependen de phi'
+%   (CargasEnLaVia): -b*v^2*phi'^2/g en Gz y b*a_t*phi'/g en Gy, con a_t la
+%   misma estimacion -g*Tz que usa DerivadaDeVia, en los dos brazos. phi''
+%   lo completa despues CompletarAceleracionRoll con este phi'.
+    n = Registro.NumeroDeNodos;
+    if n < 3
+        return
+    end
+    g = Parametros.Gravedad;
+    d = Parametros.DistanciaHeartline;
+    b = BrazoDeVerificacion(Parametros);
+    Arco = Registro.Arco(1:n);
+    Nueva = DerivadaPorArco(Registro.AnguloRoll(1:n), Arco);
+    Vieja = Registro.VelocidadRoll(1:n);
+    v2 = Registro.Velocidad(1:n).^2;
+    Tz = Registro.VersorTangente(1:n, 3);
+    DeltaCuadrado = Nueva.^2 - Vieja.^2;
+    Registro.GArribaHeartline(1:n)     = Registro.GArribaHeartline(1:n)     - d*v2.*DeltaCuadrado/g;
+    Registro.GArribaVerificacion(1:n)  = Registro.GArribaVerificacion(1:n)  - b*v2.*DeltaCuadrado/g;
+    Registro.GLateralHeartline(1:n)    = Registro.GLateralHeartline(1:n)    - d*Tz.*(Nueva - Vieja);
+    Registro.GLateralVerificacion(1:n) = Registro.GLateralVerificacion(1:n) - b*Tz.*(Nueva - Vieja);
+    Registro.VelocidadRoll(1:n) = Nueva;
 end
 
 %% ========================= auxiliares =====================================
@@ -555,7 +762,7 @@ function [CurvaturaArriba, CurvaturaLateral] = CurvaturaDeAcondicionamiento(Punt
 %   mantiene la componente paralela, que la clotoide de entrada va a retomar.
 %   La rampa es un smoothstep, como las demas: dkappa/ds continua en los dos
 %   extremos (ver MezclaDeClotoide para el por que).
-    Fraccion = Smoothstep(FraccionDeTramo(Punto.Arco, ArcoInicio, Plan.LongitudAcondicionamiento));
+    Fraccion = Smoothstep(FraccionDeTramo(Punto.Arco, ArcoInicio, Plan.LongitudAcondicionamiento), Plan.RampasC2);
     CurvaturaPerpendicular = (1 - Fraccion) * Plan.CurvaturaPerpendicular;
     Angulo = Plan.Beta + Plan.Receta.DesfasajeDeCurvatura;
     CurvaturaArriba  = Plan.CurvaturaParalela*cos(Angulo) - CurvaturaPerpendicular*sin(Angulo);
@@ -590,7 +797,7 @@ function [CurvaturaArriba, CurvaturaLateral] = MezclaDeClotoide(Punto, ArcoInici
 %   dkappa/ds es 1.5 veces el de la rampa lineal de la misma longitud; lo
 %   paga LongitudDeClotoide. Ya no es una clotoide en sentido estricto
 %   (dkappa/ds no es constante); el sub-tramo conserva el nombre.
-    Fraccion = Smoothstep(FraccionDeTramo(Punto.Arco, ArcoInicio, Longitud));
+    Fraccion = Smoothstep(FraccionDeTramo(Punto.Arco, ArcoInicio, Longitud), Plan.RampasC2);
     [ArribaObjetivo, LateralObjetivo] = CurvaturaDelModoProyectada(Punto, Plan, TiempoReferencia);
     AnguloEntrada = Punto.AnguloRoll + Punto.AnguloCurvaturaDesdeArriba;
     [ArribaInicial, LateralInicial]   = ProyectarCurvatura(CurvaturaInicial, AnguloEntrada);
@@ -598,13 +805,25 @@ function [CurvaturaArriba, CurvaturaLateral] = MezclaDeClotoide(Punto, ArcoInici
     CurvaturaLateral = (1 - Fraccion)*LateralInicial + Fraccion*LateralObjetivo;
 end
 
-function Fraccion = Smoothstep(u)
+function Fraccion = Smoothstep(u, C2)
 %SMOOTHSTEP 3u^2 - 2u^3: vale 0 en 0 y 1 en 1, con derivada nula en los dos
 %   extremos. Pendiente maxima 1.5 en u = 0.5.
-    Fraccion = u.^2 .* (3 - 2*u);
+%
+%   Con C2 (peralte alineado a la fuerza) es el quintico 6u^5 - 15u^4 + 10u^3,
+%   con primera Y segunda derivada nulas en los extremos: el roll alineado
+%   sigue a la curvatura y phi'' hereda kappa''; con la rampa cubica kappa''
+%   salta en los extremos, la G lateral b*v^2*phi''/g da un escalon y el
+%   onset medido no tiene cota (el lazo alargaria las rampas sin fin). La
+%   longitud se sigue dimensionando con el factor 1.5 de la cubica: el pico
+%   del quintico es 1.875 y lo que falte lo corrige el lazo de onset.
+    if nargin > 1 && C2
+        Fraccion = u.^3 .* (u .* (6*u - 15) + 10);
+    else
+        Fraccion = u.^2 .* (3 - 2*u);
+    end
 end
 
-function Curvatura = RampaDeSalida(Fraccion, CurvaturaInicial, DerivadaInicial, Longitud)
+function Curvatura = RampaDeSalida(Fraccion, CurvaturaInicial, DerivadaInicial, Longitud, C2)
 %RAMPADESALIDA Curvatura de la rampa de salida: Hermite cubica desde
 %   (kappa, dkappa/ds) del fin del arco hasta (0, 0). Arranca con la
 %   pendiente que traia el arco, para que dkappa/ds -- y con ella phi'' y la
@@ -613,7 +832,13 @@ function Curvatura = RampaDeSalida(Fraccion, CurvaturaInicial, DerivadaInicial, 
 %   propia rampa (que tambien arranca con pendiente nula) empalma C1.
     u = Fraccion;
     Pendiente = PendienteAcotada(DerivadaInicial, CurvaturaInicial, Longitud);
-    Curvatura = CurvaturaInicial * (2*u.^3 - 3*u.^2 + 1) + Pendiente * (u.^3 - 2*u.^2 + u);
+    if nargin > 4 && C2
+        % Hermite quintica con kappa'' nula en los dos extremos (ver Smoothstep).
+        Curvatura = CurvaturaInicial * (1 - 10*u.^3 + 15*u.^4 - 6*u.^5) ...
+                  + Pendiente * (u - 6*u.^3 + 8*u.^4 - 3*u.^5);
+    else
+        Curvatura = CurvaturaInicial * (2*u.^3 - 3*u.^2 + 1) + Pendiente * (u.^3 - 2*u.^2 + u);
+    end
 end
 
 function Pendiente = PendienteAcotada(DerivadaInicial, CurvaturaInicial, Longitud)
@@ -658,7 +883,11 @@ function Giro = GiroDeLaRampaDeSalida(Punto, Registro, Plan)
                                          Punto.CurvaturaLateralCarro, Plan.Onset, Plan.Parametros);
     Pendiente = PendienteAcotada(DerivadaCurvaturaEnElUltimoTramo(Punto, Registro, Plan.Parametros), ...
                                  Punto.Curvatura, Longitud);
-    Giro = Longitud * (0.5*Punto.Curvatura + Pendiente/12);
+    if Plan.RampasC2
+        Giro = Longitud * (0.5*Punto.Curvatura + Pendiente/10);   % integral de la Hermite quintica
+    else
+        Giro = Longitud * (0.5*Punto.Curvatura + Pendiente/12);
+    end
 end
 
 function Longitud = LongitudDeClotoidePorEjes(Velocidad, DeltaCurvaturaArriba, DeltaCurvaturaLateral, Onset, Parametros)
@@ -712,6 +941,9 @@ function [AnguloRoll, VelocidadRoll, AceleracionRoll] = PerfilRollDelElemento(Ar
 %
 %   La derivada de la parte helicoidal la completa DerivadaDeVia, que es donde
 %   recien se conoce la curvatura: dphi/ds = kappa*tan(alfa).
+%
+%   Con el peralte alineado a la fuerza esta es la ley BASE: PuntoCinematico
+%   la reemplaza por el roll que alinea el carro (RollHaciaLaFuerza).
 
     ArcoLocal = Arco - EstadoEntrada.LongitudAcumulada;
     [AnguloRoll, VelocidadRoll, AceleracionRoll] = PerfilRollQuintico( ...

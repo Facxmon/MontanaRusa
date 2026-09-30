@@ -42,10 +42,14 @@ function [EstadoSalida, Elemento, Reporte] = ElementoDiveLoop(EstadoEntrada, Par
 
     if nargin == 0
         EstadoSalida = DeclaracionDeParametros( ...
-            'RadioDelDiveLoop',      'm', ['radio de la heartline en la cuspide: en Clotoide es el que se impone; en los modos ' ...
+            'RadioDelDiveLoop',      'm', ['radio de la heartline en la cuspide: en ArcoCircular es el que se impone y en Clotoide es el radio minimo; en los modos ' ...
                                            'dependientes de v es solo la longitud caracteristica de Froude y el radio real es una salida'], ...
             'SeparacionDelDiveLoop', 'm', 'avance sobre el eje de la helice (0: gira solo pi y no se cruza consigo mismo)', ...
-            'SentidoDelGiro',        '-', 'lado hacia el que se desalinea la curvatura para el Gy objetivo en modo GNormativaMaxima');
+            'SentidoDelGiro',        '-', 'lado hacia el que se desalinea la curvatura para el Gy objetivo en modo GNormativaMaxima', ...
+            'PeralteAlineadoAlCentroDeCurvatura', '-', ['logico: U apunta siempre al centro de curvatura del riel (CIR como centro ' ...
+                                                        'de curvatura); excluyente con PeralteAlineadoALaFuerza'], ...
+            'PeralteAlineadoALaFuerza',           '-', ['logico: U sigue siempre a la fuerza especifica total, centripeta mas gravedad ' ...
+                                                        '(CIR como direccion de la fuerza: Gy nula en el riel); excluyente con la anterior']);
         return
     end
     if nargin < 3
@@ -63,6 +67,14 @@ function [EstadoSalida, Elemento, Reporte] = ElementoDiveLoop(EstadoEntrada, Par
     Receta.CurvaLimiteGz          = 'MasGzTodas';   % Fig. 10: lo que persigue el modo normativo
     Receta.CurvaLimiteGy          = 'GyBase';       % Fig. 8, acotada por la elipse de 7.1.5.1
     Receta.SentidoDeGy            = Sentido;        % +1 hacia el versor lateral del carro
+
+    % Con el peralte alineado al CIR el modo normativo deja de perseguir Gy:
+    % ese Gy sale justamente de desalinear la curvatura de U (sub-peralte), que
+    % es lo contrario de alinearla.
+    Receta = PeralteDelElemento(Receta, Parametros, 'Constante', 0, pi);
+    if ~strcmp(Receta.AlineacionDelPeralte, 'Constante')
+        Receta = rmfield(Receta, {'CurvaLimiteGy', 'SentidoDeGy'});
+    end
 
     [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Parametros, Receta, Layout);
 end
