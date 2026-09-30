@@ -3,7 +3,7 @@
 // que ser identico (toStrictEqual, sin tolerancia) al de calcularLayout, que
 // recalcula todo. Lo unico que se excluye es meta.generadoEn, la hora.
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type * as Contrato from '../src/contrato/tipos';
 import { calcularLayout, instanciasDesdeTipos, nuevoIdDeInstancia, type EntradaDeDiseno, type InstanciaDeElemento } from '../src/nucleo/calcular';
 import { CalculadorIncremental, claveExacta, conInterferencia } from '../src/nucleo/calculoIncremental';
@@ -124,6 +124,11 @@ const EDICIONES: Edicion[] = [
     return { entrada: { ...e, parametros }, descripcion: 'Masa (general)' };
   },
 ];
+
+// Estos tests son sincronos y pesados: vitest los encadena solo con promesas, asi que el hilo nunca atiende
+// los mensajes de vuelta del proceso principal y a los ~60 s vence "Timeout calling onTaskUpdate" (exit code 1
+// aunque pasen todos). Ceder un turno del bucle de eventos entre tests lo evita.
+afterEach(() => new Promise<void>((resolver) => setTimeout(resolver, 0)));
 
 describe('recalculo incremental', () => {
   describe('ediciones aleatorias sobre el DemoLayout: identico al recalculo completo', () => {
