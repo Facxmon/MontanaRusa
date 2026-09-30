@@ -14,7 +14,7 @@ describe('parametrosMencionados', () => {
 
   it('los mensajes del modo nombran el valor y no el parametro: igual marcan ModoCurvatura', () => {
     expect(parametrosMencionados('El modo GNormativaMaxima pide +Gz pero la curvatura forma 90 grados con el eje arriba del carro.')).toEqual(['ModoCurvatura']);
-    expect(parametrosMencionados('Modo de curvatura no reconocido: Raro. Los modos son: AceleracionNormalConstante, Clotoide, FuerzaGConstante, GNormativaMaxima.')).toEqual(['ModoCurvatura']);
+    expect(parametrosMencionados('Modo de curvatura no reconocido: Raro. Los modos son: AceleracionNormalConstante, ArcoCircular, Clotoide, FuerzaGConstante, GNormativaMaxima.')).toEqual(['ModoCurvatura']);
     // El valor tiene que estar completo, como los nombres.
     expect(parametrosMencionados('ClotoideDoble no existe')).toEqual([]);
   });

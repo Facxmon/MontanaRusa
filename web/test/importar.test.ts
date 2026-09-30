@@ -75,7 +75,7 @@ describe('mensajes de error concretos', () => {
 
   it('version del formato desconocida', () => {
     const d = { ...serializarDiseno(disenoDePrueba()), v: 7 };
-    expect(() => importarDiseno(JSON.stringify(d), 'viejo.json')).toThrowError(/tiene v = 7 y esta version del visualizador entiende v = 1/);
+    expect(() => importarDiseno(JSON.stringify(d), 'viejo.json')).toThrowError(/tiene v = 7 y esta version del visualizador entiende v = 2/);
   });
 
   it('un layout sin elementos o sin parametros.valores', () => {

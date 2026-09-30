@@ -51,4 +51,10 @@ function Punto = PuntoCinematico(Arco, y, Contexto)
         Punto.VelocidadParaCurvatura = max(Contexto.PerfilVelocidad(Arco), ...
                                            Contexto.VelocidadMinimaDeSeguridad);
     end
+
+    % Peralte alineado a la fuerza: el roll de la ley base se reemplaza por
+    % el que pone el eje del carro sobre la fuerza especifica.
+    if isfield(Contexto, 'PeralteHaciaLaFuerza') && ~isempty(Contexto.PeralteHaciaLaFuerza)
+        Punto = RollHaciaLaFuerza(Punto, Contexto);
+    end
 end

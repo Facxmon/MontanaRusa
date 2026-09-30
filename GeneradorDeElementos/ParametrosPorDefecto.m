@@ -22,11 +22,17 @@ function Parametros = ParametrosPorDefecto()
 % Modo de curvatura del arco principal. Cada modo fija que G quiere en el
 % PASAJERO y CurvaturaDelModo resuelve la curvatura del riel que la produce.
 %   'AceleracionNormalConstante'  centripeta del pasajero constante
-%   'Clotoide'                    radio de la heartline constante (no depende de v)
+%   'ArcoCircular'                radio de la heartline constante (no depende de v).
+%                                 Antes se llamaba 'Clotoide': clotoides son sus
+%                                 transiciones, no el arco
+%   'Clotoide'                    clotoide simetrica de verdad: la curvatura crece
+%                                 linealmente con el arco hasta 1/radio en la mitad
+%                                 del giro y baja linealmente hasta cero (sin arco
+%                                 de radio constante; no depende de v)
 %   'FuerzaGConstante'            Gz del pasajero constante
 %   'GNormativaMaxima'            Gz del pasajero igual al +Gz maximo que admite
 %                                 la curva de la norma para la duracion transcurrida
-Parametros.ModoCurvatura = 'Clotoide';
+Parametros.ModoCurvatura = 'ArcoCircular';
 
 Parametros.AceleracionNormalObjetivo = 20;    % [m/s^2] solo AceleracionNormalConstante
 Parametros.FuerzaGObjetivo           = 3.0;   % [G]     solo FuerzaGConstante; G neta incluida la gravedad
@@ -40,7 +46,8 @@ Parametros.FuerzaGObjetivo           = 3.0;   % [G]     solo FuerzaGConstante; G
 % Fig. 10 baja 0.025 G en 1.0 s y 0.007 G en 2.0 s. Cero = tabla literal. La
 % verificacion usa siempre la tabla literal.
 Parametros.SemianchoDeSuavizadoNormativo = 0.05;   % [s] de prototipo; solo GNormativaMaxima
-% Clotoide usa el radio del elemento (bloque 2) como radio de la heartline.
+% ArcoCircular usa el radio del elemento (bloque 2) como radio de la heartline;
+% Clotoide, como el radio minimo (en la mitad del giro).
 
 %% =================================================================
 %% 2. PARAMETROS GEOMETRICOS DE CADA ELEMENTO
@@ -88,6 +95,19 @@ Parametros.RadioDelGiro   = 0.80;          % [m]
 Parametros.AnguloDelGiro  = deg2rad(120);  % [rad] cambio de rumbo
 Parametros.PeralteDelGiro = deg2rad(110);  % [rad] mas de 90 = over-banked
 Parametros.AvanceDelGiro  = 0;             % [m] 0 = giro a nivel
+
+% Peralte del over-banked turn: 'Constante' usa PeralteDelGiro; los relativos
+% lo refieren al centro instantaneo de rotacion (CIR) con un desvio constante:
+%   'RelativoAlCentroDeCurvatura'  U a DesvioDePeralteDelGiro del centro de curvatura
+%   'RelativoALaFuerza'            U a DesvioDePeralteDelGiro de la fuerza especifica
+Parametros.ModoDePeralteDelGiro   = 'Constante';
+Parametros.DesvioDePeralteDelGiro = 0;   % [rad] positivo = mas volcado hacia adentro
+
+% Comun a los cuatro elementos: el peralte siempre alineado al CIR, con una de
+% sus dos definiciones (excluyentes). Pisan el peralte propio del elemento.
+% Ver PeralteDelElemento.
+Parametros.PeralteAlineadoAlCentroDeCurvatura = false;   % U apunta al centro de curvatura (psi = 0)
+Parametros.PeralteAlineadoALaFuerza           = false;   % U sigue a la fuerza especifica (Gy nula en el riel)
 
 % Sentido comun a helice, over-banked turn y cualquier giro futuro. El dive
 % loop lo usa para elegir hacia que lado desalinea la curvatura cuando

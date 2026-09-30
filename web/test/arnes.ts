@@ -13,16 +13,23 @@ import { AjustarParametros, ParametrosPorDefecto } from '../src/nucleo/parametro
 import type { ModoCurvatura, NombreDeElemento, Parametros } from '../src/nucleo/tipos';
 
 export const CASOS: Record<string, { elemento: NombreDeElemento; modo: ModoCurvatura; ajustes: Partial<Parametros> }> = {
-  'loop-clotoide': { elemento: 'LoopVertical', modo: 'Clotoide', ajustes: {} },
+  'loop-arcocircular': { elemento: 'LoopVertical', modo: 'ArcoCircular', ajustes: {} },
   'loop-gconstante': { elemento: 'LoopVertical', modo: 'FuerzaGConstante', ajustes: {} },
   'loop-normativa': { elemento: 'LoopVertical', modo: 'GNormativaMaxima', ajustes: {} },
   'loop-anconstante': { elemento: 'LoopVertical', modo: 'AceleracionNormalConstante', ajustes: {} },
-  'helice-clotoide': { elemento: 'Helice', modo: 'Clotoide', ajustes: {} },
+  'helice-arcocircular': { elemento: 'Helice', modo: 'ArcoCircular', ajustes: {} },
   'helice-normativa': { elemento: 'Helice', modo: 'GNormativaMaxima', ajustes: {} },
-  'obt-clotoide': { elemento: 'OverBankedTurn', modo: 'Clotoide', ajustes: { AnguloDelGiro: (240 * Math.PI) / 180 } },
+  'obt-arcocircular': { elemento: 'OverBankedTurn', modo: 'ArcoCircular', ajustes: { AnguloDelGiro: (240 * Math.PI) / 180 } },
   'obt-normativa': { elemento: 'OverBankedTurn', modo: 'GNormativaMaxima', ajustes: { AnguloDelGiro: (240 * Math.PI) / 180 } },
-  'diveloop-clotoide': { elemento: 'DiveLoop', modo: 'Clotoide', ajustes: {} },
+  'diveloop-arcocircular': { elemento: 'DiveLoop', modo: 'ArcoCircular', ajustes: {} },
   'diveloop-normativa': { elemento: 'DiveLoop', modo: 'GNormativaMaxima', ajustes: {} },
+  // Modo Clotoide de verdad y peralte referido al CIR (GenerarGoldenFiles.m).
+  'loop-clotoide': { elemento: 'LoopVertical', modo: 'Clotoide', ajustes: {} },
+  'obt-clotoide': { elemento: 'OverBankedTurn', modo: 'Clotoide', ajustes: { AnguloDelGiro: (240 * Math.PI) / 180 } },
+  'obt-alineado-centro': { elemento: 'OverBankedTurn', modo: 'ArcoCircular', ajustes: { AnguloDelGiro: (240 * Math.PI) / 180, PeralteAlineadoAlCentroDeCurvatura: true } },
+  'obt-alineado-fuerza': { elemento: 'OverBankedTurn', modo: 'ArcoCircular', ajustes: { AnguloDelGiro: (240 * Math.PI) / 180, PeralteAlineadoALaFuerza: true } },
+  'obt-relativo-fuerza': { elemento: 'OverBankedTurn', modo: 'ArcoCircular', ajustes: { AnguloDelGiro: (240 * Math.PI) / 180, ModoDePeralteDelGiro: 'RelativoALaFuerza', DesvioDePeralteDelGiro: (10 * Math.PI) / 180 } },
+  'helice-alineado-fuerza': { elemento: 'Helice', modo: 'ArcoCircular', ajustes: { PeralteAlineadoALaFuerza: true } },
 };
 
 export function cargarGolden(caso: string): Contrato.Layout {
@@ -51,7 +58,7 @@ export function reconstruirCaso(caso: string): Contrato.Layout {
 /** Reconstruye el circuito de DemoLayout.m. */
 export function reconstruirCircuito(): Contrato.Layout {
   const Parametros = ParametrosPorDefecto();
-  Parametros.ModoCurvatura = 'Clotoide';
+  Parametros.ModoCurvatura = 'ArcoCircular';
   Parametros.MetodoDeAcoplamiento = 'A';
   Parametros.CalcularVelocidadMinima = false;
   Parametros.RadioDelLoop = 0.3;
@@ -146,6 +153,11 @@ export function compararLayouts(golden: Contrato.Layout, port: Contrato.Layout):
         }
       });
     }
+    // El bloque normativo entero (eventos, reversiones de 7.1.6, elipses, onsets), hoja por hoja.
+    for (const [ruta, valor] of hojasNumericas(eg.criterios.normativo, `${prefijo}criterios.normativo`)) {
+      const otro = hojasNumericas(ep.criterios.normativo, `${prefijo}criterios.normativo`).get(ruta);
+      diferencias.push(compararColumnas(ruta, [valor], [otro === undefined ? null : otro]));
+    }
     for (const [clave, valor] of Object.entries(eg.estadoSalida)) {
       const otro = (ep.estadoSalida as unknown as Record<string, unknown>)[clave];
       diferencias.push(compararColumnas(`${prefijo}estadoSalida.${clave}`, ([] as (number | null)[]).concat(valor as number), ([] as (number | null)[]).concat(otro as number)));
@@ -157,4 +169,16 @@ export function compararLayouts(golden: Contrato.Layout, port: Contrato.Layout):
     diferencias.push(compararColumnas(`resumenLayout.${clave}`, ([] as (number | null)[]).concat(valor as number), ([] as (number | null)[]).concat(otro as number)));
   }
   return diferencias;
+}
+
+/** Hojas numericas (o null) de un objeto, por ruta; los textos y logicos se comparan aparte. */
+function hojasNumericas(objeto: unknown, prefijo: string, salida = new Map<string, number | null>()): Map<string, number | null> {
+  if (objeto === null || typeof objeto === 'number') {
+    salida.set(prefijo, objeto as number | null);
+  } else if (Array.isArray(objeto)) {
+    objeto.forEach((v, i) => hojasNumericas(v, `${prefijo}[${i}]`, salida));
+  } else if (typeof objeto === 'object' && objeto !== undefined) {
+    for (const [clave, v] of Object.entries(objeto as Record<string, unknown>)) hojasNumericas(v, `${prefijo}.${clave}`, salida);
+  }
+  return salida;
 }

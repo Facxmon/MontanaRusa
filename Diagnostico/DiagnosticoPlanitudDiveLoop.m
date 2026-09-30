@@ -6,7 +6,7 @@
 % curvatura del riel queda con una componente lateral sostenida en todo el
 % arco, que es por definicion una trayectoria que abandona el plano.
 %
-% Se corre el mismo dive loop en Clotoide y en FuerzaGConstante (ninguno
+% Se corre el mismo dive loop en ArcoCircular y en FuerzaGConstante (ninguno
 % persigue Gy) y en GNormativaMaxima, y se mide la desviacion del plano con
 % algo cuantitativo: el valor singular mas chico de PuntosRiel centrado,
 % que es la distancia RMS al mejor plano por minimos cuadrados, y la
@@ -23,7 +23,7 @@ addpath(genpath(fullfile(fileparts(mfilename('fullpath')), '..', 'GeneradorDeEle
 
 PosicionInicial  = [0, 0, 1.00];   % [m]
 VelocidadInicial = 4.60;           % [m/s]
-Modos = {'Clotoide', 'FuerzaGConstante', 'GNormativaMaxima'};
+Modos = {'ArcoCircular', 'FuerzaGConstante', 'GNormativaMaxima'};
 
 fprintf('%-18s %-10s %10s %10s %10s %10s %10s %10s %10s %10s\n', 'Modo', 'Sentido', 'RMS plano', 'max plano', 'sigma3/1', ...
         'inclin.', 'psi max', 'peralte fin', 'y salida', 'Gy max');
@@ -56,7 +56,7 @@ end
 
 fprintf(['\nLectura. "RMS plano" y "max plano" son la distancia del riel a su mejor plano: si son del\n' ...
          'orden del paso de generacion (%.1f mm) o menores, el giro es PLANO en ese modo. "inclin." es\n' ...
-         'cuanto se aparta ese plano de la vertical. En Clotoide y FuerzaGConstante tienen que dar\n' ...
+         'cuanto se aparta ese plano de la vertical. En ArcoCircular y FuerzaGConstante tienen que dar\n' ...
          'plano y vertical: si no, hay un bug en el armado del plano. En GNormativaMaxima el giro\n' ...
          'tambien es plano, pero el plano esta inclinado psi respecto de la vertical: con el carro\n' ...
          'invertido a roll fijo, la unica forma de darle a la curvatura una componente lateral\n' ...

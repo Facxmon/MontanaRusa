@@ -6,7 +6,8 @@
 import type { Vec3 } from './matematica';
 import type { CurvaNormativa } from './norma';
 
-export type ModoCurvatura = 'AceleracionNormalConstante' | 'Clotoide' | 'FuerzaGConstante' | 'GNormativaMaxima';
+export type ModoCurvatura = 'AceleracionNormalConstante' | 'ArcoCircular' | 'Clotoide' | 'FuerzaGConstante' | 'GNormativaMaxima';
+export type ModoDePeralte = 'Constante' | 'RelativoAlCentroDeCurvatura' | 'RelativoALaFuerza';
 export type MetodoDeAcoplamiento = 'A' | 'B' | 'Ambos';
 export type SentidoDelGiro = 'Derecha' | 'Izquierda';
 export type PuntoDeVerificacion = 'Heartline' | 'Cabeza';
@@ -31,6 +32,10 @@ export interface Parametros {
   AnguloDelGiro: number;
   PeralteDelGiro: number;
   AvanceDelGiro: number;
+  ModoDePeralteDelGiro: ModoDePeralte;
+  DesvioDePeralteDelGiro: number;
+  PeralteAlineadoAlCentroDeCurvatura: boolean;
+  PeralteAlineadoALaFuerza: boolean;
   SentidoDelGiro: SentidoDelGiro;
   RadioDeReferencia: number;
   InclinacionHelicoidalImpuesta: number | null;
@@ -108,6 +113,9 @@ export interface Receta {
   CurvaLimiteGz: CurvaNormativa;
   CurvaLimiteGy?: CurvaNormativa;
   SentidoDeGy?: 1 | -1;
+  /** PeralteDelElemento.m: como se para el carro respecto del CIR. */
+  AlineacionDelPeralte?: 'Constante' | 'CentroDeCurvatura' | 'Fuerza';
+  DesvioDelPeralte?: number;
 }
 
 /** Contrato de Estado (EstadoInicial.m). */
@@ -282,6 +290,8 @@ export interface Diagnostico {
   FactorLongitudTransicion: number;
   OnsetVerticalGenerado: number;
   OnsetLateralGenerado: number;
+  /** Desalineo maximo entre el eje del carro y la fuerza con el peralte alineado a la fuerza (0 si no). */
+  ResidualAlineacionPeralte: number;
   PerfilVelocidad: { Arco: Float64Array; Velocidad: Float64Array };
   TiempoDeRecorrido: Float64Array;
   GArribaHeartline: Float64Array;
@@ -350,6 +360,39 @@ export interface EventoSostenido {
   PicoG: number;
 }
 
+/** 7.1.6: reversiones entre eventos sostenidos de signo opuesto en X o Y (ReversionesSostenidas). */
+export interface Reversion {
+  /** Tiempo de prototipo entre picos del par mas rapido que toca el elemento; Infinity si no hay pares. */
+  TiempoPicoAPicoMinimo: number;
+  /** true si algun par que toca el elemento tiene menos de 0.2 s entre picos: el limite cae al 50 %. */
+  Reducida: boolean;
+  /** Del evento critico (el de mayor exceso entre los reducidos que tocan el elemento); NaN si no hay. */
+  TiempoPicoAPico: number;
+  PicoG: number;
+  DuracionReal: number;
+  LimiteReducido: number;
+  Exceso: number;
+}
+
+/**
+ * Linea de tiempo continua del layout para la norma (SerieNormativaDelLayout.m):
+ * G de todos los elementos concatenadas sin repetir los nodos de los empalmes,
+ * con el tiempo en PROTOTIPO. `Elemento` (base 0) dice cual se esta verificando.
+ */
+export interface ContextoNormativo {
+  TiempoPrototipo: Float64Array;
+  Gx: Float64Array;
+  Gy: Float64Array;
+  Gz: Float64Array;
+  /** [primero, ultimo] (base 0, inclusivos) de cada elemento, con el nodo del empalme de entrada. */
+  Rango: Array<[number, number]>;
+  /** Nodos dentro de una ventana de 7.1.7.1 (rige MasGzReducido). */
+  Reducida: boolean[];
+  /** Nodos de un evento -Gz de mas de 3 s de prototipo. */
+  EnAirtimeLargo: boolean[];
+  Elemento: number;
+}
+
 export interface Normativo {
   FactorTiempo: number;
   DuracionModelo: number;
@@ -361,6 +404,8 @@ export interface Normativo {
   Gy: EventoSostenido;
   MasGx: EventoSostenido;
   MenosGx: EventoSostenido;
+  ReversionGx: Reversion;
+  ReversionGy: Reversion;
   Elipse: { ValorMaximoGyGz: number; ValorMaximoGxGz: number; ValorMaximoGxGy: number; Semiejes: Vec3 };
   OnsetDeCarga: number;
   OnsetNormativoReal: number;

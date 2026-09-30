@@ -11,7 +11,7 @@ import {
   type CurvaNormativa,
 } from '../src/nucleo/norma';
 
-const CASOS = ['loop-clotoide', 'loop-normativa', 'helice-normativa', 'obt-normativa', 'diveloop-normativa', 'circuito-demolayout'];
+const CASOS = ['loop-arcocircular', 'loop-normativa', 'helice-normativa', 'obt-normativa', 'diveloop-normativa', 'circuito-demolayout'];
 const cargar = (caso: string) =>
   analizarLayout(readFileSync(fileURLToPath(new URL(`../../golden/${caso}.json`, import.meta.url)), 'utf8'));
 

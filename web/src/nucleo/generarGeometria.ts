@@ -2,7 +2,9 @@
 // cuatro elementos. Misma estructura que el original (tres lazos: ajuste
 // de longitudes e inclinacion, correccion de cierre por secante, marcha RK4
 // por sub-tramos) para poder leerlos lado a lado. Los indices de los
-// sub-tramos son base 0.
+// sub-tramos son base 0. Incluye el modo Clotoide (RecorrerClotoide) y el
+// peralte alineado a la fuerza (CompletarRollAlineado; el roll lo calcula
+// RollHaciaLaFuerza en integrador.ts).
 
 import {
   AgregarNodo,
@@ -15,7 +17,7 @@ import {
   RegistroVacio,
 } from './basicos';
 import { CurvaturaDelModo, type Reloj } from './curvaturaDelModo';
-import { DerivadaDeVia, IntegrarTramo, PuntoCinematico, type Contexto, type VectorDeEstado } from './integrador';
+import { AlEjeDeLaFuerza, DerivadaDeVia, IntegrarTramo, PuntoCinematico, type Contexto, type PeralteHaciaLaFuerza, type VectorDeEstado } from './integrador';
 import { EPS, cruz, cumsum, gradiente, maximo, modulo, norma, normaDe, normalizar, punto as productoPunto, resta, type Vec3 } from './matematica';
 import { ObjetivoNormativoPorNiveles } from './objetivoNormativo';
 import type { Diagnostico, Escala, Estado, ObjetivoNormativo, Parametros, Punto, Receta, Registro, SubTramo, Track } from './tipos';
@@ -35,6 +37,9 @@ interface Plan {
   Inclinacion: number;
   LongitudAcondicionamiento: number;
   FuncionRoll: (Arco: number, AnguloGirado: number) => [number, number, number];
+  PeralteHaciaLaFuerza: PeralteHaciaLaFuerza | null;
+  /** Rampas de curvatura C2 (quinticas): con el peralte alineado a la fuerza. */
+  RampasC2: boolean;
 }
 
 interface Recorrido {
@@ -107,9 +112,29 @@ export function GenerarGeometria(
     Inclinacion: 0,
     LongitudAcondicionamiento: 0,
     FuncionRoll: () => [0, 0, 0],
+    // Peralte alineado a la fuerza: el roll sale del estado (RollHaciaLaFuerza).
+    PeralteHaciaLaFuerza:
+      Receta.AlineacionDelPeralte === 'Fuerza'
+        ? { Desvio: Receta.DesvioDelPeralte ?? 0, ArcoInicio: EstadoEntrada.LongitudAcumulada, LongitudTransicion: 0 }
+        : null,
+    RampasC2: Receta.AlineacionDelPeralte === 'Fuerza',
   };
 
-  const DeltaRollCrudo = Beta + Receta.RollDelElemento - EstadoEntrada.AnguloRoll;
+  let DeltaRollCrudo = Beta + Receta.RollDelElemento - EstadoEntrada.AnguloRoll;
+  if (Receta.AlineacionDelPeralte === 'Fuerza') {
+    // Alineado a la fuerza: la transicion de entrada va al roll alineado del estado de entrada (mas el desvio).
+    const RollBaseTransporte = Beta + Receta.RollDelElemento;
+    const v2 = EstadoEntrada.Velocidad ** 2;
+    const kv = EstadoEntrada.VectorCurvatura;
+    const Fuerza: Vec3 = [v2 * kv[0], v2 * kv[1], v2 * kv[2] + Parametros.Gravedad];
+    const FuerzaArriba = productoPunto(Fuerza, VersorArribaTransporteEntrada);
+    const FuerzaLateral = productoPunto(Fuerza, VersorLateralTransporteEntrada);
+    let RollAlineado = RollBaseTransporte + (Receta.DesvioDelPeralte ?? 0);
+    if (Math.hypot(FuerzaArriba, FuerzaLateral) >= 0.05 * Parametros.Gravedad) {
+      RollAlineado += AlEjeDeLaFuerza(Math.atan2(FuerzaLateral, FuerzaArriba) - RollBaseTransporte);
+    }
+    DeltaRollCrudo = RollAlineado - EstadoEntrada.AnguloRoll;
+  }
   const DeltaRoll = Math.abs(DeltaRollCrudo) <= Math.PI + 1e-9 ? DeltaRollCrudo : AjustarAngulo(DeltaRollCrudo);
   const RollObjetivo = EstadoEntrada.AnguloRoll + DeltaRoll;
 
@@ -142,6 +167,7 @@ export function GenerarGeometria(
     const InclinacionDelPlan = Inclinacion;
     Plan.FuncionRoll = (Arco, AnguloGirado) =>
       PerfilRollDelElemento(Arco, AnguloGirado, EstadoEntrada, RollObjetivo, LongitudAcondicionamiento, InclinacionDelPlan);
+    if (Plan.PeralteHaciaLaFuerza) Plan.PeralteHaciaLaFuerza = { ...Plan.PeralteHaciaLaFuerza, LongitudTransicion: Plan.LongitudAcondicionamiento };
 
     AjusteCierre = 0;
     for (IteracionCierre = 1; IteracionCierre <= Parametros.MaxIteracionesCierre; IteracionCierre++) {
@@ -152,12 +178,18 @@ export function GenerarGeometria(
     }
     if (IteracionCierre > Parametros.MaxIteracionesCierre) IteracionCierre = Parametros.MaxIteracionesCierre;
 
+    if (Plan.PeralteHaciaLaFuerza) CompletarRollAlineado(Recorrido.Registro, Parametros);
     CompletarAceleracionRoll(Recorrido.Registro, Parametros);
     [OnsetMedido, OnsetLateralMedido] = OnsetDelRecorrido(Recorrido.Registro);
     if (Recorrido.Aviso !== '') break;
 
-    const OnsetRelativo = Math.max(OnsetMedido / Escala.OnsetMaximo[2], OnsetLateralMedido / Escala.OnsetMaximo[1]);
-    const FactorSiguiente = (1 + Parametros.MargenDeOnset) * FactorLongitud * OnsetRelativo;
+    // Con el peralte alineado a la fuerza el onset lateral lo pone el roll de las rampas y escala como 1/L^3.
+    let OnsetRelativoLateral = OnsetLateralMedido / Escala.OnsetMaximo[1];
+    if (Plan.PeralteHaciaLaFuerza) OnsetRelativoLateral = OnsetRelativoLateral ** (1 / 3);
+    const OnsetRelativo = Math.max(OnsetMedido / Escala.OnsetMaximo[2], OnsetRelativoLateral);
+    let FactorSiguiente = (1 + Parametros.MargenDeOnset) * FactorLongitud * OnsetRelativo;
+    // Con el roll alineado el onset lateral medido no es suave en el largo de las rampas: el factor solo crece.
+    if (Plan.PeralteHaciaLaFuerza) FactorSiguiente = Math.max(FactorSiguiente, FactorLongitud);
 
     let InclinacionSiguiente = Inclinacion;
     if (AjustarInclinacion && Recorrido.LongitudDelGiro > 0) {
@@ -238,6 +270,7 @@ export function GenerarGeometria(
     FactorLongitudTransicion: FactorLongitud,
     OnsetVerticalGenerado: OnsetMedido,
     OnsetLateralGenerado: OnsetLateralMedido,
+    ResidualAlineacionPeralte: ResidualDeAlineacion(Registro, Plan, Parametros),
     PerfilVelocidad: { Arco, Velocidad: Float64Array.from(Registro.VelocidadCentroDeMasa) },
     TiempoDeRecorrido: Float64Array.from(Registro.Tiempo),
     GArribaHeartline: Float64Array.from(Registro.GArribaHeartline),
@@ -284,6 +317,7 @@ function RecorrerElemento(Plan: Plan, AjusteCierre: number): Recorrido {
     AnguloGiradoDeReferencia: 0,
     FuncionCurvatura: () => [0, 0],
     FuncionAnguloDeCurvatura: () => Plan.Beta + Plan.Receta.DesfasajeDeCurvatura,
+    PeralteHaciaLaFuerza: Plan.PeralteHaciaLaFuerza,
   };
 
   let y: VectorDeEstado = [...Plan.EstadoInicialY];
@@ -358,6 +392,12 @@ function RecorrerElemento(Plan: Plan, AjusteCierre: number): Recorrido {
     Recorrido.CurvaturaResidualFueraPlano = productoPunto(VectorCurvatura, Recorrido.EjeDeLaHelice);
   }
 
+  if (Parametros.ModoCurvatura === 'Clotoide') {
+    ({ y, Arco } = RecorrerClotoide(Recorrido, Plan, Contexto, y, Arco, AjusteCierre, CurvaturaInicialArco, AnguloDeCurvatura, AnguloGiradoInicio));
+    if (Recorrido.Aviso === '') CerrarRecorrido(Recorrido, Plan, Arco, ArcoInicioLoop);
+    return Recorrido;
+  }
+
   // --- ClotoideEntrada ---
   const [, PuntoInicial] = DerivadaDeVia(Arco, y, Contexto);
   const [CurvaturaObjetivo, AnguloObjetivo] = CurvaturaDelModo(PuntoInicial, Parametros, Plan.Escala, PuntoInicial.Tiempo, Plan.Receta);
@@ -416,7 +456,7 @@ function RecorrerElemento(Plan: Plan, AjusteCierre: number): Recorrido {
     const ArcoInicio = Arco;
     Contexto.FuncionCurvatura = (P) =>
       ProyectarCurvatura(
-        RampaDeSalida(FraccionDeTramo(P.Arco, ArcoInicio, LongitudSalida), CurvaturaFinArco, DerivadaCurvaturaFinArco, LongitudSalida),
+        RampaDeSalida(FraccionDeTramo(P.Arco, ArcoInicio, LongitudSalida), CurvaturaFinArco, DerivadaCurvaturaFinArco, LongitudSalida, Plan.RampasC2),
         AnguloDeCurvatura(P) + DesvioFinArco,
       );
     const Indice = Recorrido.Registro.NumeroDeNodos;
@@ -427,12 +467,119 @@ function RecorrerElemento(Plan: Plan, AjusteCierre: number): Recorrido {
     Recorrido.SubTramos.push({ Nombre: 'ClotoideSalida', IndiceInicio: Indice, IndiceFin: Recorrido.Registro.NumeroDeNodos - 1 });
   }
 
+  CerrarRecorrido(Recorrido, Plan, Arco, ArcoInicioLoop);
+  return Recorrido;
+}
+
+/** Residual de cierre, desplazamiento lateral y longitud del giro. */
+function CerrarRecorrido(Recorrido: Recorrido, Plan: Plan, Arco: number, ArcoInicioLoop: number): void {
   const TangenteFinal = Recorrido.PuntoFinal!.VersorTangente;
   const AnguloMedido = Math.atan2(productoPunto(TangenteFinal, Recorrido.DireccionDeGiro), productoPunto(TangenteFinal, Recorrido.TangenteArco));
   Recorrido.ResidualCierre = AjustarAngulo(AnguloMedido - Plan.Receta.GiroObjetivo);
   Recorrido.DesplazamientoLateral = productoPunto(resta(Recorrido.PuntoFinal!.Posicion, Recorrido.PosicionArco), Recorrido.EjeDeLaHelice);
   Recorrido.LongitudDelGiro = Arco - ArcoInicioLoop;
-  return Recorrido;
+}
+
+// ========================= clotoide simetrica =============================
+/**
+ * Modo Clotoide (RecorrerClotoide de GenerarGeometria.m): el giro entero es
+ * una clotoide simetrica. La curvatura sube lineal en el arco desde K0 hasta
+ * la del pico Kp (radio del elemento) en la mitad del giro y baja lineal
+ * hasta cero; kappa lineal en s es kappa^2 lineal en el angulo girado:
+ *   subida:  kappa = K0 + A*(s - s0),        A = (Kp^2 - K0^2)/Giro
+ *   bajada:  kappa^2 = 2*B*(Giro - theta),   B = Kp^2/Giro
+ */
+function RecorrerClotoide(
+  Recorrido: Recorrido, Plan: Plan, Contexto: Contexto, y: VectorDeEstado, Arco: number, AjusteCierre: number,
+  CurvaturaInicial: number, AnguloDeCurvatura: (P: Punto) => number, AnguloGiradoInicio: number,
+): { y: VectorDeEstado; Arco: number } {
+  const Parametros = Plan.Parametros;
+  const Giro = Plan.Receta.GiroObjetivo - AjusteCierre;
+  const [, PuntoInicial] = DerivadaDeVia(Arco, y, Contexto);
+  const [CurvaturaPico] = CurvaturaDelModo(PuntoInicial, Parametros, Plan.Escala, PuntoInicial.Tiempo, Plan.Receta);
+  const K0 = Math.max(CurvaturaInicial, 0);
+  const PendienteSubida = (CurvaturaPico ** 2 - K0 ** 2) / Giro;
+  const PendienteBajada = CurvaturaPico ** 2 / Giro;
+  const Girado = (P: Punto) => P.AnguloGirado - AnguloGiradoInicio;
+
+  // --- ClotoideEntrada: sube ---
+  {
+    const ArcoInicio = Arco;
+    Contexto.FuncionCurvatura = (P) => ProyectarCurvatura(Math.min(K0 + PendienteSubida * (P.Arco - ArcoInicio), CurvaturaPico), AnguloDeCurvatura(P));
+    const ArcoQueFalta = (P: Punto): number => (CurvaturaPico - P.Curvatura) / Math.max(PendienteSubida, EPS);
+    const Indice = Recorrido.Registro.NumeroDeNodos;
+    if (PendienteSubida > 0) ({ y, Arco } = IntegrarTramo(Recorrido.Registro, y, Arco, Contexto, 50, ArcoQueFalta));
+    Recorrido.LongitudClotoideEntrada = Arco - ArcoInicio;
+    Recorrido.SubTramos.push({ Nombre: 'ClotoideEntrada', IndiceInicio: Indice, IndiceFin: Recorrido.Registro.NumeroDeNodos - 1 });
+    if (y[12]! <= 0) {
+      TerminarSinEnergia(Recorrido, y, Arco, Contexto, 'la clotoide de entrada');
+      return { y, Arco };
+    }
+  }
+
+  // --- ClotoideSalida: baja hasta cero ---
+  {
+    Contexto.FuncionCurvatura = (P) => ProyectarCurvatura(Math.sqrt(Math.max(2 * PendienteBajada * (Giro - Girado(P)), 0)), AnguloDeCurvatura(P));
+    const ArcoQueFalta = (P: Punto): number => P.Curvatura / PendienteBajada;
+    const ArcoInicio = Arco;
+    const Indice = Recorrido.Registro.NumeroDeNodos;
+    ({ y, Arco } = IntegrarTramo(Recorrido.Registro, y, Arco, Contexto, 50, ArcoQueFalta));
+    Recorrido.LongitudClotoideSalida = Arco - ArcoInicio;
+    if (y[12]! <= 0) {
+      TerminarSinEnergia(Recorrido, y, Arco, Contexto, 'la clotoide de salida');
+      return { y, Arco };
+    }
+    const [, PuntoFinal] = DerivadaDeVia(Arco, y, Contexto);
+    Recorrido.PuntoFinal = PuntoFinal;
+    AgregarNodo(Recorrido.Registro, PuntoFinal);
+    Recorrido.SubTramos.push({ Nombre: 'ClotoideSalida', IndiceInicio: Indice, IndiceFin: Recorrido.Registro.NumeroDeNodos - 1 });
+  }
+  return { y, Arco };
+}
+
+// ========================= peralte alineado a la fuerza ===================
+/** Desalineo maximo [rad] entre el eje del carro y la fuerza del riel, pasado el acondicionamiento. */
+function ResidualDeAlineacion(Registro: Registro, Plan: Plan, Parametros: Parametros): number {
+  if (!Plan.PeralteHaciaLaFuerza) return 0;
+  const g = Parametros.Gravedad;
+  const Desde = Plan.EstadoEntrada.LongitudAcumulada + Plan.LongitudAcondicionamiento;
+  let Residual = 0;
+  for (let i = 0; i < Registro.NumeroDeNodos; i++) {
+    if (Registro.Arco[i]! < Desde) continue;
+    const v2 = Registro.Velocidad[i]! ** 2;
+    const k = Registro.VectorCurvatura[i]!;
+    const Fuerza: Vec3 = [v2 * k[0], v2 * k[1], v2 * k[2] + g];
+    const FuerzaArriba = productoPunto(Fuerza, Registro.VersorArribaCarro[i]!);
+    const FuerzaLateral = productoPunto(Fuerza, Registro.VersorLateral[i]!);
+    if (Math.hypot(FuerzaArriba, FuerzaLateral) < 0.05 * g) continue;
+    Residual = Math.max(Residual, Math.abs(AlEjeDeLaFuerza(Math.atan2(FuerzaLateral, FuerzaArriba)) + Plan.PeralteHaciaLaFuerza.Desvio));
+  }
+  return Residual;
+}
+
+/**
+ * CompletarRollAlineado: phi' del peralte alineado sobre la polilinea, y los
+ * terminos de la G que dependen de phi' (-b*v^2*phi'^2/g en Gz, b*a_t*phi'/g
+ * en Gy con a_t = -g*Tz), en los dos brazos.
+ */
+function CompletarRollAlineado(Registro: Registro, Parametros: Parametros): void {
+  const n = Registro.NumeroDeNodos;
+  if (n < 3) return;
+  const g = Parametros.Gravedad;
+  const d = Parametros.DistanciaHeartline;
+  const b = BrazoDeVerificacion(Parametros);
+  const Nueva = DerivadaPorArco(Registro.AnguloRoll, Registro.Arco);
+  for (let i = 0; i < n; i++) {
+    const Vieja = Registro.VelocidadRoll[i]!;
+    const v2 = Registro.Velocidad[i]! ** 2;
+    const Tz = Registro.VersorTangente[i]![2];
+    const DeltaCuadrado = Nueva[i]! ** 2 - Vieja ** 2;
+    Registro.GArribaHeartline[i] = Registro.GArribaHeartline[i]! - (d * v2 * DeltaCuadrado) / g;
+    Registro.GArribaVerificacion[i] = Registro.GArribaVerificacion[i]! - (b * v2 * DeltaCuadrado) / g;
+    Registro.GLateralHeartline[i] = Registro.GLateralHeartline[i]! - d * Tz * (Nueva[i]! - Vieja);
+    Registro.GLateralVerificacion[i] = Registro.GLateralVerificacion[i]! - b * Tz * (Nueva[i]! - Vieja);
+    Registro.VelocidadRoll[i] = Nueva[i]!;
+  }
 }
 
 // ========================= auxiliares =====================================
@@ -452,7 +599,7 @@ function ProyectarCurvatura(Curvatura: number, AnguloDeCurvatura: number): [numb
 }
 
 function CurvaturaDeAcondicionamiento(P: Punto, ArcoInicio: number, Plan: Plan): [number, number] {
-  const Fraccion = Smoothstep(FraccionDeTramo(P.Arco, ArcoInicio, Plan.LongitudAcondicionamiento));
+  const Fraccion = Smoothstep(FraccionDeTramo(P.Arco, ArcoInicio, Plan.LongitudAcondicionamiento), Plan.RampasC2);
   const CurvaturaPerpendicular = (1 - Fraccion) * Plan.CurvaturaPerpendicular;
   const Angulo = Plan.Beta + Plan.Receta.DesfasajeDeCurvatura;
   return [
@@ -467,20 +614,22 @@ function CurvaturaDelModoProyectada(P: Punto, Plan: Plan, TiempoReferencia: Relo
 }
 
 function MezclaDeClotoide(P: Punto, ArcoInicio: number, Longitud: number, CurvaturaInicial: number, Plan: Plan, TiempoReferencia: Reloj): [number, number] {
-  const Fraccion = Smoothstep(FraccionDeTramo(P.Arco, ArcoInicio, Longitud));
+  const Fraccion = Smoothstep(FraccionDeTramo(P.Arco, ArcoInicio, Longitud), Plan.RampasC2);
   const [ArribaObjetivo, LateralObjetivo] = CurvaturaDelModoProyectada(P, Plan, TiempoReferencia);
   const AnguloEntrada = P.AnguloRoll + P.AnguloCurvaturaDesdeArriba;
   const [ArribaInicial, LateralInicial] = ProyectarCurvatura(CurvaturaInicial, AnguloEntrada);
   return [(1 - Fraccion) * ArribaInicial + Fraccion * ArribaObjetivo, (1 - Fraccion) * LateralInicial + Fraccion * LateralObjetivo];
 }
 
-function Smoothstep(u: number): number {
-  return u * u * (3 - 2 * u);
+/** 3u^2 - 2u^3; con C2 (peralte alineado a la fuerza), el quintico 6u^5 - 15u^4 + 10u^3 (ver Smoothstep de GenerarGeometria.m). */
+function Smoothstep(u: number, C2 = false): number {
+  return C2 ? u ** 3 * (u * (6 * u - 15) + 10) : u * u * (3 - 2 * u);
 }
 
-function RampaDeSalida(Fraccion: number, CurvaturaInicial: number, DerivadaInicial: number, Longitud: number): number {
+function RampaDeSalida(Fraccion: number, CurvaturaInicial: number, DerivadaInicial: number, Longitud: number, C2 = false): number {
   const u = Fraccion;
   const Pendiente = PendienteAcotada(DerivadaInicial, CurvaturaInicial, Longitud);
+  if (C2) return CurvaturaInicial * (1 - 10 * u ** 3 + 15 * u ** 4 - 6 * u ** 5) + Pendiente * (u - 6 * u ** 3 + 8 * u ** 4 - 3 * u ** 5);
   return CurvaturaInicial * (2 * u ** 3 - 3 * u ** 2 + 1) + Pendiente * (u ** 3 - 2 * u ** 2 + u);
 }
 
@@ -499,7 +648,7 @@ function DerivadaCurvaturaEnElUltimoTramo(P: Punto, Registro: Registro, Parametr
 function GiroDeLaRampaDeSalida(P: Punto, Registro: Registro, Plan: Plan): number {
   const Longitud = LongitudDeClotoidePorEjes(P.Velocidad, P.CurvaturaArribaCarro, P.CurvaturaLateralCarro, Plan.Onset, Plan.Parametros);
   const Pendiente = PendienteAcotada(DerivadaCurvaturaEnElUltimoTramo(P, Registro, Plan.Parametros), P.Curvatura, Longitud);
-  return Longitud * (0.5 * P.Curvatura + Pendiente / 12);
+  return Longitud * (0.5 * P.Curvatura + Pendiente / (Plan.RampasC2 ? 10 : 12));
 }
 
 function LongitudDeClotoidePorEjes(Velocidad: number, DeltaCurvaturaArriba: number, DeltaCurvaturaLateral: number, Onset: Vec3, Parametros: Parametros): number {

@@ -20,6 +20,7 @@ import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import { formatearNumero, SIN_DATO, type Notacion } from '../paneles/formato';
 import { fuenteDeCanvas, tema } from '../tema';
+import { acompanantesDe, valorEnElCursor } from './series';
 
 /**
  * Colores simbolicos de las series: series.ts no toca el DOM (se testea en
@@ -38,6 +39,17 @@ export interface SerieDeFigura {
   trazos?: number[];
   /** No aparece en la leyenda (referencias repetidas, bordes de bandas). */
   ocultarEnLeyenda?: boolean;
+  /**
+   * Indice (base 0 dentro de `series`) de la serie de la leyenda a la que
+   * acompana: la mitad inferior de una referencia simetrica. Prender o
+   * apagar esa serie en la leyenda prende o apaga tambien esta, y ninguna
+   * otra: cada toggle controla solo sus lineas.
+   */
+  acompanaA?: number;
+  /** Aclaracion de la serie: se ve al pasar el puntero por su fila de la leyenda. */
+  ayuda?: string;
+  /** Dibuja los puntos (p. ej. un punto marcado solo, sin linea). */
+  puntos?: boolean;
 }
 
 export interface Franja {
@@ -156,8 +168,12 @@ export function opcionesDeFigura(datos: DatosDeFigura, tamano: TamanoDeFigura, c
         width: (s.ancho ?? 1.6) * escala,
         dash: s.trazos?.map((d) => d * escala),
         spanGaps: datos.unirHuecos ?? false,
-        points: { show: false },
-        value: (_u: uPlot, v: number | null) => (v === null ? SIN_DATO : formatearNumero(v, datos.decimales, datos.notacion)),
+        points: s.puntos ? { show: true, size: 9 * escala, fill: colorDeSerie(s.color) } : { show: false },
+        // Con A/B, el valor de la serie en la abscisa del cursor aunque el punto sea del otro diseno.
+        value: (_u: uPlot, v: number | null, _serie: number, indice: number | null) => {
+          const valor = indice === null || indice === undefined ? v : valorEnElCursor(datos, s.valores, indice);
+          return valor === null ? SIN_DATO : formatearNumero(valor, datos.decimales, datos.notacion);
+        },
       })),
     ],
     bands: (datos.bandas ?? []).map((b) => ({ series: [b.superior + 1, b.inferior + 1] as [number, number], fill: colorDeSerie(b.color) })),
@@ -344,6 +360,16 @@ export class Figura {
     opciones.hooks = {
       ...opciones.hooks,
       setCursor: [(u: uPlot) => this.dibujarTooltip(u)],
+      // La leyenda solo lista la mitad superior de cada referencia simetrica:
+      // el toggle se propaga a sus acompanantes (series.ts, acompanantesDe).
+      setSeries: [
+        (u: uPlot, indice: number | null, opciones: uPlot.Series) => {
+          if (indice === null || indice < 1 || opciones.show === undefined) return;
+          for (const j of acompanantesDe(datos.series, indice - 1)) {
+            if (u.series[j + 1]?.show !== opciones.show) u.setSeries(j + 1, { show: opciones.show });
+          }
+        },
+      ],
       setScale: [
         (u: uPlot, clave: string) => {
           if (clave === 'x') this.avisarDelRango(u);
@@ -353,11 +379,13 @@ export class Figura {
     this.grafico = new uPlot(opciones, [datos.x, ...datos.series.map((s) => s.valores)], this.contenedor);
     this.contenedor.append(this.tooltip);
 
-    // Leyenda: las series marcadas como ocultas no se listan.
+    // Leyenda: las series marcadas como ocultas no se listan, y las que
+    // traen ayuda la muestran al pasar el puntero (el patron `title` de la UI).
     const filas = this.contenedor.querySelectorAll<HTMLElement>('.u-legend .u-series');
     datos.series.forEach((s, i) => {
       const fila = filas[i + 1];
       if (fila && s.ocultarEnLeyenda) fila.style.display = 'none';
+      if (fila && s.ayuda) fila.title = s.ayuda;
     });
 
     const u = this.grafico;
@@ -399,13 +427,8 @@ export class Figura {
       filaDeTooltip(`${datos.etiquetaX}: ${typeof x === 'number' ? formatearNumero(x, datos.decimalesX) : SIN_DATO}`),
       ...datos.series.flatMap((serie) => {
         if (serie.ocultarEnLeyenda) return [];
-        const valor = serie.valores[indice];
-        return [
-          filaDeSerie(
-            serie,
-            valor === null || valor === undefined ? SIN_DATO : formatearNumero(valor, datos.decimales, datos.notacion),
-          ),
-        ];
+        const valor = valorEnElCursor(datos, serie.valores, indice);
+        return [filaDeSerie(serie, valor === null ? SIN_DATO : formatearNumero(valor, datos.decimales, datos.notacion))];
       }),
     );
     this.tooltip.hidden = false;

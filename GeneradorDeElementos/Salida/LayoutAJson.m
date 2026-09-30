@@ -61,7 +61,7 @@ end
 
 %% ========================= bloques del contrato ===========================
 function Meta = MetaAJson()
-    Meta.versionContrato  = '1.0.0';
+    Meta.versionContrato  = '1.2.0';
     Meta.generadoPor      = 'matlab';
     Meta.versionGenerador = VersionDelRepo();
     Meta.generadoEn       = char(datetime('now', 'TimeZone', 'UTC', ...

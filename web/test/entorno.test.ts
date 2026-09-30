@@ -22,7 +22,7 @@ describe('entorno de la escena (piso, caja disponible)', () => {
   });
 
   it('la caja se pinta como falla exactamente cuando el criterio del JSON falla', () => {
-    for (const caso of ['loop-normativa', 'circuito-demolayout', 'helice-clotoide']) {
+    for (const caso of ['loop-normativa', 'circuito-demolayout', 'helice-arcocircular']) {
       const layout = cargar(caso);
       const disponible = layout.parametros.valores.boundingBoxDisponible as [[number, number], [number, number], [number, number]];
       const criterios = layout.elementos.flatMap((e) => [...e.criterios.previos, ...e.criterios.posteriores]).filter((c) => /bounding box/i.test(c.nombre));

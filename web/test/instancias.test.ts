@@ -38,8 +38,8 @@ describe('dos helices distintas en la misma secuencia', () => {
     expect(a!.nodos.numeroDeNodos).not.toBe(b!.nodos.numeroDeNodos);
   });
 
-  it('el contrato lleva ajustes solo en la instancia que piso algo, y version 1.1.0', () => {
-    expect(layout.meta.versionContrato).toBe('1.1.0');
+  it('el contrato lleva ajustes solo en la instancia que piso algo, y version 1.2.0', () => {
+    expect(layout.meta.versionContrato).toBe('1.2.0');
     expect(layout.elementos[0]!.ajustes).toEqual({ radioDeLaHelice: 0.5 });
     expect(layout.elementos[0]!.inertes).toBeUndefined();
     expect(layout.elementos[1]!.ajustes).toBeUndefined();
@@ -64,7 +64,7 @@ describe('inertes', () => {
     const { Inertes } = AjustarParametros(d.parametros, d.secuencia[0]!.ajustes, 'LoopVertical');
     expect(Inertes.map((n) => textoDeInerte(n, d.parametros.ModoCurvatura, 'LoopVertical'))).toEqual([
       'ajustaste RadioDeLaHelice pero el elemento LoopVertical no lo consume',
-      'ajustaste FuerzaGObjetivo pero el modo Clotoide no lo consume',
+      'ajustaste FuerzaGObjetivo pero el modo ArcoCircular no lo consume',
     ]);
   });
 
@@ -91,7 +91,7 @@ describe('reduccion a MATLAB: con ajustes vacios, calcularLayout es el arnes', (
   function entradaDelCaso(caso: string): EntradaDeDiseno {
     if (caso === 'circuito-demolayout') {
       const parametros = ParametrosPorDefecto();
-      parametros.ModoCurvatura = 'Clotoide';
+      parametros.ModoCurvatura = 'ArcoCircular';
       parametros.MetodoDeAcoplamiento = 'A';
       parametros.CalcularVelocidadMinima = false;
       parametros.RadioDelLoop = 0.3;
@@ -129,8 +129,8 @@ describe('reduccion a MATLAB: con ajustes vacios, calcularLayout es el arnes', (
     }, 120000);
   }
 
-  it('loop-clotoide: bit a bit igual a lo que reconstruye el arnes (salvo la fecha de generacion)', () => {
+  it('loop-arcocircular: bit a bit igual a lo que reconstruye el arnes (salvo la fecha de generacion)', () => {
     const sinFecha = (l: ReturnType<typeof reconstruirCaso>) => ({ ...l, meta: { ...l.meta, generadoEn: '' } });
-    expect(sinFecha(calcularLayout(entradaDelCaso('loop-clotoide'), 'port'))).toEqual(sinFecha(reconstruirCaso('loop-clotoide')));
+    expect(sinFecha(calcularLayout(entradaDelCaso('loop-arcocircular'), 'port'))).toEqual(sinFecha(reconstruirCaso('loop-arcocircular')));
   });
 });

@@ -25,8 +25,11 @@ export function CurvaturaDelModo(Punto: Punto, Parametros: Parametros, Escala: E
 
   let ObjetivoSinGravedad: number;
   switch (Parametros.ModoCurvatura) {
+    case 'ArcoCircular':
     case 'Clotoide': {
-      // Radio de referencia del PASAJERO: el riel va d*c mas afuera.
+      // Radio de referencia del PASAJERO: el riel va d*c mas afuera. En
+      // Clotoide es la curvatura del pico, en la mitad del giro: la ley
+      // lineal la arma generarGeometria (RecorrerClotoide).
       const RadioRiel = Math.max(Parametros.RadioDeReferencia + d * Coseno, 0.5 * Parametros.RadioDeReferencia);
       return [1 / RadioRiel, AnguloDesdeArriba];
     }

@@ -7,12 +7,12 @@
 import { deg2rad } from './matematica';
 import type { Declaracion, ModoCurvatura, NombreDeElemento, NombreDeParametro, Parametros } from './tipos';
 
-export const MODOS_DE_CURVATURA: ModoCurvatura[] = ['AceleracionNormalConstante', 'Clotoide', 'FuerzaGConstante', 'GNormativaMaxima'];
+export const MODOS_DE_CURVATURA: ModoCurvatura[] = ['AceleracionNormalConstante', 'ArcoCircular', 'Clotoide', 'FuerzaGConstante', 'GNormativaMaxima'];
 
 export function ParametrosPorDefecto(): Parametros {
   const Parametros: Omit<Parametros, 'SeparacionDePatas'> = {
     // 1. modo de curvatura
-    ModoCurvatura: 'Clotoide',
+    ModoCurvatura: 'ArcoCircular',
     AceleracionNormalObjetivo: 20,
     FuerzaGObjetivo: 3.0,
     SemianchoDeSuavizadoNormativo: 0.05,
@@ -29,6 +29,10 @@ export function ParametrosPorDefecto(): Parametros {
     AnguloDelGiro: deg2rad(120),
     PeralteDelGiro: deg2rad(110),
     AvanceDelGiro: 0,
+    ModoDePeralteDelGiro: 'Constante',
+    DesvioDePeralteDelGiro: 0,
+    PeralteAlineadoAlCentroDeCurvatura: false,
+    PeralteAlineadoALaFuerza: false,
     SentidoDelGiro: 'Derecha',
     RadioDeReferencia: 0.21,
     InclinacionHelicoidalImpuesta: null,
@@ -107,9 +111,14 @@ export function ParametrosDelModo(Modo: ModoCurvatura): { Lista: Declaracion[]; 
         Lista: ternas(['AceleracionNormalObjetivo', 'm/s^2', 'aceleracion centripeta del pasajero sobre U, sin la gravedad, constante en el arco']),
         Nota: '',
       };
-    case 'Clotoide':
+    case 'ArcoCircular':
       return {
         Lista: ternas(['RadioDeReferencia', 'm', 'radio de la heartline en el arco (el riel va d*cos(psi) mas afuera); lo pisa cada elemento con su radio']),
+        Nota: '',
+      };
+    case 'Clotoide':
+      return {
+        Lista: ternas(['RadioDeReferencia', 'm', 'radio minimo de la heartline, en la mitad del giro (el riel va d*cos(psi) mas afuera); lo pisa cada elemento con su radio']),
         Nota: '',
       };
     case 'FuerzaGConstante':
@@ -163,7 +172,7 @@ export function ParametrosGenerales(): Declaracion[] {
     ['AltoCarro', 'm', 'alto del carro del modelo'],
     ['AnchoVia', 'm', 'trocha (ancho de via) del modelo'],
     ['Holgura', 'm', 'margen sobre la envolvente del carro para el chequeo de interferencia'],
-    ['DiametroRueda', 'm', 'diametro de rueda; piso impuesto por el rodamiento minimo'],
+    ['DiametroRueda', 'm', 'diametro de rueda; piso impuesto por el rodamiento minimo. No entra en ningun calculo: la rodadura va en los Crr y la inercia de las ruedas no se modela'],
     ['AreaFrontal', 'm^2', 'area frontal proyectada de un carro'],
     ['DistanciaHeartline', 'm', 'del riel al centro de masa del pasajero (heartline), medida sobre U; define la via'],
     ['DistanciaHeartlineACabeza', 'm', 'de la heartline a la cabeza del pasajero, medida sobre U; solo informativa salvo verificacion en Cabeza'],
@@ -193,41 +202,51 @@ export const DECLARACIONES_DE_ELEMENTOS: Record<NombreDeElemento, Declaracion[]>
     [
       'RadioDelLoop',
       'm',
-      'radio de la heartline en la cuspide: en Clotoide es el que se impone; en los modos dependientes de v es solo la longitud caracteristica de Froude y el radio real es una salida',
+      'radio de la heartline en la cuspide: en ArcoCircular es el que se impone y en Clotoide es el radio minimo; en los modos dependientes de v es solo la longitud caracteristica de Froude y el radio real es una salida',
     ],
     ['RollExtraDelLoop', 'rad', 'roll adicional del carro respecto de la vertical (0 = loop vertical estandar)'],
     ['SeparacionDePatas', 'm', 'avance sobre el eje de la helice: separa la pata de salida de la de entrada'],
+    ['PeralteAlineadoAlCentroDeCurvatura', '-', 'logico: U apunta siempre al centro de curvatura del riel (CIR como centro de curvatura); excluyente con PeralteAlineadoALaFuerza'],
+    ['PeralteAlineadoALaFuerza', '-', 'logico: U sigue siempre a la fuerza especifica total, centripeta mas gravedad (CIR como direccion de la fuerza: Gy nula en el riel); excluyente con la anterior'],
   ),
   DiveLoop: ternas(
     [
       'RadioDelDiveLoop',
       'm',
-      'radio de la heartline en la cuspide: en Clotoide es el que se impone; en los modos dependientes de v es solo la longitud caracteristica de Froude y el radio real es una salida',
+      'radio de la heartline en la cuspide: en ArcoCircular es el que se impone y en Clotoide es el radio minimo; en los modos dependientes de v es solo la longitud caracteristica de Froude y el radio real es una salida',
     ],
     ['SeparacionDelDiveLoop', 'm', 'avance sobre el eje de la helice (0: gira solo pi y no se cruza consigo mismo)'],
     ['SentidoDelGiro', '-', 'lado hacia el que se desalinea la curvatura para el Gy objetivo en modo GNormativaMaxima'],
+    ['PeralteAlineadoAlCentroDeCurvatura', '-', 'logico: U apunta siempre al centro de curvatura del riel (CIR como centro de curvatura); excluyente con PeralteAlineadoALaFuerza'],
+    ['PeralteAlineadoALaFuerza', '-', 'logico: U sigue siempre a la fuerza especifica total, centripeta mas gravedad (CIR como direccion de la fuerza: Gy nula en el riel); excluyente con la anterior'],
   ),
   Helice: ternas(
     [
       'RadioDeLaHelice',
       'm',
-      'radio de la heartline en el arco: en Clotoide es el que se impone; en los modos dependientes de v es solo la longitud caracteristica de Froude y el radio real es una salida',
+      'radio de la heartline en el arco: en ArcoCircular es el que se impone y en Clotoide es el radio minimo; en los modos dependientes de v es solo la longitud caracteristica de Froude y el radio real es una salida',
     ],
     ['VueltasDeLaHelice', '-', 'vueltas del giro (puede no ser entero)'],
     ['AvanceDeLaHelice', 'm', 'cuanto sube (positivo) o baja (negativo) sobre el eje vertical'],
     ['PeralteDeLaHelice', 'rad', 'roll del carro respecto de la vertical en el arco'],
     ['SentidoDelGiro', '-', "'Derecha' o 'Izquierda'"],
+    ['PeralteAlineadoAlCentroDeCurvatura', '-', 'logico: U apunta siempre al centro de curvatura del riel (CIR como centro de curvatura); excluyente con PeralteAlineadoALaFuerza'],
+    ['PeralteAlineadoALaFuerza', '-', 'logico: U sigue siempre a la fuerza especifica total, centripeta mas gravedad (CIR como direccion de la fuerza: Gy nula en el riel); excluyente con la anterior'],
   ),
   OverBankedTurn: ternas(
     [
       'RadioDelGiro',
       'm',
-      'radio de la heartline en el arco: en Clotoide es el que se impone; en los modos dependientes de v es solo la longitud caracteristica de Froude y el radio real es una salida',
+      'radio de la heartline en el arco: en ArcoCircular es el que se impone y en Clotoide es el radio minimo; en los modos dependientes de v es solo la longitud caracteristica de Froude y el radio real es una salida',
     ],
     ['AnguloDelGiro', 'rad', 'cambio de rumbo'],
-    ['PeralteDelGiro', 'rad', 'roll del carro respecto de la vertical en el arco (mas de pi/2 = over-banked)'],
+    ['PeralteDelGiro', 'rad', "roll del carro respecto de la vertical en el arco (mas de pi/2 = over-banked); solo con ModoDePeralteDelGiro = 'Constante'"],
     ['AvanceDelGiro', 'm', 'cuanto sube o baja sobre el eje vertical (0 = giro a nivel)'],
     ['SentidoDelGiro', '-', "'Derecha' o 'Izquierda'"],
+    ['ModoDePeralteDelGiro', '-', "'Constante' (PeralteDelGiro), 'RelativoAlCentroDeCurvatura' o 'RelativoALaFuerza': desvio constante respecto del CIR"],
+    ['DesvioDePeralteDelGiro', 'rad', 'desvio del peralte respecto del CIR en los modos relativos; positivo = mas volcado hacia adentro del giro'],
+    ['PeralteAlineadoAlCentroDeCurvatura', '-', 'logico: U apunta siempre al centro de curvatura del riel (CIR como centro de curvatura); excluyente con PeralteAlineadoALaFuerza'],
+    ['PeralteAlineadoALaFuerza', '-', 'logico: U sigue siempre a la fuerza especifica total, centripeta mas gravedad (CIR como direccion de la fuerza: Gy nula en el riel); excluyente con la anterior'],
   ),
 };
 
@@ -244,6 +263,7 @@ export const OPCIONES_DE_PARAMETRO: Partial<Record<NombreDeParametro, readonly s
   SentidoDelGiro: ['Derecha', 'Izquierda'],
   PuntoDeVerificacionNormativa: ['Heartline', 'Cabeza'],
   MetodoDeAcoplamiento: ['A', 'B', 'Ambos'],
+  ModoDePeralteDelGiro: ['Constante', 'RelativoAlCentroDeCurvatura', 'RelativoALaFuerza'],
 };
 
 /** Los que en MATLAB admiten [] (vacio = derivar): aca valen null, y el contrato los escribe como []. */

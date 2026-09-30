@@ -44,7 +44,7 @@ Ver la tabla completa en [`NOMENCLATURA.md`](NOMENCLATURA.md).
 3. [Marco de referencia](#3-marco-de-referencia)
 4. [Sub-tramos](#4-sub-tramos)
    - [4.1 Cómo se construye la geometría, paso a paso](#41-cómo-se-construye-la-geometría-paso-a-paso)
-5. [Los cuatro modos de curvatura](#5-los-cuatro-modos-de-curvatura)
+5. [Los modos de curvatura](#5-los-modos-de-curvatura)
 6. [Los dos métodos de acoplamiento](#6-los-dos-métodos-de-acoplamiento)
 7. [Presupuesto de onset y longitudes de transición](#7-presupuesto-de-onset-y-longitudes-de-transición)
 8. [Chequeos de factibilidad](#8-chequeos-de-factibilidad)
@@ -63,7 +63,7 @@ Ver la tabla completa en [`NOMENCLATURA.md`](NOMENCLATURA.md).
 ```matlab
 run('DemoElemento.m')         % un elemento en detalle: reporte y gráficos
 run('DemoLayout.m')           % los cuatro elementos encadenados en un circuito
-run('TestsValidacion.m')      % dieciseis tests, termina con error si alguno falla
+run('TestsValidacion.m')      % diecinueve tests, termina con error si alguno falla
 ```
 
 Todos los parámetros de entrada están agrupados en [`ParametrosPorDefecto.m`](GeneradorDeElementos/ParametrosPorDefecto.m), en cuatro bloques: **parámetros del modo de curvatura**, **parámetros geométricos de cada elemento**, **criterios de aceptación** y parámetros generales. Los que dependen de investigación pendiente (disponibilidad de rodamientos en Argentina, tolerancia de la impresora) están marcados como **SIN CERRAR** ahí mismo. La tabla completa de esos parámetros, con símbolo, unidad y sección donde se usan, está en [`NOMENCLATURA.md` bloque 3](NOMENCLATURA.md#3-parámetros-de-entrada-del-generador-parametrospordefectom).
@@ -196,7 +196,7 @@ La tabla siguiente es la referencia rápida de las tres capas; después va el de
 
 Es lo único que de verdad avanza la vía. `IntegrarTramo` la corre sub-tramo por sub-tramo (acondicionamiento, clotoide de entrada, arco principal, clotoide de salida) y en cada uno repite, mientras quede arco por recorrer:
 
-1. **Evaluar el punto actual** (`PuntoCinematico` + `DerivadaDeVia`): con el estado $y$ de ese nodo se arma el marco del carro (roll aplicado sobre el marco de transporte), se evalúa la curvatura objetivo de ese sub-tramo — constante, mezcla suave, o según el modo elegido (ver [§5](#5-los-cuatro-modos-de-curvatura)) — y con eso las cargas $G$ y la resistencia al avance. La velocidad que entra a este cálculo es `Punto.VelocidadParaCurvatura`: la velocidad real de la marcha en el método A, o el perfil de velocidad supuesto (interpolado) en el método B — ver [§6](#6-los-dos-métodos-de-acoplamiento).
+1. **Evaluar el punto actual** (`PuntoCinematico` + `DerivadaDeVia`): con el estado $y$ de ese nodo se arma el marco del carro (roll aplicado sobre el marco de transporte), se evalúa la curvatura objetivo de ese sub-tramo — constante, mezcla suave, o según el modo elegido (ver [§5](#5-los-modos-de-curvatura)) — y con eso las cargas $G$ y la resistencia al avance. La velocidad que entra a este cálculo es `Punto.VelocidadParaCurvatura`: la velocidad real de la marcha en el método A, o el perfil de velocidad supuesto (interpolado) en el método B — ver [§6](#6-los-dos-métodos-de-acoplamiento).
 2. **Registrar el nodo** (`AgregarNodo`) con todos esos campos: posición, los tres versores, curvatura, roll, velocidad, G's, pérdidas, ángulo girado, tiempo.
 3. **Dar el paso** (`PasoRK4`): integra el sistema completo posición + marco + energía con Runge-Kutta 4 sobre un paso $\Delta s$ = `Parametros.PasoGeneracion` (o menos, si es el último paso del sub-tramo). El vector de estado tiene 15 componentes — posición, tangente, arriba y lateral del transporte paralelo, $v^2$, ángulo girado, tiempo — y sus derivadas son:
    $$\frac{d\mathbf{r}}{ds}=\mathbf{T},\quad \frac{d\mathbf{T}}{ds}=\kappa_U\mathbf{U}_{pt}+\kappa_L\mathbf{L}_{pt},\quad \frac{d\mathbf{U}_{pt}}{ds}=-\kappa_U\mathbf{T},\quad \frac{d\mathbf{L}_{pt}}{ds}=-\kappa_L\mathbf{T}$$
@@ -211,7 +211,7 @@ La curvatura que entra en el paso 1 depende de en qué sub-tramo está la marcha
 |---|---|
 | `AcondicionamientoEntrada` | rampa smoothstep de la componente perpendicular hacia 0, manteniendo la paralela |
 | `ClotoideEntrada` | mezcla $(1-f)\kappa_0 + f\,\kappa_{modo}$, con $f = 3u^2 - 2u^3$ y $u$ = fracción recorrida del sub-tramo |
-| `ArcoPrincipal` | $\kappa_{modo}$ evaluada en cada paso según la tabla de modos ([§5](#5-los-cuatro-modos-de-curvatura)) |
+| `ArcoPrincipal` | $\kappa_{modo}$ evaluada en cada paso según la tabla de modos ([§5](#5-los-modos-de-curvatura)) |
 | `ClotoideSalida` | Hermite cúbica desde $(\kappa_{fin}, d\kappa/ds_{fin})$ del arco principal hasta $(0, 0)$ |
 
 #### 4.1.2 Capa 2 — cierre del loop: corrección por secante
@@ -224,7 +224,7 @@ Esa predicción no es exacta cuando $\kappa$ depende de $v$ (modos 1, 3 y 4), as
 2. Medir el residual de cierre real, sobre la rotación de la tangente **dentro del plano de giro** (no el ángulo 3D total, que con torsión no vuelve exactamente al objetivo aunque el giro sí haya cerrado).
 3. Si $\lvert$residual$\rvert <$ `Parametros.TolCierrePitch`, listo. Si no, `AjusteCierre += residual` (paso de secante) y se repite, hasta `Parametros.MaxIteracionesCierre`.
 
-En modo `Clotoide` converge en la primera vuelta porque $\kappa$ no depende de $v$ y la predicción ya es exacta.
+En modo `ArcoCircular` converge en la primera vuelta porque $\kappa$ no depende de $v$ y la predicción ya es exacta.
 
 #### 4.1.3 Capa 1 — ajuste de forma: longitud de transición y torsión helicoidal
 
@@ -253,7 +253,7 @@ El **Método B** no es parte del proceso principal: es una envoltura *alternativ
 
 El perfil viaja entre iteraciones como interpolante `pchip` precompilado (no lineal: la interpolación lineal metería un error de orden $\Delta s^2$ en los estadios intermedios de RK4 y separaría artificialmente los dos métodos). Las **longitudes** de las transiciones (capa 1) siempre se dimensionan con la velocidad real de la marcha, nunca con el perfil supuesto — lo que el perfil supuesto rompe es sólo el lazo de la *ley de curvatura*, no el dimensionamiento geométrico.
 
-Es más caro (~6 s contra ~2 s de A, ver [§6](#6-los-dos-métodos-de-acoplamiento)) precisamente porque cada una de sus iteraciones vuelve a correr las tres capas del proceso principal completas. En modo `Clotoide` converge en 2 iteraciones y da resultado idéntico bit a bit al método A, porque ahí $\kappa$ no depende de $v$ (§6 tiene el detalle de esa equivalencia).
+Es más caro (~6 s contra ~2 s de A, ver [§6](#6-los-dos-métodos-de-acoplamiento)) precisamente porque cada una de sus iteraciones vuelve a correr las tres capas del proceso principal completas. En modo `ArcoCircular` converge en 2 iteraciones y da resultado idéntico bit a bit al método A, porque ahí $\kappa$ no depende de $v$ (§6 tiene el detalle de esa equivalencia).
 
 ### 4.2 El loop no es plano
 
@@ -282,20 +282,21 @@ El arco se corta cuando el ángulo ya girado más lo que va a girar la clotoide 
 
 ---
 
-## 5. Los cuatro modos de curvatura
+## 5. Los modos de curvatura
 
 Cada modo fija qué G quiere en el **pasajero** (punto de verificación, brazo $b$ del riel) y `CurvaturaDelModo` devuelve la curvatura **del riel** que la produce, por transporte inverso ([`memoria_de_calculo.md` §3.6](memoria_de_calculo.md#36-transporte-inverso-la-curvatura-del-riel-para-una-g-del-pasajero)). Qué parámetros consume cada modo lo declara `ParametrosDelModo`, en el código.
 
 | Modo | Objetivo en el pasajero | ¿Depende de $v$? | Parámetros |
 |---|---|---|---|
 | `AceleracionNormalConstante` | centrípeta sobre $\mathbf U$ igual a $a_n$ | sí | `AceleracionNormalObjetivo` |
-| `Clotoide` | radio de la heartline igual a $R_{ref}$ (el riel va a $R_{ref}+d\cos\psi$) | no | `RadioDeReferencia` (lo pisa cada elemento con su radio) |
+| `ArcoCircular` | radio de la heartline igual a $R_{ref}$ (el riel va a $R_{ref}+d\cos\psi$). **Antes se llamaba `Clotoide`**: clotoides son sus transiciones, no el arco | no | `RadioDeReferencia` (lo pisa cada elemento con su radio) |
+| `Clotoide` | clotoide simétrica de verdad: $\kappa$ lineal en $s$ hasta $1/(R_{ref}+d\cos\psi)$ en la mitad del giro y de vuelta a cero, sin arco de radio constante (§5.2) | no | `RadioDeReferencia` (radio mínimo) |
 | `FuerzaGConstante` | $G_z = G_{obj}$, constante en el arco | sí | `FuerzaGObjetivo` |
 | `GNormativaMaxima` | $G_z = G_{lim}(\text{duración})$, la curva de la norma que declara la **Receta** del elemento | sí | ninguno global: `Receta.CurvaLimiteGz` (y `Receta.CurvaLimiteGy` en el dive loop, §5.1) |
 
 En el caso plano sin roll el transporte inverso se reduce a $\kappa_{riel} = g(G_{obj}-U_z)\,/\,[v^2\cos\psi\,(1 - b\kappa\cos\psi)]$, con $\psi$ el ángulo entre la curvatura y $\mathbf U$: la proyección $\cos\psi$ es la que hace que una hélice peraltada 55° necesite $1/\sin 55° = 1.22$ veces más curvatura que un loop para la misma $G_z$, y que una curva sin peraltar no pueda generar $+G_z$ (hay una guarda explícita).
 
-$U_z$ (ver definición en [§3](#3-marco-de-referencia)) es la componente vertical del versor "arriba del carro", que en un loop plano vale $\cos\theta$. En la cúspide vale $-1$ y ahí $v$ es mínima, así que $\kappa$ es máxima: de ahí sale la **forma de lágrima** del loop clotoide real. Con el modo `Clotoide` sale un círculo, que es lo correcto para ese modo.
+$U_z$ (ver definición en [§3](#3-marco-de-referencia)) es la componente vertical del versor "arriba del carro", que en un loop plano vale $\cos\theta$. En la cúspide vale $-1$ y ahí $v$ es mínima, así que $\kappa$ es máxima: de ahí sale la **forma de lágrima** del loop clotoide real. Con el modo `ArcoCircular` sale un círculo, que es lo correcto para ese modo; con `Clotoide`, una gota por la ley de curvatura y no por la dinámica (§5.2).
 
 **Qué curva persigue cada elemento en `GNormativaMaxima`.** Loop vertical, hélice y over-banked turn apuntan al $+G_z$ máximo de la Fig. 10 (`'MasGzTodas'`). El dive loop apunta además a un $G_y$ objetivo (§5.1). La curva es parte de la Receta que arma cada `ElementoXxx.m`, no un parámetro global: un elemento solo no puede perseguir "todas las G máximas", y el nombre anterior del modo (`GMaximas`) sugería eso.
 
@@ -325,11 +326,43 @@ Dos ecuaciones, dos incógnitas ($\kappa_u$, $\kappa_l$), resueltas punto a punt
 
 $$G_{y,obj} = \min\!\Big(G_{y,lim}(\text{dur}),\; 1.1\,G_{y,lim}(0.2)\,\sqrt{1 - \big(G_{z,lim}(\text{dur})/1.1\,G_{z,lim}(0.2)\big)^2}\Big) - \text{TolObjetivoDeG}$$
 
-Con $G_z = 6.0$ eso da $3.3\sqrt{1-0.826} - 0.05 = 1.33$ G; el $G_z$ que entra en la elipse es el objetivo real del modo (5.95 con los defaults, ya con la tolerancia descontada, ver [§5](#5-los-cuatro-modos-de-curvatura)), y con él sale 1.38 G. El descuento de `TolObjetivoDeG` es para que el error admitido del transporte inverso no saque el punto de la elipse, cuyo chequeo es estricto. Derivación y tabla en [`memoria_de_calculo.md` §5.8](memoria_de_calculo.md#58-gy-objetivo-del-dive-loop-prioridad-al-gz-y-elipse-de-7151).
+Con $G_z = 6.0$ eso da $3.3\sqrt{1-0.826} - 0.05 = 1.33$ G; el $G_z$ que entra en la elipse es el objetivo real del modo (5.95 con los defaults, ya con la tolerancia descontada, ver [§5](#5-los-modos-de-curvatura)), y con él sale 1.38 G. El descuento de `TolObjetivoDeG` es para que el error admitido del transporte inverso no saque el punto de la elipse, cuyo chequeo es estricto. Derivación y tabla en [`memoria_de_calculo.md` §5.8](memoria_de_calculo.md#58-gy-objetivo-del-dive-loop-prioridad-al-gz-y-elipse-de-7151).
 
 **Onset lateral y compatibilidad.** El $\psi$ resuelto se superpone al roll de $\pi$ del dive loop: el sub-tramo de acondicionamiento (medio tonel, smoothstep quíntico) no se toca, y $\psi$ sólo actúa en el arco y sus clotoides. Para que el perfil no viole el presupuesto de onset lateral, las clotoides de entrada y salida se dimensionan ahora **por los dos ejes del carro** —cada componente de la curvatura con su presupuesto, manda la que pida más longitud— y la clotoide de salida conserva el desvío $\psi$ final del arco en vez de volver de golpe a la dirección de la Receta ([§7](#7-presupuesto-de-onset-y-longitudes-de-transición)). Si aun así el onset lateral se pasa, el chequeo posterior "Onset máximo de Gy" lo reporta. El giro sigue cerrando: `ResidualCierrePitch` contra `TolCierrePitch` es criterio como siempre. Si el sistema no tiene solución (objetivo de $G_z$ inalcanzable a esa velocidad), el criterio "Gz objetivo del modo alcanzado" falla con el motivo; el de $G_y$ tiene su propio criterio, "Gy objetivo del modo alcanzado", que además informa el sub-peralte máximo.
 
 Medido en el test 13 (v₀ = 6 m/s, defaults): $G_y$ objetivo 1.32 G alcanzado dentro de $10^{-4}$ G, sub-peralte hasta 10.7°, residual de cierre $10^{-5}$ rad, elipse en 0.988, onset lateral 17.8 de 21.1 G/s.
+
+Con el peralte alineado al CIR (§5.3) el dive loop deja de perseguir $G_y$: ese $G_y$ sale justamente de desalinear la curvatura de $\mathbf U$, que es lo contrario de alinearla.
+
+### 5.2 `Clotoide`: la clotoide simétrica de verdad
+
+Hasta el 2026-09-29 el modo `Clotoide` era un arco de radio constante (hoy `ArcoCircular`) y sus transiciones son rampas smoothstep/Hermite, no lineales (§7.8 de la memoria). El modo `Clotoide` nuevo es literal: **el elemento entero es una clotoide simétrica** (`RecorrerClotoide` en `GenerarGeometria.m`). La curvatura del riel sube linealmente con el arco desde la de entrada $K_0$ hasta $K_p = 1/(R_{ref}+d\cos\psi)$ en la mitad del giro, y baja linealmente hasta cero. No hay `ArcoPrincipal`: los sub-tramos son `ClotoideEntrada` (sube) y `ClotoideSalida` (baja).
+
+Como $d\theta/ds = \kappa$, $\kappa$ lineal en $s$ equivale a $\kappa^2$ lineal en el ángulo girado $\theta$, y eso fija las dos pendientes para que cada mitad gire $\Theta/2$:
+
+$$\text{subida: } \kappa = K_0 + A\,(s-s_0),\quad A = \frac{K_p^2-K_0^2}{\Theta};\qquad \text{bajada: } \kappa^2 = 2B\,(\Theta-\theta),\quad B = \frac{K_p^2}{\Theta}$$
+
+con $\Theta$ el giro objetivo menos la corrección de cierre. La subida se escribe en el arco (con $K_0 = 0$, la forma en $\theta$ no arranca: $\theta = 0$ es un punto fijo) y la bajada en $\theta$, que garantiza que el giro cierre exactamente con $\kappa = 0$. Las pendientes las fija la geometría, no el presupuesto de onset: el onset que resulte lo reporta la verificación. $d\kappa/ds$ salta en la entrada, en el pico y en la salida, y con roll helicoidal eso es un escalón de $G_y$ (§7.8 de la memoria): es el precio de la clotoide literal. Loop de 0.30 m a 5 m/s: dos mitades de 2.07 m con $|d\kappa/ds| = 1.46$ 1/m², residuo contra la recta $10^{-15}$ en la subida y $10^{-4}$ en la bajada, $G_z$ máxima 3.6 G (contra 6.4 G del arco circular de la misma cúspide).
+
+### 5.3 Peralte referido al centro instantáneo de rotación (CIR)
+
+`PeralteDelElemento.m` decide cómo se para el carro sobre la curva. El CIR tiene dos definiciones, las dos seleccionables:
+
+| Referencia | Qué alinea | Cómo se implementa |
+|---|---|---|
+| Centro de curvatura | $\mathbf U$ apunta al centro de curvatura del riel: $\psi = 0$ | roll constante igual al desfasaje de la curvatura (en un giro a nivel, 90°) |
+| Fuerza resultante | el **eje** del carro sigue a la fuerza específica del riel $v^2\boldsymbol\kappa + g\hat z$: $G_y$ de balance nula | el roll se calcula del estado en cada punto (`RollHaciaLaFuerza`) |
+
+- **Todos los elementos** tienen dos ticks excluyentes, `PeralteAlineadoAlCentroDeCurvatura` y `PeralteAlineadoALaFuerza`: el peralte siempre alineado con una definición o la otra. Pisan el peralte propio del elemento.
+- **El over-banked turn** tiene además `ModoDePeralteDelGiro`: `'Constante'` (el `PeralteDelGiro` de siempre), `'RelativoAlCentroDeCurvatura'` o `'RelativoALaFuerza'`, con un desvío constante `DesvioDePeralteDelGiro` respecto de esa referencia (positivo = más volcado hacia adentro). Con un desvío de 20° respecto del centro de curvatura sale el mismo roll que con 110° constantes.
+
+**Alineado a la fuerza, en detalle.** En cada punto, en el marco de transporte, $F_U = v^2\kappa_U + g\,U^t_z$ y $F_L = v^2\kappa_L + g\,L^t_z$, y el roll que pone el eje del carro sobre $\mathbf F$ es $\operatorname{atan2}(F_L, F_U)$, llevado a $(-\pi/2, \pi/2]$ alrededor del roll base (se alinea el eje, no el sentido: con $-G_z$ no se da vuelta el carro). El módulo de la curvatura depende del roll (por $\cos\psi$), así que se cierra con pocas pasadas de punto fijo. En el acondicionamiento se pasa del roll de entrada al alineado con el smoothstep quíntico, y la transición se dimensiona con el roll alineado del estado de entrada. Dentro del paso $\phi'$ y $\phi''$ son aproximados; sobre la polilínea se derivan del $\phi$ registrado y se corrigen los términos de la G que dependen de ellos (`CompletarRollAlineado` y `CompletarAceleracionRoll`).
+
+Tres consecuencias, las tres medidas:
+
+1. **Las rampas de curvatura pasan a ser C2** (smoothstep quíntico a la entrada, Hermite quíntica a la salida). Con el roll siguiendo a la fuerza, $\phi''$ hereda $\kappa''$, y con las rampas cúbicas $\kappa''$ salta en sus extremos: un escalón de $G_y$ en el pasajero ($b\,v^2\Delta\phi''/g$) y un onset medido sin cota, que hacía que el lazo de onset alargara las rampas sin fin.
+2. **El lazo de onset cambia en ese modo**: el onset lateral lo pone el roll de las rampas, que escala como $1/L^3$ (se realimenta con raíz cúbica, como `LongitudTransicionDeRoll`), y el factor sólo puede crecer. El onset medido salta de nodo con cambios mínimos de largo y el punto fijo oscilaba ±1 %; así se detiene en el primer largo que cumple, igual en MATLAB y en JS. Un solo factor alarga todas las transiciones: si la de roll pide más, también se alargan las de curvatura (el OBT relativo a la fuerza con 10° de desvío queda con 11 m de rampa de entrada).
+3. **La $G_y$ que queda es la dinámica del roll**, no el balance de fuerzas: $b\,(a_t\phi' + v^2\phi'')/g$. En el OBT de 240° a 5 m/s el desalineo de diseño es $6\cdot10^{-8}$ rad y la $G_y$ en el pasajero queda entre −0.23 y +0.33 G (contra −1.9 G con el peralte constante de 110°), casi toda en la rampa de salida, donde el carro se desperalta de 67° a 0 en 1.2 m.
 
 ---
 
@@ -342,11 +375,11 @@ En los modos que dependen de $v$, la forma depende de la velocidad, la velocidad
 | Cómo | una sola pasada; con $v_k$ conocida se calcula $\kappa_k$, se propaga con RK4 y se actualiza la energía | se supone un perfil $v(s)$, se genera con él, se obtiene el $v(s)$ resultante y se repite |
 | A favor | una pasada, sin criterio de convergencia que ajustar | separa la forma del perfil de velocidad, que es lo que hace falta para imponer un perfil de diseño o resolver hacia atrás |
 | En contra | la geometría queda atada a la marcha | hay que iterar; con modos muy sensibles a $v$ puede necesitar relajación |
-| Costo medido | ~2 s | ~6 s (2 iteraciones en modo clotoide, ~11 en los modos dependientes de $v$) |
+| Costo medido | ~2 s | ~6 s (2 iteraciones en modo ArcoCircular, ~11 en los modos dependientes de $v$) |
 
 El perfil supuesto viaja como **interpolante pchip precompilado**: con interpolación lineal, los estadios intermedios de RK4 metían un error de orden $\Delta s^2$ que separaba artificialmente los dos métodos.
 
-**Resultado de la comparación.** Los dos métodos son matemáticamente equivalentes en el punto fijo: la diferencia entre ellos es de costo de cómputo y de flexibilidad, no de resultado. En modo `Clotoide` dan resultados **idénticos bit a bit** y el método B converge en 2 iteraciones.
+**Resultado de la comparación.** Los dos métodos son matemáticamente equivalentes en el punto fijo: la diferencia entre ellos es de costo de cómputo y de flexibilidad, no de resultado. En modo `ArcoCircular` dan resultados **idénticos bit a bit** y el método B converge en 2 iteraciones.
 
 ---
 
@@ -421,7 +454,7 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 
 ## 11. Tests de validación
 
-`TestsValidacion.m` implementa **dieciséis** tests y termina con error si alguno falla. Todos pasan por la API pública de los elementos, para que lo que se verifica sea el mismo camino que usa el usuario.
+`TestsValidacion.m` implementa **diecinueve** tests y termina con error si alguno falla. Todos pasan por la API pública de los elementos, para que lo que se verifica sea el mismo camino que usa el usuario.
 
 | # | Test | Resultado típico |
 |---|---|---|
@@ -429,7 +462,7 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 | 2 | Curvatura impuesta contra recuperada de la polilínea | error relativo $7\times10^{-4}$ (límite $10^{-3}$; con rampas lineales era $10^{-5}$: el estimador de tres puntos tiene error $\propto h^2\,d^2\kappa/ds^2$, que en las rampas suaves es máximo donde $\kappa$ es chica) |
 | 3 | Residual del endpoint y desplazamiento lateral | tangente $8.8\times10^{-5}$, desplazamiento lateral dentro del 0.01 % del objetivo |
 | 4 | Continuidad en el empalme | los tres saltos exactamente 0 |
-| 5 | Equivalencia de métodos A y B en modo clotoide | diferencia exactamente 0 |
+| 5 | Equivalencia de métodos A y B en modo `ArcoCircular` | diferencia exactamente 0 |
 | 6 | Ortonormalidad del marco | desvío $8\times10^{-13}$ |
 | 7 | Cierre del loop de 360° | pitch final $-6\times10^{-5}$ rad; ángulo girado dentro de $6\times10^{-5}$ rad de $2\pi\cos\alpha$ |
 | 8 | Los cuatro elementos generan y encadenan (loop, over-banked turn, hélice, dive loop en secuencia) | peor residual de cierre y peor salto de empalme, ambos por debajo de tolerancia; velocidad final finita |
@@ -440,9 +473,12 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 | 13 | El dive loop alcanza su $G_y$ objetivo por sub-peralte | $\lvert G_y - \text{objetivo}\rvert < 10^{-4}$ G; sub-peralte hasta 10.7°; cierre $10^{-5}$ rad; elipse 7.1.5.1 en 0.988 y onset lateral pasan |
 | 14 | El factor de seguridad escala el objetivo del modo y no la verificación (`FactorDeSeguridadNormativo` = 1.25, loop y dive loop) |  arco = 6.0/1.25 − 0.05 = 4.75 G dentro de 0.002 G; criterios de objetivo pasan; semiejes de la elipse de §7.1.5.1 sin escalar |
 | 15 | El diseño es $C^2$ en roll: `LimiteDeDiseno` es $C^1$ y nunca supera la norma; el onset lateral del loop vertical no depende del paso de generación | objetivo 0 G por encima de la norma; el salto de pendiente numérica cae a 0.50 al refinar la grilla (0.5 = $C^1$); onset lateral 8.8 G/s a 2 mm y 9.1 G/s a 1 mm (2 %). Con rampas lineales daba 124 y 446 G/s |
-| 16 | El loop normativo de referencia (v₀ = 4.6 m/s, `RadioDelLoop` 0.11) cumple "+Gz (Fig. 10)" con el margen entero y su peralte en módulo es continuo | exceso −0.049 G (nivel crítico 5.36 G durante 1.30 s; antes del reloj por nivel: +0.36 G); áxima 5.951 G; arco de 3.9 s; lvert	ext{peralte}vert a 180° con un salto máximo de 4.3° entre nodos (antes saltaba 360° en la cúspide) |
+| 16 | El loop normativo de referencia (v₀ = 4.6 m/s, `RadioDelLoop` 0.11) cumple "+Gz (Fig. 10)" con el margen entero y su peralte en módulo es continuo | exceso −0.049 G (nivel crítico 5.95 G durante 0.20 s reales, contra el límite de evento corto; antes del reloj por nivel: +0.36 G); $G_z$ máxima 5.951 G; arco de 3.9 s; $\lvert\text{peralte}\rvert$ llega a 180° con un salto máximo de 4.3° entre nodos (antes saltaba 360° en la cúspide) |
+| 17 | El modo `Clotoide` es una clotoide de verdad: $\kappa$ lineal en el arco en cada mitad, pico $1/(R+d\cos\psi)$ y cierre con curvatura cero (loop de 0.30 m a 5 m/s) | residuo contra la recta $9.9\cdot10^{-5}$ 1/m; curvatura final 0; cierre $1.1\cdot10^{-9}$ rad; pico 3.0303 contra 3.0303 1/m |
+| 18 | Peralte alineado al centro de curvatura (OBT de 240° a nivel): $\psi$ nulo | $\lvert\psi\rvert$ máximo $6\cdot10^{-32}$ rad; peralte 90.0000° |
+| 19 | Peralte alineado a la fuerza (OBT de 240° a 5 m/s): $G_y$ de balance nula y onset dentro del presupuesto | desalineo de diseño $6.2\cdot10^{-8}$ rad; onset lateral 10.9 de 15.8 G/s, vertical 11.9 de 47.4 G/s; $\lvert G_y\rvert$ máxima en el pasajero 0.329 G (dinámica del roll, §5.3) |
 
-**Nota de discrepancia doc↔código corregida.** Una versión anterior de este documento decía en prosa "los ocho son ejecutables" pero la tabla sólo listaba siete filas, sin el test de encadenamiento. Se corrigió agregando la fila que faltaba. Hoy son **dieciséis**: los tests 9 y 10 se agregaron junto con el modelo de heartline de [§14](#14-el-modelo-de-heartline-tres-curvas), el 11 fija la hipótesis del eje de roll, el 12 es el que hubiera cazado el error de proyección de la hélice y el 13 cubre el $G_y$ del dive loop; el 14 verifica que `FactorDeSeguridadNormativo` escala el objetivo del modo y no la verificación; el 15 fija que el diseño es ^2 roll (rampas y objetivo ^1 onset lateral independiente del paso); el 16 es el caso de referencia de los dos bugs del reloj único y del signo del peralte en la cúspide ([§5](#5-los-cuatro-modos-de-curvatura) y [§12.3](#123-dos-ángulos-de-roll-distintos-y-sólo-uno-se-ve-en-la-vía)).
+**Nota de discrepancia doc↔código corregida.** Una versión anterior de este documento decía en prosa "los ocho son ejecutables" pero la tabla sólo listaba siete filas, sin el test de encadenamiento. Se corrigió agregando la fila que faltaba. Hoy son **diecinueve**: los tests 9 y 10 se agregaron junto con el modelo de heartline de [§14](#14-el-modelo-de-heartline-tres-curvas), el 11 fija la hipótesis del eje de roll, el 12 es el que hubiera cazado el error de proyección de la hélice y el 13 cubre el $G_y$ del dive loop; el 14 verifica que `FactorDeSeguridadNormativo` escala el objetivo del modo y no la verificación; el 15 fija que el diseño es $C^2$ en roll (rampas $C^2$ y objetivo $C^1$, onset lateral independiente del paso); el 16 es el caso de referencia de los dos bugs del reloj único y del signo del peralte en la cúspide ([§5](#5-los-modos-de-curvatura) y [§12.3](#123-dos-ángulos-de-roll-distintos-y-sólo-uno-se-ve-en-la-vía)); el 17 fija la ley lineal del modo `Clotoide` (§5.2), y el 18 y el 19 las dos definiciones del peralte alineado al CIR (§5.3).
 
 **Test 2 excluye los nodos cuyo esquema de tres puntos cruza una frontera de sub-tramo.** Ahí $d\kappa/ds$ salta y la circunferencia por tres puntos devuelve un promedio de dos curvaturas distintas: el error sube a $4.6\times10^{-3}$. Es una limitación del estimador discreto, no de la geometría generada — y es exactamente la fragilidad que ya documenta [`documentacion_analisis_energia.md` §4](documentacion_analisis_energia.md#4-radio-de-giro-curvatura-local).
 
@@ -569,4 +605,4 @@ Para la rotación pura, el criterio normativo propio es un límite de **velocida
 - **Criterio de rotación por offset equivalente.** La rotación entra en la G del pasajero y en la longitud de transición de roll a través del brazo $b$. El criterio normativo propio de la rotación pura es un límite de velocidad angular (ASTM F2291 §7.1.6). Ver [§14.5](#145-lo-que-queda-abierto).
 - **Reparto entre juegos de ruedas — específico de este script.** En el generador de elementos (`Fisica/CargasEnLaVia.m` y `Fisica/ResistenciaAlAvance.m`) el reparto **ya se hace correctamente**, proyectando la normal sobre $\mathbf{U}$ y $\mathbf{L}$ del marco del carro: la componente sobre $\mathbf{U}$ va a las portantes si es positiva y a las de retención si es negativa, y la componente sobre $\mathbf{L}$ va a las de guía (código verificado: `ResistenciaAlAvance.m` líneas 10–12). Esto es distinto de lo que hace el script `analisis_energia.m` de la raíz del repo, que todavía asume peralte perfecto (ver [`documentacion_analisis_energia.md` §8](documentacion_analisis_energia.md#8-modelo-de-resistencia-al-avance)) — son dos scripts separados y esta sección se refiere únicamente al generador. Los tres $C_{rr}$ y el $C_d$ siguen siendo provisorios y **requieren calibración experimental**.
 - **Modo inverso**, elemento conector y tren de $n_{carros}>1$ quedan fuera de alcance, igual que el backend web.
-- **Modo `GNormativaMaxima`**: el reloj de cada nivel arranca donde la G registrada en este elemento cruzó el nivel. Si el elemento anterior ya venía por encima de un nivel, ese evento empezó antes y ni el modo ni la verificación (que es por elemento) lo ven: el encadenado normativo de varios elementos sostenidos no está cubierto. La curva de  dive loop sigue con el reloj único desde el arco ([§5](#5-los-cuatro-modos-de-curvatura)).
+- **Modo `GNormativaMaxima`**: el reloj de cada nivel arranca donde la G registrada en este elemento cruzó el nivel. Si el elemento anterior ya venía por encima de un nivel, ese evento empezó antes y ni el modo ni la verificación (que es por elemento) lo ven: el encadenado normativo de varios elementos sostenidos no está cubierto. La curva de  dive loop sigue con el reloj único desde el arco ([§5](#5-los-modos-de-curvatura)).

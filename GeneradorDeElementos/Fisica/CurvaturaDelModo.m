@@ -72,8 +72,10 @@ function [Curvatura, AnguloDesdeArriba] = CurvaturaDelModo(Punto, Parametros, Es
     Coseno = cos(AnguloDesdeArriba);
 
     switch Parametros.ModoCurvatura
-        case 'Clotoide'
-            % Radio de referencia del PASAJERO: el riel va d*c mas afuera.
+        case {'ArcoCircular', 'Clotoide'}
+            % Radio de referencia del PASAJERO: el riel va d*c mas afuera. En
+            % Clotoide es la curvatura del pico, en la mitad del giro: la ley
+            % lineal la arma GenerarGeometria (RecorrerClotoide).
             RadioRiel = max(Parametros.RadioDeReferencia + d*Coseno, 0.5*Parametros.RadioDeReferencia);
             Curvatura = 1 / RadioRiel;
             return
