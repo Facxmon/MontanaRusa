@@ -65,6 +65,13 @@ export interface DatosDeEstado {
    */
   nodo: number | null;
   /**
+   * true mientras el reproductor corre. Los paneles que muestran NUMEROS del
+   * nodo (valores en el cursor, leyendas y tooltips de los graficos) los
+   * refrescan a ~8 Hz mientras dura (paneles/refresco.ts), y al pausar
+   * escriben los del instante exacto; el 3D sigue a su frame rate.
+   */
+  reproduciendo: boolean;
+  /**
    * Diseno fijado como A para comparar (fase 4.8), o null. Se guarda el
    * LAYOUT (las curvas) ademas del diseno: recalcular A cada vez costaria
    * segundos, y un golden no tiene diseno hasta que se lo abre.

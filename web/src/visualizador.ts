@@ -164,6 +164,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     autoGenerar: leerAutoGenerar(),
     panel: 'resultados',
     nodo: null,
+    reproduciendo: false,
     comparacion: null,
   });
 

@@ -18,6 +18,7 @@ import { franjaDeComparacion } from '../paneles/comparar';
 import { leerAlmacen, escribirAlmacen } from '../paneles/almacen';
 import { el, vaciar } from '../paneles/dom';
 import { montarPestanas } from '../paneles/pestanas';
+import { LimitadorDeRefresco } from '../paneles/refresco';
 import { formatearNumero } from '../paneles/formato';
 import { descargarArchivo, slug } from '../paneles/archivo';
 import { csvDeFigura } from '../nucleo/descargar';
@@ -288,6 +289,7 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
     contenedorDeRango.hidden = false;
   }
 
+  const limitadorDelCursor = new LimitadorDeRefresco();
   const actualizarBarra = armarBarra();
   dibujarFiguras();
   // uPlot congela los colores de trazo dentro de sus opciones: al cambiar de
@@ -307,7 +309,11 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
       return;
     }
     // Cursor movido desde afuera (el reproductor, otro panel): se refleja aca.
-    if (nuevo.nodo !== anterior.nodo) {
+    // Con el carro andando, a ~8 Hz (la leyenda y el tooltip muestran numeros
+    // que a 60 Hz no se leen); al pausar, el nodo exacto donde paro.
+    const alPausarOArrancar = nuevo.reproduciendo !== anterior.reproduciendo;
+    if (alPausarOArrancar) limitadorDelCursor.reiniciar();
+    if (alPausarOArrancar || (nuevo.nodo !== anterior.nodo && (!nuevo.reproduciendo || limitadorDelCursor.toca(performance.now())))) {
       aplicandoCursor = true;
       figuras.forEach((f, i) => {
         const punto = nuevo.nodo === null ? null : puntoDeNodo(datosDeFiguras[i], nuevo.nodo);

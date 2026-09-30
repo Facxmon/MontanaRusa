@@ -2,7 +2,9 @@
 // velocidad de reproduccion, seguir al carro (mueve el centro de la orbita,
 // la camara sigue afuera) y un HUD con el instante, el elemento, la
 // velocidad y la G. El estado de la animacion vive aca, no en el store:
-// cambia en cada cuadro y no le interesa a ningun otro panel.
+// cambia en cada cuadro y no le interesa a ningun otro panel. Lo unico que
+// se publica es si esta corriendo (estado.reproduciendo), para que los
+// paneles de numeros se refresquen a ~8 Hz mientras tanto (refresco.ts).
 
 import type { Carro } from '../escena/carro';
 import type { Escena } from '../escena/escena';
@@ -10,6 +12,7 @@ import type { Estado } from '../estado';
 import { nodoGlobalDe, ubicacionDeNodo } from '../graficos/series';
 import { el } from './dom';
 import { numeroDeMagnitud, SIN_DATO } from './formato';
+import { LimitadorDeRefresco } from './refresco';
 
 const VELOCIDADES = [0.1, 0.25, 0.5, 1, 2];
 
@@ -91,11 +94,25 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
     hud,
   );
 
+  // Mientras corre, los numeros del HUD se reescriben a ~8 Hz (refresco.ts);
+  // el carro se mueve en cada cuadro. Pausado, cada actualizacion escribe
+  // el valor exacto del instante.
+  const limitador = new LimitadorDeRefresco();
+
+  /** Cambia entre reproduciendo y pausado, y lo publica (los paneles de numeros lo leen). */
+  function ponerReproduciendo(valor: boolean): void {
+    reproduciendo = valor;
+    botonPlay.textContent = valor ? '❚❚' : '▶';
+    if (valor) limitador.reiniciar();
+    if (estado.get().reproduciendo !== valor) estado.set({ reproduciendo: valor });
+  }
+
   function alternar(): void {
     if (carro.duracion <= 0) return;
     if (!reproduciendo && tiempo >= carro.duracion) tiempo = 0;
-    reproduciendo = !reproduciendo;
-    botonPlay.textContent = reproduciendo ? '❚❚' : '▶';
+    ponerReproduciendo(!reproduciendo);
+    // Al pausar: los valores del instante exacto, no los del ultimo refresco.
+    if (!reproduciendo) actualizar(0, true);
   }
 
   function actualizar(dt: number, forzar = false): void {
@@ -105,22 +122,23 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
       tiempo += dt * factor;
       if (tiempo >= carro.duracion) {
         tiempo = carro.duracion;
-        reproduciendo = false;
-        botonPlay.textContent = '▶';
+        ponerReproduciendo(false);
       }
       barra.value = String(tiempo);
     }
     const donde = carro.ubicar(tiempo);
     if (!donde) return;
     const { layout } = estado.get();
-    const tipo = layout?.elementos[donde.elemento]?.tipo ?? '';
-    hudTiempo.textContent = numeroDeMagnitud(tiempo, 'tiempo');
-    const nombre = `${donde.elemento + 1}. ${tipo}`;
-    hudElemento.textContent = nombre;
-    hudElemento.title = nombre;
-    hudVelocidad.textContent = numeroDeMagnitud(donde.velocidad, 'velocidad');
-    hudGz.textContent = numeroDeMagnitud(donde.gz, 'gz');
-    hudGy.textContent = numeroDeMagnitud(donde.gy, 'gy');
+    if (!reproduciendo || forzar || limitador.toca(performance.now())) {
+      const tipo = layout?.elementos[donde.elemento]?.tipo ?? '';
+      hudTiempo.textContent = numeroDeMagnitud(tiempo, 'tiempo');
+      const nombre = `${donde.elemento + 1}. ${tipo}`;
+      hudElemento.textContent = nombre;
+      hudElemento.title = nombre;
+      hudVelocidad.textContent = numeroDeMagnitud(donde.velocidad, 'velocidad');
+      hudGz.textContent = numeroDeMagnitud(donde.gz, 'gz');
+      hudGy.textContent = numeroDeMagnitud(donde.gy, 'gy');
+    }
     if (seguir) escena.centrarEn(donde.posicion);
     // Cursor ligado: el nodo por el que va el carro es el que resalta el 3D y
     // el que marcan los graficos. Se publica solo cuando cambia de nodo.
@@ -148,8 +166,7 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
 
   const reiniciar = () => {
     const { layout } = estado.get();
-    reproduciendo = false;
-    botonPlay.textContent = '▶';
+    ponerReproduciendo(false);
     tiempo = 0;
     if (layout) {
       carro.construir(layout);
@@ -177,8 +194,7 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
       if (!ubicacion) return;
       const instante = carro.tiempoDelNodo(ubicacion.elemento, ubicacion.nodoLocal);
       if (instante === null) return;
-      reproduciendo = false;
-      botonPlay.textContent = '▶';
+      ponerReproduciendo(false);
       tiempo = instante;
       barra.value = String(tiempo);
       actualizar(0, true);
