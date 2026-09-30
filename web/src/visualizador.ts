@@ -33,6 +33,7 @@ import { el, idUnico } from './paneles/dom';
 import { montarElementos } from './paneles/elementos';
 import { montarBarra } from './paneles/barra';
 import { montarCabecera } from './paneles/cabecera';
+import { montarControles3d } from './paneles/controles3d';
 import { montarErrores } from './paneles/errores';
 import { leerAutoGenerar, montarGenerar } from './paneles/generar';
 import { guardadorDeDiseno, haceCuanto, olvidarDiseno, restaurarDiseno } from './paneles/persistencia';
@@ -62,7 +63,9 @@ function armarDom() {
   const reproductor = el('div', { class: 'reproductor', 'aria-label': 'Reproducción', hidden: true });
   // El reproductor va DENTRO de la vista 3D y no al lado: con las dos vistas
   // partiendo el area, flotando sobre .principal quedaria sobre los graficos.
-  const vista3d = el('div', { class: 'vista3d', 'aria-label': 'Vista 3D de la vía' }, reproductor);
+  // Arriba a la derecha: reiniciar la camara y lo que se dibuja alrededor de la via.
+  const controles3d = el('div', { class: 'controles-3d', role: 'group', 'aria-label': 'Controles de la vista 3D' });
+  const vista3d = el('div', { class: 'vista3d', 'aria-label': 'Vista 3D de la vía' }, controles3d, reproductor);
   const graficos = el('div', { class: 'graficos', 'aria-label': 'Gráficos', hidden: true });
   const aviso = el('div', { class: 'aviso', role: 'status', hidden: true });
   const principal = el('main', { class: 'principal' }, vista3d, graficos, aviso);
@@ -109,6 +112,7 @@ function armarDom() {
     aviso,
     selectorDeVista,
     vista3d,
+    controles3d,
     reproductor,
     graficos,
     cabecera,
@@ -167,6 +171,15 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   const entorno = new Entorno(escena.scene);
   const via = new Via(escena.scene);
   const carro = new Carro(escena.scene);
+  montarControles3d(dom.controles3d, {
+    reiniciarVista: () => {
+      const { layout } = estado.get();
+      if (layout) escena.encuadrar(layout.resumenLayout.boundingBox);
+    },
+    mostrarCaja: (visible) => entorno.mostrarCaja(visible),
+    mostrarProyeccion: (visible) => entorno.mostrarProyeccion(visible),
+    mostrarLimites: (visible) => via.mostrarLimites(visible),
+  });
 
   const zonas = montarBarra(dom.barra);
   zonas.centro.append(dom.selectorDeVista);

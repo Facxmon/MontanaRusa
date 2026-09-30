@@ -11,6 +11,7 @@ import { bufferALineal, rangoDeMagnitud } from './colores';
 import {
   aplanarNodos,
   coloresPorVertice,
+  juntasEntreElementos,
   lineaHeartline,
   tubo,
   uniones,
@@ -23,6 +24,8 @@ import {
 const RADIO_DEL_RIEL = 0.008;
 /** El marcador del nodo bajo el cursor: una esfera algo mas gorda que el riel. */
 const RADIO_DEL_MARCADOR = RADIO_DEL_RIEL * 2.2;
+/** Los puntos de cambio de elemento: apenas mas chicos que el marcador, para no confundirse con el. */
+const RADIO_DEL_LIMITE = RADIO_DEL_RIEL * 1.8;
 const LADOS_DEL_TUBO = 10;
 const UNION_CADA_N_NODOS = 25;
 
@@ -35,12 +38,26 @@ export class Via {
   private heartline: THREE.Line | null = null;
   private unionesLineas: THREE.LineSegments | null = null;
   private marcador: THREE.Mesh | null = null;
+  /**
+   * Puntos rojos donde la via pasa de un elemento al siguiente (p. ej. de
+   * loop a helice): solo en esas juntas, no entre subtramos de un mismo
+   * elemento. Se conmutan desde los controles de la vista 3D y arrancan
+   * apagados; la visibilidad sobrevive a construir().
+   */
+  private readonly limites = new THREE.Group();
   /** Nodo global pedido y nodo global ya dibujado (ver marcarNodo). */
   private nodoPedido: number | null = null;
   private nodoDibujado: number | null = null;
 
   constructor(scene: THREE.Scene) {
     scene.add(this.grupo);
+    this.limites.visible = false;
+    this.grupo.add(this.limites);
+  }
+
+  /** Muestra u oculta los puntos de cambio de elemento. */
+  mostrarLimites(visible: boolean): void {
+    this.limites.visible = visible;
   }
 
   /** Libera las geometrias y saca el grupo de la escena. */
@@ -104,6 +121,17 @@ export class Via {
     this.marcador = marcador;
     this.grupo.add(marcador);
     this.nodoDibujado = null;
+
+    // Un punto por junta entre elementos: el primer nodo de cada elemento
+    // salvo el primero (aplanarNodos ya descarto el nodo repetido).
+    const geometriaDelLimite = new THREE.SphereGeometry(RADIO_DEL_LIMITE, 12, 8);
+    // Sin tone mapping: ACES lavaba el rojo a rosado y se confundia con la escala de la via.
+    const materialDelLimite = new THREE.MeshBasicMaterial({ color: new THREE.Color(tema().escenaLimiteElemento), toneMapped: false });
+    for (const nodo of juntasEntreElementos(this.nodos)) {
+      const punto = new THREE.Mesh(geometriaDelLimite, materialDelLimite);
+      punto.position.set(this.nodos.riel[3 * nodo]!, this.nodos.riel[3 * nodo + 1]!, this.nodos.riel[3 * nodo + 2]!);
+      this.limites.add(punto);
+    }
 
     this.recolorear(magnitud, elementoResaltado);
   }
@@ -186,6 +214,11 @@ export class Via {
       objeto.geometry.dispose();
       (objeto.material as THREE.Material).dispose();
     }
+    // Los puntos comparten geometria y material: se liberan una vez.
+    const primero = this.limites.children[0] as THREE.Mesh | undefined;
+    primero?.geometry.dispose();
+    (primero?.material as THREE.Material | undefined)?.dispose();
+    this.limites.clear();
     this.tuboMesh = null;
     this.heartline = null;
     this.unionesLineas = null;

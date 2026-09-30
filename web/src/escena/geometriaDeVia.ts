@@ -82,6 +82,16 @@ export function aplanarNodos(layout: Layout): NodosAplanados {
 }
 
 /**
+ * Nodos globales donde la via pasa de un elemento al siguiente: el ultimo
+ * nodo de cada elemento salvo el ultimo (que coincide con el primero,
+ * descartado, del elemento que sigue). Solo juntas entre elementos: los
+ * limites entre subtramos de un mismo elemento no cuentan.
+ */
+export function juntasEntreElementos(nodos: NodosAplanados): number[] {
+  return nodos.inicioDeElemento.slice(1).map((inicio) => inicio - 1);
+}
+
+/**
  * Tubo alrededor del riel: un anillo de `lados` vertices por nodo en el plano
  * (U, L), y dos triangulos por cara entre anillos consecutivos.
  */

@@ -143,6 +143,8 @@
   --escena-pasajero-brillo: var(--rojo-800);
   /* Marcador del nodo bajo el cursor de los graficos. */
   --escena-marcador: var(--azul-400);
+  /* Puntos donde la via pasa de un elemento al siguiente (conmutable). */
+  --escena-limite-elemento: var(--rojo-500);
   /* Caja disponible (entra / se sale), proyeccion al piso y gizmo de ejes. */
   --escena-caja: var(--verde-600);
   --escena-caja-fuera: var(--rojo-500);
