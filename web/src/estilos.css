@@ -972,7 +972,7 @@ summary { cursor: pointer; font-size: var(--texto-sm); color: var(--texto-1); pa
   font-size: var(--texto-xs);
   line-height: 1.4;
 }
-.summary-error { color: var(--falla); }
+.summary-error { margin-left: var(--esp-1); color: var(--falla); }
 .secuencia-fila.con-error { border-color: var(--falla); }
 .secuencia-error { color: var(--falla); cursor: help; }
 

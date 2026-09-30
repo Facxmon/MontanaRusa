@@ -9,7 +9,7 @@ import { nuevoIdDeInstancia, type EntradaDeDiseno, type InstanciaDeElemento } fr
 import { textoDelLayout } from '../nucleo/descargar';
 import { CATALOGO_DE_ELEMENTOS } from '../nucleo/parametros';
 import type { NombreDeElemento } from '../nucleo/tipos';
-import { el, tarjeta, vaciar } from './dom';
+import { el, marcarErroresEnSecciones, tarjeta, vaciar } from './dom';
 import { descargarArchivo } from './archivo';
 
 function contarAjustes(inst: InstanciaDeElemento): number {
@@ -156,6 +156,8 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
         }, '+ Agregar elemento'),
       ),
     );
+    // La fila que fallo (.con-error) marca tambien el encabezado de la secuencia si esta plegada.
+    marcarErroresEnSecciones(contenedor);
   };
   dibujar();
   estado.suscribir((nuevo, anterior) => {
