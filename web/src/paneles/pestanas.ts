@@ -85,7 +85,7 @@ export function montarPestanas<T extends string>(
   };
   activar(activa);
   // La fuente o el ancho del contenedor pueden cambiar despues de montar
-  // (Plex carga tarde, el panel se muestra): se vuelve a ubicar sin animar.
+  // (la fuente carga tarde, el panel se muestra): se vuelve a ubicar sin animar.
   const observador = new ResizeObserver(() => {
     indicador.classList.add('sin-transicion');
     ubicarIndicador();

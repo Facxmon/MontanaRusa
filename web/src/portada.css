@@ -1,9 +1,9 @@
 /* Portada del portfolio (index.html): solo tokens y tipografia, sin nada del
    visualizador, para que la pagina cargue sin Three.js ni uPlot. Mismos
-   tokens y la misma Plex que la app: se lee como un solo producto.
+   tokens y la misma Lato que la app: se lee como un solo producto.
 
    Presupuesto de carga (< 1 s en 3G): en el build este CSS va DENTRO del
-   HTML (plugins/cssEnLinea.ts) y la portada usa solo Plex Sans 400 y 600,
+   HTML (plugins/cssEnLinea.ts) y la portada usa solo Lato 400 y 600,
    las dos que index.html precarga. Nada de Mono ni de 500 aca: cada peso
    nuevo es otro pedido de ~560 ms de latencia en 3G. */
 

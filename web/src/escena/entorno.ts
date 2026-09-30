@@ -84,7 +84,7 @@ function rotulo(texto: string, color: string): THREE.Sprite {
   const escala = 4;
   const lienzo = document.createElement('canvas');
   const contexto = lienzo.getContext('2d')!;
-  const fuente = `${parseFloat(t.textoXs) * escala}px ${t.mono}`;
+  const fuente = `${parseFloat(t.textoXs) * escala}px ${t.fuente}`;
   contexto.font = fuente;
   const ancho = Math.ceil(contexto.measureText(texto).width) + 4 * escala;
   const alto = Math.ceil(parseFloat(t.textoXs) * escala * 1.4);

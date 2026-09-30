@@ -1,27 +1,30 @@
-/* IBM Plex self-hosteada (OFL-1.1), subseteada a latin mas los simbolos de
-   la interfaz por scripts/subsetear-fuentes.mjs. Sin CDN: funciona offline.
-   font-display: swap muestra el fallback del sistema hasta que carga. */
+/* Lato 2.0 (OFL-1.1, paquete npm lato-font) para la interfaz y los numeros,
+   e IBM Plex Mono (OFL-1.1) solo para lo que es codigo. Autohospedadas y
+   subseteadas a latin mas los simbolos de la interfaz por
+   scripts/subsetear-fuentes.mjs. Sin CDN: funciona offline.
+   font-display: swap muestra el fallback del sistema hasta que carga.
+   Las cifras de Lato son tabulares por defecto (verificado por el script). */
 
 @font-face {
-  font-family: "IBM Plex Sans";
+  font-family: "Lato";
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("/fuentes/IBMPlexSans-Regular.woff2") format("woff2");
+  src: url("/fuentes/Lato-Regular.woff2") format("woff2");
 }
 @font-face {
-  font-family: "IBM Plex Sans";
+  font-family: "Lato";
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url("/fuentes/IBMPlexSans-Medium.woff2") format("woff2");
+  src: url("/fuentes/Lato-Medium.woff2") format("woff2");
 }
 @font-face {
-  font-family: "IBM Plex Sans";
+  font-family: "Lato";
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url("/fuentes/IBMPlexSans-SemiBold.woff2") format("woff2");
+  src: url("/fuentes/Lato-SemiBold.woff2") format("woff2");
 }
 @font-face {
   font-family: "IBM Plex Mono";
