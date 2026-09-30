@@ -591,3 +591,30 @@ elemento se construye con sus propios `Parametros`. Lo que faltaba era la interf
 - La animación de los acordeones depende de `interpolate-size`, que hoy es solo de Chromium; en Firefox y
   Safari abren sin animar.
 - Contenido de la portada (textos, video, contacto): lo escribe el autor.
+
+# Mejoras de interfaz (2026-09-30)
+
+Once cambios de uso, sin tocar el núcleo, los golden ni el contrato (el JSON no cambia: todo sale de
+campos que ya existían).
+
+| Qué | Cómo | Por qué |
+|---|---|---|
+| Controles de la vista 3D | Panel flotante arriba a la derecha (`paneles/controles3d.ts`): **Reiniciar vista** (la cámara vuelve al encuadre inicial de la vía entera), y casillas **Caja** (caja disponible, visible por defecto; su tamaño no cambia), **Proyección XY** (la huella del riel en el piso, **apagada** por defecto) y **Límites** (puntos rojos en las juntas entre elementos, apagados por defecto). Las casillas se recuerdan en `localStorage`. | Perder el encuadre obligaba a recargar. La proyección, siempre prendida, ensuciaba la vista; los límites dicen dónde termina un loop y empieza el siguiente. |
+| Juntas entre elementos | `juntasEntreElementos()` en `geometriaDeVia.ts`: el último nodo de cada elemento salvo el último. Solo entre elementos, nunca entre subtramos. Material sin tone mapping (token `--escena-limite-elemento`). | ACES lavaba el rojo a rosado y se confundía con la escala de la vía. |
+| Rueda sobre los gráficos | La rueda sola scrollea la página; **Ctrl + rueda** hace zoom (Ctrl + Shift = eje Y). La primera vez que se usa la rueda sobre una figura aparece la pista "Ctrl + rueda para zoom" (una vez por navegador). El pellizco del trackpad llega como Ctrl + rueda y sigue haciendo zoom. | La rueda tomada por el zoom atrapaba el scroll de la página. Invierte la decisión de la fase 3. |
+| Zoom por arrastre | Arrastrar marca un **rango del eje X** con un rectángulo de todo el alto y bordes, y al soltar hace zoom a ese rango. Ya no hay selección en Y ni de caja. Doble clic o el botón **⟲** de la figura (visible mientras hay zoom) vuelven a la vista completa. Un clic que termina un arrastre ya no elige un punto. | El arrastre podía ser horizontal, vertical o de caja según el ángulo y no se entendía qué hacía. |
+| Ícono de error en secciones plegadas | `marcarErroresEnSecciones()` (`paneles/dom.ts`) repite el ⚠ en el encabezado de cada `<details>` que contiene un `.con-error` (grupo, tarjeta, ficha, secuencia), y la pestaña **Diseño** lo muestra cuando el último cálculo falló en un campo o una instancia. | Un campo con error dentro de una tarjeta cerrada no se veía. |
+| Elegir un elemento | `resaltarElemento()` (`paneles/resaltarElemento.ts`) es la única forma de elegirlo: la usan Resultados › Elementos, Diseño › Secuencia y la tarjeta de criterios. La fila de la secuencia se mapea al elemento por id en `disenoCalculado`: con cambios sin generar, una instancia que el layout no tiene no resalta nada. | Mismo resaltado y mismo encuadre desde los dos paneles. |
+| Números durante la reproducción | `estado.reproduciendo` (nuevo) y `LimitadorDeRefresco` (`paneles/refresco.ts`, 8 Hz): el HUD, los valores en el cursor y el cursor de los gráficos (leyenda y tooltip) se refrescan a 8 Hz; el carro y el marcador 3D siguen a su frame rate. Al pausar, cada panel escribe los valores del instante exacto. | A 60 Hz los números eran ilegibles. Medido: 16 cambios del HUD en 2 s con el render a ~100 cuadros/s. |
+| Tipografía | **Lato 2.0** (400/500/600) del paquete npm `lato-font@3.0.0` (devDependency), subseteada a `public/fuentes/` por `scripts/subsetear-fuentes.mjs`, sin CDN. Reemplaza a Plex Sans en la interfaz y también en los números (token `--cifras`). Plex Mono queda solo para lo que es código: claves del JSON, atajos y el banner de errores. | Las cifras de Lato son **tabulares por defecto** (las diez miden 1160 unidades con y sin `tnum`); el script lo verifica con harfbuzz sobre cada subset y falla si deja de ser cierto. `tabular-nums` se sigue declarando. Se eligió `lato-font` y no `@fontsource/lato` porque el de Fontsource es la versión de Google Fonts, sin los pesos 500 y 600. |
+| Tarjeta de criterios | Cada G: valor grande y, en una línea, **margen contra la norma**: el menor margen entre elementos del criterio normativo de ese eje (`+Gz (Fig. 10)`, `-Gz (Fig. 9)`, `Gy (Fig. 8)`), leído del contrato (`margenNormativo` en `contrato/veredicto.ts`). La ubicación (elemento · subtramo · arco) pasa al tooltip del valor; **clic en el valor** resalta el elemento, lleva carro y marcador a ese nodo y acerca la cámara (cubo de 0,3 m de medio lado); con solo gráficos pasa a "Ambos". El criterio peor va en una línea: nombre y margen, con el detalle en el tooltip. | Tenía demasiado texto. El margen normativo es el mismo número que decide si ese criterio pasa: no se recalcula nada. |
+
+## Decisiones abiertas
+
+- **Margen "contra la norma" de cada G**: se usa el margen del criterio normativo de ese eje (nivel crítico
+  sostenido contra la curva de límite por duración), no la diferencia entre el pico y el límite de 200 ms.
+  Si en ningún elemento el criterio es evaluable (todos informativos, sin eventos sostenidos de más de
+  200 ms, típico de −Gz) la línea dice "norma: sin evento sostenido".
+- **"Nombre corto" del criterio peor**: se muestra el nombre del criterio tal cual lo escribe el núcleo,
+  recortado con puntos suspensivos si no entra; no hay una tabla de nombres cortos.
+- Los pesos de Lato subseteados pesan ~32 kB cada uno contra ~21 kB de Plex: la portada precarga dos.

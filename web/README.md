@@ -35,7 +35,8 @@ npm run preview    # sirve dist/ en http://localhost:4173/MontanaRusa/
 npm run tipos      # regenera src/contrato/tipos.ts desde ../esquema/layout-v1.schema.json
 ```
 
-Las fuentes (IBM Plex Sans y Mono, self-hosteadas en `public/fuentes/`) se regeneran con
+Las fuentes (Lato para la interfaz y los números, IBM Plex Mono para lo que es código, autohospedadas en
+`public/fuentes/`) se regeneran con
 `scripts/subsetear-fuentes.mjs` (ver la cabecera del script). `public/og.png` (1200×630, la imagen de
 las meta tags `og:image`) es una captura de la vista 3D de `circuito-demolayout`; si cambia el aspecto
 de la vía, se vuelve a capturar.
