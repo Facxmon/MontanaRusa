@@ -178,6 +178,8 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
   const carro = new Carro(escena.scene);
   montarControles3d(dom.controles3d, {
     reiniciarVista: () => {
+      // Des-selecciona el elemento (vuelve el color de toda la via) y encuadra la via entera.
+      resaltarElemento(estado, null);
       const { layout } = estado.get();
       if (layout) escena.encuadrar(layout.resumenLayout.boundingBox);
     },

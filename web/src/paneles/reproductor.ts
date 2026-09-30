@@ -4,7 +4,7 @@
 // velocidad y la G. El estado de la animacion vive aca, no en el store:
 // cambia en cada cuadro y no le interesa a ningun otro panel. Lo unico que
 // se publica es si esta corriendo (estado.reproduciendo), para que los
-// paneles de numeros se refresquen a ~8 Hz mientras tanto (refresco.ts).
+// paneles de numeros se refresquen a ~12 Hz mientras tanto (refresco.ts).
 
 import type { Carro } from '../escena/carro';
 import type { Escena } from '../escena/escena';
@@ -61,28 +61,25 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
     mostrarCarro = casillaCarro.checked;
     carro.mostrar(mostrarCarro);
   });
-  // HUD: un span por campo dentro de una grilla de columnas fijas, para que un
-  // valor que cambia de ancho no mueva lo que tiene a la derecha. Los numeros
-  // van con decimales fijos (formato.ts) y cifras tabulares (CSS).
+  // HUD: un grupo "etiqueta valor unidad" por magnitud, pegados entre si y
+  // separados de los otros grupos. El valor tiene ancho fijo (en ch, cifras
+  // tabulares) y va alineado a la derecha: un numero que cambia de ancho no
+  // mueve lo que tiene al lado. Decimales fijos (formato.ts).
   const hudTiempo = el('span', { class: 'hud-valor' }, SIN_DATO);
   const hudElemento = el('span', { class: 'hud-elemento' });
   const hudVelocidad = el('span', { class: 'hud-valor' }, SIN_DATO);
   const hudGz = el('span', { class: 'hud-valor' }, SIN_DATO);
   const hudGy = el('span', { class: 'hud-valor' }, SIN_DATO);
+  const campo = (etiqueta: string, valor: HTMLElement, unidad: string) =>
+    el('span', { class: 'hud-campo' }, el('span', { class: 'hud-etiqueta' }, etiqueta), valor, el('span', { class: 'hud-unidad' }, unidad));
   const hud = el(
     'span',
     { class: 'reproductor-hud' },
-    el('span', {}, 't ='),
-    hudTiempo,
-    el('span', {}, 's ·'),
+    campo('t', hudTiempo, 's'),
     hudElemento,
-    el('span', {}, '· v ='),
-    hudVelocidad,
-    el('span', {}, 'm/s · Gz ='),
-    hudGz,
-    el('span', {}, 'G · Gy ='),
-    hudGy,
-    el('span', {}, 'G'),
+    campo('v', hudVelocidad, 'm/s'),
+    campo('Gz', hudGz, 'G'),
+    campo('Gy', hudGy, 'G'),
   );
 
   contenedor.append(
@@ -94,7 +91,7 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
     hud,
   );
 
-  // Mientras corre, los numeros del HUD se reescriben a ~8 Hz (refresco.ts);
+  // Mientras corre, las magnitudes del HUD se reescriben a ~12 Hz (el tiempo, en cada cuadro) (refresco.ts);
   // el carro se mueve en cada cuadro. Pausado, cada actualizacion escribe
   // el valor exacto del instante.
   const limitador = new LimitadorDeRefresco();
@@ -129,9 +126,10 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
     const donde = carro.ubicar(tiempo);
     if (!donde) return;
     const { layout } = estado.get();
+    // El tiempo corre en cada cuadro (se lee como un reloj); las magnitudes, a ~12 Hz.
+    hudTiempo.textContent = numeroDeMagnitud(tiempo, 'tiempo');
     if (!reproduciendo || forzar || limitador.toca(performance.now())) {
       const tipo = layout?.elementos[donde.elemento]?.tipo ?? '';
-      hudTiempo.textContent = numeroDeMagnitud(tiempo, 'tiempo');
       const nombre = `${donde.elemento + 1}. ${tipo}`;
       hudElemento.textContent = nombre;
       hudElemento.title = nombre;

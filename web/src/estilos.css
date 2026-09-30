@@ -410,9 +410,26 @@ html, body {
 .uplot .u-legend .u-value { display: inline-block; box-sizing: content-box; min-width: var(--ancho-leyenda-valor); text-align: right; color: var(--texto-1); font-family: var(--cifras); }
 /* La seleccion de rango (arrastre en X): de todo el alto y con bordes, que se vea que rango se va a ampliar. */
 .u-select {
-  background: var(--acento-suave);
-  border-left: 1px solid var(--acento);
-  border-right: 1px solid var(--acento);
+  background: var(--acento-barrido);
+  border-left: 2px solid var(--acento);
+  border-right: 2px solid var(--acento);
+}
+/* Barrido: afuera del rango se oscurece; arriba, los extremos del rango. */
+.figura-velo { position: absolute; top: 0; bottom: 0; background: var(--velo-barrido); pointer-events: none; }
+.figura-velo[hidden], .figura-rango-barrido[hidden] { display: none; }
+.figura-rango-barrido {
+  position: absolute;
+  top: var(--esp-1);
+  transform: translateX(-50%);
+  padding: 1px var(--esp-2);
+  background: var(--acento);
+  color: var(--texto-sobre-acento);
+  border-radius: var(--radio-chico);
+  font-family: var(--cifras);
+  font-size: var(--texto-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
 }
 /* "Ctrl + rueda para zoom": arriba al centro de la figura, una sola vez. */
 .figura-pista {
@@ -1056,25 +1073,20 @@ summary { cursor: pointer; font-size: var(--texto-sm); color: var(--texto-1); pa
 .reproductor-barra { flex: 1; min-width: var(--esp-8); accent-color: var(--acento); }
 .reproductor-velocidad { width: auto; padding: var(--esp-1) var(--esp-2); font-size: var(--texto-sm); }
 .reproductor-opcion { display: inline-flex; align-items: center; gap: var(--esp-1); color: var(--texto-2); white-space: nowrap; }
+/* HUD: grupos "etiqueta valor unidad" juntos, y aire entre grupos. */
 .reproductor-hud {
-  display: inline-grid;
-  grid-auto-flow: column;
-  grid-template-columns:
-    max-content var(--ancho-hud-numero)
-    max-content var(--ancho-hud-elemento)
-    max-content var(--ancho-hud-numero)
-    max-content var(--ancho-hud-numero)
-    max-content var(--ancho-hud-numero)
-    max-content;
-  column-gap: var(--esp-1);
+  display: inline-flex;
   align-items: baseline;
+  gap: var(--esp-3);
   font-family: var(--cifras);
   font-size: var(--texto-xs);
   color: var(--texto-2);
   white-space: nowrap;
 }
-.reproductor-hud .hud-valor { text-align: right; }
-.reproductor-hud .hud-elemento { overflow: hidden; text-overflow: ellipsis; }
+.reproductor-hud .hud-campo { display: inline-flex; align-items: baseline; gap: 0.35ch; }
+.reproductor-hud .hud-etiqueta { color: var(--texto-3); }
+.reproductor-hud .hud-valor { display: inline-block; min-width: var(--ancho-hud-numero); text-align: right; color: var(--texto-1); }
+.reproductor-hud .hud-elemento { display: inline-block; width: var(--ancho-hud-elemento); overflow: hidden; text-overflow: ellipsis; color: var(--texto-1); }
 @media (max-width: 900px) {
   .reproductor { flex-wrap: wrap; }
 }

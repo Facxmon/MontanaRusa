@@ -1,15 +1,15 @@
 // Refresco limitado de los numeros durante la reproduccion. Con el carro
 // andando, el nodo cambia en cada cuadro (60 Hz) y un numero que se reescribe
 // sesenta veces por segundo no se puede leer. Mientras se reproduce, el HUD,
-// los valores en el cursor y los graficos se refrescan a ~8 Hz; el carro y el
+// los valores en el cursor y los graficos se refrescan a ~12 Hz; el tiempo del HUD, el carro y el
 // marcador del 3D siguen a su frame rate. Al pausar, cada panel escribe los
 // valores del instante EXACTO en que se paro, no los del ultimo refresco.
 //
 // Puro, sin DOM ni reloj propio (el tiempo entra como argumento): se testea
 // en Node.
 
-/** 8 Hz: el extremo lento del rango de 8 a 10 Hz, el mas legible. */
-export const PERIODO_DE_REFRESCO_MS = 125;
+/** 12 Hz: un poco mas vivo que los 8 Hz iniciales y todavia legible. */
+export const PERIODO_DE_REFRESCO_MS = 80;
 
 export class LimitadorDeRefresco {
   private ultimo = -Infinity;

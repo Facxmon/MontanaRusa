@@ -67,7 +67,7 @@ export interface DatosDeEstado {
   /**
    * true mientras el reproductor corre. Los paneles que muestran NUMEROS del
    * nodo (valores en el cursor, leyendas y tooltips de los graficos) los
-   * refrescan a ~8 Hz mientras dura (paneles/refresco.ts), y al pausar
+   * refrescan a ~12 Hz mientras dura (paneles/refresco.ts), y al pausar
    * escriben los del instante exacto; el 3D sigue a su frame rate.
    */
   reproduciendo: boolean;

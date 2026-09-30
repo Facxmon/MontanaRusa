@@ -1,7 +1,7 @@
 // Controles flotantes de la vista 3D, arriba a la derecha (arriba a la
 // izquierda esta el gizmo de ejes y abajo el reproductor):
 //
-//  - Reiniciar vista: vuelve la camara (zoom y posicion) al encuadre inicial
+//  - Reiniciar vista: des-selecciona el elemento y vuelve la camara (zoom y posicion) al encuadre inicial
 //    de la via entera, el mismo que se hace al cargar un layout.
 //  - Caja: muestra u oculta la caja disponible (BoundingBoxDisponible). Su
 //    tamano no se toca, solo si se dibuja.

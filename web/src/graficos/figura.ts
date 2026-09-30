@@ -374,7 +374,15 @@ export class Figura {
     opciones.plugins = [zoomYDesplazamiento(() => this.mostrarPista())];
     opciones.hooks = {
       ...opciones.hooks,
-      setCursor: [(u: uPlot) => this.dibujarTooltip(u)],
+      setCursor: [
+        (u: uPlot) => {
+          this.dibujarTooltip(u);
+          this.dibujarBarrido(u);
+        },
+      ],
+      // Barrido: mientras se arrastra, lo de afuera del rango se oscurece y el
+      // rango se va "pintando" con el puntero, con sus extremos rotulados.
+      setSelect: [(u: uPlot) => this.dibujarBarrido(u)],
       setScale: [
         (u: uPlot, clave: string) => {
           if (clave === 'x') this.avisarDelRango(u);
@@ -383,6 +391,15 @@ export class Figura {
     };
     this.grafico = new uPlot(opciones, [datos.x, ...datos.series.map((s) => s.valores)], this.contenedor);
     this.contenedor.append(this.tooltip, this.pista);
+    this.veloIzquierdo = document.createElement('div');
+    this.veloDerecho = document.createElement('div');
+    this.rotuloDeRango = document.createElement('div');
+    this.veloIzquierdo.className = this.veloDerecho.className = 'figura-velo';
+    this.rotuloDeRango.className = 'figura-rango-barrido';
+    for (const nodo of [this.veloIzquierdo, this.veloDerecho, this.rotuloDeRango]) {
+      nodo.hidden = true;
+      this.grafico.over.append(nodo);
+    }
 
     // Leyenda: las series marcadas como ocultas no se listan.
     const filas = this.contenedor.querySelectorAll<HTMLElement>('.u-legend .u-series');
@@ -406,6 +423,31 @@ export class Figura {
       this.opciones.alElegirPunto?.(u.cursor.idx);
     });
     this.avisarDelRango(u);
+  }
+
+  private veloIzquierdo: HTMLElement | null = null;
+  private veloDerecho: HTMLElement | null = null;
+  private rotuloDeRango: HTMLElement | null = null;
+
+  /** El barrido de la seleccion: velos a los costados y los extremos del rango arriba. */
+  private dibujarBarrido(u: uPlot): void {
+    const { left, width } = u.select;
+    const izquierdo = this.veloIzquierdo;
+    const derecho = this.veloDerecho;
+    const rotulo = this.rotuloDeRango;
+    if (!izquierdo || !derecho || !rotulo) return;
+    const activo = width > 0;
+    izquierdo.hidden = derecho.hidden = rotulo.hidden = !activo;
+    if (!activo || !this.datos) return;
+    const total = u.over.clientWidth;
+    izquierdo.style.left = '0px';
+    izquierdo.style.width = `${left}px`;
+    derecho.style.left = `${left + width}px`;
+    derecho.style.width = `${Math.max(0, total - left - width)}px`;
+    const desde = u.posToVal(left, 'x');
+    const hasta = u.posToVal(left + width, 'x');
+    rotulo.textContent = `${formatearNumero(desde, this.datos.decimalesX)} – ${formatearNumero(hasta, this.datos.decimalesX)}`;
+    rotulo.style.left = `${left + width / 2}px`;
   }
 
   /** Vuelve a la vista completa en X (el eje Y se reajusta solo), como el doble clic. */

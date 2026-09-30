@@ -133,7 +133,8 @@ export function montarDiseno(contenedor: HTMLElement, estado: Estado, abrirDisen
             estado.set({ instancia: inst.id });
             // El mismo resaltado y encuadre que Resultados > Elementos, si el
             // layout en pantalla ya tiene esta instancia (con cambios sin generar puede no tenerla).
-            const indice = elementoDeInstancia(estado.get().disenoCalculado, inst.id);            if (indice !== null) resaltarElemento(estado, indice);
+            const indice = elementoDeInstancia(estado.get().disenoCalculado, inst.id);            // Volver a clickear el elemento resaltado lo des-selecciona: vista completa.
+            if (indice !== null) resaltarElemento(estado, estado.get().elemento === indice ? null : indice);
           },
         },
         el('span', { class: 'secuencia-numero' }, `${i + 1}.`),
