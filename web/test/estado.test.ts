@@ -25,6 +25,7 @@ const inicial: DatosDeEstado = {
   panel: 'resultados',
   nodo: null,
   reproduciendo: false,
+  carro: null,
   comparacion: null,
 };
 

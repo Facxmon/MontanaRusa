@@ -25,6 +25,7 @@ import { csvDeFigura } from '../nucleo/descargar';
 import { figuraAPng, nombreDeFigura } from './exportarFigura';
 import { Figura, type DatosDeFigura } from './figura';
 import {
+  abscisaDelCarro,
   esSobreElRecorrido,
   estadisticaDeRango,
   indiceDeNodo,
@@ -247,6 +248,7 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
         },
       });
       figura.mostrar(d);
+      figura.ponerCarroEn(abscisaDelCarro(d, estado.get().carro));
       figuras.push(figura);
     });
   };
@@ -318,6 +320,11 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
     ) {
       dibujarFiguras();
       return;
+    }
+    // Marcador del carro: sigue al reproductor cuadro a cuadro (mover un nodo
+    // del DOM, sin redibujar el canvas), igual que el carro del 3D.
+    if (nuevo.carro !== anterior.carro) {
+      figuras.forEach((f, i) => f.ponerCarroEn(abscisaDelCarro(datosDeFiguras[i]!, nuevo.carro)));
     }
     // Cursor movido desde afuera (el reproductor, otro panel): se refleja aca.
     // Con el carro andando, a ~8 Hz (la leyenda y el tooltip muestran numeros

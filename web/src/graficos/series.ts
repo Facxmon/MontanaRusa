@@ -220,6 +220,83 @@ export function indiceDeNodo(nodos: ArrayLike<number>, nodoGlobal: number): numb
   return null;
 }
 
+/**
+ * Primer indice con ese nodo global en una lista CRECIENTE con repetidos
+ * (con la comparacion A/B, los puntos que solo tiene A repiten el ultimo
+ * nodo de B: el primero es el de B, que es donde esta el carro), o null.
+ */
+export function primerIndiceDeNodo(nodos: ArrayLike<number>, nodoGlobal: number): number | null {
+  let bajo = 0;
+  let alto = nodos.length;
+  while (bajo < alto) {
+    const medio = (bajo + alto) >> 1;
+    if (nodos[medio]! < nodoGlobal) bajo = medio + 1;
+    else alto = medio;
+  }
+  return bajo < nodos.length && nodos[bajo] === nodoGlobal ? bajo : null;
+}
+
+/**
+ * Donde esta el carro sobre el layout: entre el nodo global `nodo` y el
+ * `siguiente` (consecutivos en la tabla del carro), a `fraccion` del camino
+ * (0 = en `nodo`). La publica el reproductor en cada cuadro.
+ */
+export interface PosicionDelCarroEnElLayout {
+  nodo: number;
+  siguiente: number;
+  fraccion: number;
+}
+
+/**
+ * Abscisa del carro en una figura: interpolada entre las x de sus dos nodos,
+ * en el eje que tenga la figura (arco, tiempo del modelo o del prototipo).
+ * null si la figura no esta sobre el recorrido o el carro no esta en el
+ * tramo que muestra (otro elemento elegido). Puro.
+ */
+export function abscisaDelCarro(figura: Pick<DatosDeFigura, 'x' | 'nodos'>, carro: PosicionDelCarroEnElLayout | null): number | null {
+  if (!carro || !figura.nodos) return null;
+  const i0 = primerIndiceDeNodo(figura.nodos, carro.nodo);
+  const i1 = primerIndiceDeNodo(figura.nodos, carro.siguiente);
+  if (i0 !== null && i1 !== null) return figura.x[i0]! + (figura.x[i1]! - figura.x[i0]!) * carro.fraccion;
+  // Justo en el borde del tramo que se muestra (el empalme con el elemento de al lado).
+  if (i0 !== null && carro.fraccion === 0) return figura.x[i0]!;
+  if (i1 !== null && carro.fraccion === 1) return figura.x[i1]!;
+  return null;
+}
+
+/**
+ * Valor de cada serie en la abscisa x (interpolacion lineal entre los puntos
+ * que la rodean). Una serie sin dato en alguno de los dos no tiene valor,
+ * salvo que la figura una huecos (A/B): ahi se buscan los vecinos de la
+ * misma serie, que es lo que la linea dibujada muestra. Puro.
+ */
+export function valoresEnX(figura: Pick<DatosDeFigura, 'x' | 'series' | 'unirHuecos'>, x: number): (number | null)[] {
+  const xs = figura.x;
+  let j = 0;
+  let alto = xs.length;
+  while (j < alto) {
+    const medio = (j + alto) >> 1;
+    if (xs[medio]! < x) j = medio + 1;
+    else alto = medio;
+  }
+  return figura.series.map(({ valores }) => {
+    const definido = (k: number) => valores[k] !== null && valores[k] !== undefined;
+    if (j < xs.length && xs[j] === x && definido(j)) return valores[j]!;
+    let antes = j - 1;
+    let despues = j < xs.length && xs[j] === x ? j + 1 : j;
+    if (figura.unirHuecos) {
+      while (antes >= 0 && !definido(antes)) antes--;
+      while (despues < xs.length && !definido(despues)) despues++;
+    }
+    if (antes < 0 || despues >= xs.length || !definido(antes) || !definido(despues)) return null;
+    const x0 = xs[antes]!;
+    const x1 = xs[despues]!;
+    const y0 = valores[antes]!;
+    const y1 = valores[despues]!;
+    return x1 === x0 ? y0 : y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
+  });
+}
+
 function numero(v: number | null | undefined): number | null {
   return v === null || v === undefined || !Number.isFinite(v) ? null : v;
 }

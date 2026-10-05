@@ -15,6 +15,12 @@ export interface PosicionDelCarro {
   elemento: number;
   /** Nodo local mas cercano por debajo. */
   nodo: number;
+  /**
+   * Los dos nodos consecutivos de la tabla entre los que esta el carro y
+   * cuanto avanzo de uno al otro (0..1): el marcador de los graficos
+   * interpola la abscisa con esto.
+   */
+  entre: { anterior: { elemento: number; nodo: number }; posterior: { elemento: number; nodo: number }; fraccion: number };
   velocidad: number | null;
   gz: number | null;
   gy: number | null;
@@ -125,6 +131,11 @@ export class Carro {
       gz: valor(tabla.gz),
       gy: valor(tabla.gy),
       posicion,
+      entre: {
+        anterior: { elemento: tabla.elemento[k]!, nodo: tabla.nodoLocal[k]! },
+        posterior: { elemento: tabla.elemento[k + 1]!, nodo: tabla.nodoLocal[k + 1]! },
+        fraccion: a,
+      },
     };
   }
 

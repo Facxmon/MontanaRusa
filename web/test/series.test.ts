@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { analizarLayout } from '../src/contrato/cargar';
 import {
+  abscisaDelCarro,
   acompanantesDe,
   columna,
   columnasDeEnergia,
@@ -19,6 +20,8 @@ import {
   ubicacionDeNodo,
   PESTANAS,
   rangoConValores,
+  primerIndiceDeNodo,
+  valoresEnX,
 } from '../src/graficos/series';
 
 const cargar = (caso: string) =>
@@ -327,5 +330,41 @@ describe('energia mecanica', () => {
     const [bajo2] = rangoConValores(-0.1, 0.9, [0, 1]);
     expect(bajo2).toBeLessThan(-0.1);
     expect(rangoConValores(null, null, [0, 2])).toEqual([0, 2.1]);
+  });
+});
+
+describe('marcador del carro en los graficos', () => {
+  const c = extraerColumnas(circuito, null);
+  const [velocidad] = figurasDePestana('cinematica', c, 'arco');
+
+  it('la abscisa se interpola entre los dos nodos del carro, en el eje de la figura', () => {
+    const nodos = velocidad!.nodos!;
+    const carro = { nodo: nodos[100]!, siguiente: nodos[101]!, fraccion: 0.25 };
+    const x = abscisaDelCarro(velocidad!, carro)!;
+    expect(x).toBeCloseTo(velocidad!.x[100]! + 0.25 * (velocidad!.x[101]! - velocidad!.x[100]!), 12);
+    const [v] = valoresEnX(velocidad!, x);
+    const v0 = velocidad!.series[0]!.valores[100]!;
+    const v1 = velocidad!.series[0]!.valores[101]!;
+    expect(v).toBeCloseTo(v0 + 0.25 * (v1 - v0), 12);
+  });
+
+  it('en el nodo exacto, el valor del nodo; sin carro o fuera del elemento elegido, no hay marcador', () => {
+    const nodos = velocidad!.nodos!;
+    expect(valoresEnX(velocidad!, velocidad!.x[5]!)[0]).toBe(velocidad!.series[0]!.valores[5]);
+    expect(abscisaDelCarro(velocidad!, null)).toBeNull();
+    const [delPrimero] = figurasDePestana('cinematica', extraerColumnas(circuito, 0), 'arco');
+    const ultimo = nodos[nodos.length - 2]!;
+    expect(abscisaDelCarro(delPrimero!, { nodo: ultimo, siguiente: ultimo + 1, fraccion: 0.5 })).toBeNull();
+  });
+
+  it('con nodos repetidos (A/B) se toma el primero, que es el punto de B', () => {
+    expect(primerIndiceDeNodo([0, 1, 1, 1, 2], 1)).toBe(1);
+    expect(primerIndiceDeNodo([0, 1, 1, 1, 2], 3)).toBeNull();
+  });
+
+  it('valoresEnX no inventa: sin dato a un lado no hay valor, salvo que la figura una huecos', () => {
+    const figura = { x: [0, 1, 2], series: [{ valores: [0, null, 2] }] } as unknown as Parameters<typeof valoresEnX>[0];
+    expect(valoresEnX(figura, 0.5)).toEqual([null]);
+    expect(valoresEnX({ ...figura, unirHuecos: true }, 0.5)).toEqual([0.5]);
   });
 });

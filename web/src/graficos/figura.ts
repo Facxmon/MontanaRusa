@@ -26,7 +26,7 @@ import 'uplot/dist/uPlot.min.css';
 import { escribirAlmacen, leerAlmacen } from '../paneles/almacen';
 import { formatearNumero, SIN_DATO, type Notacion } from '../paneles/formato';
 import { fuenteDeCanvas, tema } from '../tema';
-import { acompanantesDe, rangoConValores, valorEnElCursor } from './series';
+import { acompanantesDe, rangoConValores, valoresEnX, valorEnElCursor } from './series';
 
 /**
  * Colores simbolicos de las series: series.ts no toca el DOM (se testea en
@@ -406,6 +406,8 @@ export class Figura {
     opciones.plugins = [zoomYDesplazamiento(() => this.mostrarPista())];
     opciones.hooks = {
       ...opciones.hooks,
+      // El marcador del carro se reubica despues de cada redibujo (zoom, tamano, series prendidas o apagadas).
+      draw: [(u: uPlot) => this.ubicarCarro(u)],
       setCursor: [
         (u: uPlot) => {
           this.dibujarTooltip(u);
@@ -438,6 +440,21 @@ export class Figura {
     };
     this.grafico = new uPlot(opciones, [datos.x, ...datos.series.map((s) => s.valores)], this.contenedor);
     this.contenedor.append(this.tooltip, this.pista);
+    // Marcador del carro: una linea vertical y un punto por serie de datos,
+    // como nodos del DOM sobre el area de dibujo. Moverlo es cambiar un
+    // `left`/`top`: no redibuja el canvas, asi puede ir a la par del 3D.
+    this.lineaDelCarro = document.createElement('div');
+    this.lineaDelCarro.className = 'figura-carro';
+    this.lineaDelCarro.hidden = true;
+    this.puntosDelCarro = datos.series.map((s) => {
+      const punto = document.createElement('div');
+      punto.className = 'figura-carro-punto';
+      punto.style.background = colorDeSerie(s.color);
+      punto.hidden = true;
+      return punto;
+    });
+    this.grafico.over.append(this.lineaDelCarro, ...this.puntosDelCarro);
+    this.ubicarCarro(this.grafico);
     this.veloIzquierdo = document.createElement('div');
     this.veloDerecho = document.createElement('div');
     this.rotuloDeRango = document.createElement('div');
@@ -472,6 +489,47 @@ export class Figura {
       this.opciones.alElegirPunto?.(u.cursor.idx);
     });
     this.avisarDelRango(u);
+  }
+
+  /** Abscisa del carro en esta figura (en su eje x), o null si no se marca. */
+  private xDelCarro: number | null = null;
+  private lineaDelCarro: HTMLElement | null = null;
+  private puntosDelCarro: HTMLElement[] = [];
+
+  /** Pone el marcador del carro en la abscisa x (null lo saca). */
+  ponerCarroEn(x: number | null): void {
+    if (x === this.xDelCarro) return;
+    this.xDelCarro = x;
+    if (this.grafico) this.ubicarCarro(this.grafico);
+  }
+
+  private ubicarCarro(u: uPlot): void {
+    const linea = this.lineaDelCarro;
+    const datos = this.datos;
+    if (!linea || !datos) return;
+    const x = this.xDelCarro;
+    const escala = u.scales.x;
+    const visible = x !== null && escala?.min !== undefined && escala.max !== undefined && x >= escala.min && x <= escala.max;
+    linea.hidden = !visible;
+    if (!visible) {
+      for (const punto of this.puntosDelCarro) punto.hidden = true;
+      return;
+    }
+    const izquierda = u.valToPos(x, 'x');
+    linea.style.left = `${izquierda}px`;
+    const valores = valoresEnX(datos, x);
+    const ey = u.scales.y;
+    this.puntosDelCarro.forEach((punto, i) => {
+      const serie = datos.series[i]!;
+      const y = valores[i];
+      const mostrar =
+        esSerieDeDatos(serie) && u.series[i + 1]?.show !== false && y !== null && y !== undefined &&
+        ey?.min !== undefined && ey.max !== undefined && y >= ey.min && y <= ey.max;
+      punto.hidden = !mostrar;
+      if (!mostrar) return;
+      punto.style.left = `${izquierda}px`;
+      punto.style.top = `${u.valToPos(y, 'y')}px`;
+    });
   }
 
   private veloIzquierdo: HTMLElement | null = null;
@@ -559,6 +617,8 @@ export class Figura {
     this.grafico?.destroy();
     this.grafico = null;
     this.datos = null;
+    this.lineaDelCarro = null;
+    this.puntosDelCarro = [];
     this.contenedor.replaceChildren();
     this.tooltip.hidden = true;
   }
@@ -570,6 +630,15 @@ export class Figura {
     this.observador.disconnect();
   }
 }
+
+/**
+ * El marcador del carro lleva punto sobre las curvas de DATOS, no sobre las
+ * referencias (limites, bandas, cero, E0) ni las mitades ocultas.
+ */
+function esSerieDeDatos(serie: SerieDeFigura): boolean {
+  return !serie.ocultarEnLeyenda && !serie.puntos && SERIES_DE_DATOS.has(serie.color);
+}
+const SERIES_DE_DATOS = new Set<ColorDeSerie>(['serie1', 'serie2', 'serie3', 'comparacion1', 'comparacion2', 'comparacion3']);
 
 function filaDeTooltip(texto: string): HTMLElement {
   const fila = document.createElement('div');
