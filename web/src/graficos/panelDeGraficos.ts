@@ -227,7 +227,7 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
       );
       cuerpo.append(caja);
       const figura = new Figura(lienzo, {
-        claveDeSincronizacion: `graficos-${pestana}`,
+        claveDeSincronizacion: `graficos-${pestana}${d.grupoDeCursor ? `-${d.grupoDeCursor}` : ''}`,
         alto,
         alMoverCursor: (punto) => {
           if (aplicandoCursor) return;

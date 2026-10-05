@@ -94,6 +94,13 @@ export interface DatosDeFigura {
   nodos?: number[];
   /** Con la comparacion A/B cada serie tiene huecos donde el otro diseno tiene puntos: se unen. */
   unirHuecos?: boolean;
+  /**
+   * Una figura cuya abscisa no es la del resto de la pestana (arco y altura
+   * contra el tiempo con el eje en arco) no comparte el cursor de uPlot, que
+   * sincroniza por VALOR de x: lleva su propio grupo. El cursor ligado por
+   * nodo (estado.nodo) y el marcador del carro la siguen igual.
+   */
+  grupoDeCursor?: string;
 }
 
 function colorDeSerie(color: ColorDeSerie): string {

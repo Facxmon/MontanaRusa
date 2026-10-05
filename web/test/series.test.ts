@@ -99,6 +99,32 @@ describe('figurasDePestana', () => {
     expect(modelo.series[1]!.valores[0]).toBeCloseTo(15 * factor, 3);
   });
 
+  it('la aceleracion normal es v^2 * kappa de la heartline, en m/s^2', () => {
+    const c = extraerColumnas(circuito, 0);
+    const figura = figurasDePestana('cinematica', c, 'arco').find((f) => f.clave === 'aceleracionNormal')!;
+    expect(figura.etiquetaY).toBe('a_n [m/s²]');
+    const v = columna(c, 'velocidad');
+    const k = columna(c, 'curvatura');
+    for (const i of [0, 250, 700]) expect(figura.series[0]!.valores[i]).toBeCloseTo(v[i]! ** 2 * k[i]!, 12);
+  });
+
+  it('arco y altura van contra el tiempo: del modelo si el eje elegido es el arco', () => {
+    const c = extraerColumnas(circuito, null);
+    for (const [ejeX, eje] of [['arco', 'tiempo'], ['tiempo', 'tiempo'], ['tiempoPrototipo', 'tiempoPrototipo']] as const) {
+      const figuras = figurasDePestana('cinematica', c, ejeX);
+      for (const clave of ['arcoContraTiempo', 'alturaContraTiempo']) {
+        const f = figuras.find((d) => d.clave === clave)!;
+        expect(f.x).toEqual(c.x[eje]);
+        // Con otra abscisa que el resto de la pestana, el cursor de uPlot va aparte.
+        expect(f.grupoDeCursor).toBe(ejeX === 'arco' ? 'tiempo' : undefined);
+      }
+    }
+    const arco = figurasDePestana('cinematica', c, 'tiempo').find((d) => d.clave === 'arcoContraTiempo')!;
+    expect(arco.series[0]!.valores).toEqual(c.x.arco);
+    const altura = figurasDePestana('cinematica', c, 'tiempo').find((d) => d.clave === 'alturaContraTiempo')!;
+    expect(altura.series.map((s) => s.valores[10])).toEqual([columna(c, 'z')[10], columna(c, 'zRiel')[10]]);
+  });
+
   it('sinHuecosEnX saca los nodos con tiempo null (despues de una parada)', () => {
     const figura = sinHuecosEnX({
       titulo: '',

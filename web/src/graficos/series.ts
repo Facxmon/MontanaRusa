@@ -286,7 +286,7 @@ export function extraerColumnas(layout: Layout, elementoElegido: number | null):
 }
 
 /** Columna de nodos concatenada, con null donde el JSON trae null. */
-export function columna(columnas: Columnas, clave: ClaveDeMagnitud, escala = 1): (number | null)[] {
+export function columna(columnas: Columnas, clave: ClaveDeMagnitud | 'z' | 'zRiel', escala = 1): (number | null)[] {
   const valores: (number | null)[] = [];
   for (const tramo of columnas.tramos) {
     const datos = tramo.elemento.nodos[clave];
@@ -440,8 +440,26 @@ export function figurasDeJerk(columnas: Columnas, ejeX: EjeX): DatosDeFigura[] {
   });
 }
 
+/**
+ * Eje de las figuras "contra el tiempo" (arco y altura): el tiempo que este
+ * elegido; con el eje en arco, el del modelo (arco contra arco no dice nada).
+ */
+export function ejeDeTiempo(ejeX: EjeX): Exclude<EjeX, 'arco'> {
+  return ejeX === 'arco' ? 'tiempo' : ejeX;
+}
+
+/** a_n = v^2 * kappa de la heartline, nodo a nodo: v del centro de masa y curvatura de la heartline, las dos del contrato. */
+export function aceleracionNormal(columnas: Columnas): (number | null)[] {
+  const curvatura = columna(columnas, 'curvatura');
+  return columna(columnas, 'velocidad').map((v, i) => {
+    const k = curvatura[i];
+    return v === null || k === null || k === undefined ? null : v * v * k;
+  });
+}
+
 export function figurasDeCinematica(columnas: Columnas, ejeX: EjeX): DatosDeFigura[] {
   const x = columnas.x[ejeX] as number[];
+  const enTiempo = ejeDeTiempo(ejeX);
   return [
     {
       clave: 'velocidad',
@@ -472,6 +490,25 @@ export function figurasDeCinematica(columnas: Columnas, ejeX: EjeX): DatosDeFigu
       franjas: columnas.franjas[ejeX],
     },
     {
+      clave: 'aceleracionNormal',
+      titulo: 'Aceleración normal de la heartline — a_n = v²·κ',
+      etiquetaX: ETIQUETA_DE_EJE[ejeX],
+      etiquetaY: 'a_n [m/s²]',
+      x,
+      decimalesX: DECIMALES_DE_EJE[ejeX],
+      ...formatoDe('aceleracionTangencial'),
+      series: [
+        {
+          etiqueta: 'Aceleración normal (v² · κ de la heartline)',
+          valores: aceleracionNormal(columnas),
+          color: SERIE[0],
+          ancho: 1.6,
+          ayuda: 'Velocidad del centro de masa al cuadrado por la curvatura de la heartline, nodo a nodo. Es la aceleración centrípeta de la trayectoria del pasajero, sin la gravedad.',
+        },
+      ],
+      franjas: columnas.franjas[ejeX],
+    },
+    {
       clave: 'energia',
       titulo: 'Energía mecánica total del centro de masa',
       etiquetaX: ETIQUETA_DE_EJE[ejeX],
@@ -481,6 +518,33 @@ export function figurasDeCinematica(columnas: Columnas, ejeX: EjeX): DatosDeFigu
       ...formatoDe('energiaTotal'),
       series: [{ etiqueta: 'Energía total', valores: columna(columnas, 'energiaTotal'), color: SERIE[0], ancho: 1.6 }],
       franjas: columnas.franjas[ejeX],
+    },
+    {
+      clave: 'arcoContraTiempo',
+      titulo: 'Arco recorrido contra el tiempo',
+      grupoDeCursor: enTiempo === ejeX ? undefined : enTiempo,
+      etiquetaX: ETIQUETA_DE_EJE[enTiempo],
+      etiquetaY: 's [m]',
+      x: columnas.x[enTiempo] as number[],
+      decimalesX: DECIMALES_DE_EJE[enTiempo],
+      ...formatoDe('arco'),
+      series: [{ etiqueta: 'Arco recorrido sobre el riel', valores: columnas.x.arco, color: SERIE[0], ancho: 1.8 }],
+      franjas: columnas.franjas[enTiempo],
+    },
+    {
+      clave: 'alturaContraTiempo',
+      titulo: 'Altura contra el tiempo',
+      grupoDeCursor: enTiempo === ejeX ? undefined : enTiempo,
+      etiquetaX: ETIQUETA_DE_EJE[enTiempo],
+      etiquetaY: 'z [m]',
+      x: columnas.x[enTiempo] as number[],
+      decimalesX: DECIMALES_DE_EJE[enTiempo],
+      ...formatoDe('arco'),
+      series: [
+        { etiqueta: 'Centro de masa (heartline)', valores: columna(columnas, 'z'), color: SERIE[0], ancho: 1.8 },
+        { etiqueta: 'Riel', valores: columna(columnas, 'zRiel'), color: SERIE[1], ancho: 1, trazos: [4, 3] },
+      ],
+      franjas: columnas.franjas[enTiempo],
     },
   ];
 }
