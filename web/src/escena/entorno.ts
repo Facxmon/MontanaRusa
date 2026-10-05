@@ -9,6 +9,11 @@
 //    via entra y en rojo si se sale: conecta la vista con un criterio de
 //    aceptacion real ("Dentro del bounding box disponible").
 //  - La proyeccion del riel sobre el piso (z = 0): la huella que ocupa.
+//  - Un eje vertical graduado (z) en la esquina de x e y minimos de la caja
+//    disponible (o de la del layout si no hay disponible): la referencia de
+//    alturas. Va de la z mas baja a la mas alta de las dos cajas y el paso
+//    de las marcas sale de ese alto (1, 2, 2,5 o 5 por potencia de 10), asi
+//    se rehace con cada layout y acompana la escala del diseno.
 //
 // La caja y la proyeccion se prenden y apagan desde los controles de la
 // vista 3D (paneles/controles3d.ts): la caja arranca visible (su tamano es
@@ -61,6 +66,42 @@ export function extremosDeGrilla(cajas: Caja[]): { x: [number, number]; y: [numb
 /** true si la caja `dentro` cabe en `fuera` (con tolerancia de un milimetro). */
 export function cabe(dentro: Caja, fuera: Caja): boolean {
   return dentro.every(([a, b], i) => a >= fuera[i]![0] - 1e-3 && b <= fuera[i]![1] + 1e-3);
+}
+
+/** Cuantos intervalos se buscan como maximo en el eje z (con el paso redondo quedan entre 2 y 5). */
+const MARCAS_DEL_EJE_Z = 5;
+
+/**
+ * Paso "redondo" (1, 2, 2,5 o 5 por una potencia de 10) para graduar un
+ * alto: el menor que deja a lo sumo MARCAS_DEL_EJE_Z intervalos. Puro.
+ */
+export function pasoDeGraduacion(alto: number, marcas = MARCAS_DEL_EJE_Z): number {
+  if (!(alto > 0) || !Number.isFinite(alto)) return 0.1;
+  const crudo = alto / marcas;
+  const potencia = 10 ** Math.floor(Math.log10(crudo));
+  for (const m of [1, 2, 2.5, 5, 10]) {
+    if (m * potencia >= crudo) return m * potencia;
+  }
+  return 10 * potencia;
+}
+
+/** Marcas del eje z: multiplos del paso que cubren [desde, hasta] hacia afuera. Puro. */
+export function marcasDelEjeZ(desde: number, hasta: number): { paso: number; marcas: number[] } {
+  const paso = pasoDeGraduacion(hasta - desde);
+  const primera = Math.floor(desde / paso + 1e-9);
+  const ultima = Math.ceil(hasta / paso - 1e-9);
+  const marcas: number[] = [];
+  for (let i = primera; i <= ultima; i++) marcas.push(Number((i * paso).toPrecision(12)));
+  return { paso, marcas };
+}
+
+/** "0,25 m", "-0,1 m": el rotulo de una marca del eje z, con los decimales del paso. */
+export function rotuloDeAltura(v: number, paso: number): string {
+  // Los decimales justos para escribir el paso (0,25 -> 2; 0,5 -> 1; 2 -> 0).
+  let decimales = 0;
+  while (decimales < 6 && Math.abs(Math.round(paso * 10 ** decimales) - paso * 10 ** decimales) > 1e-6) decimales++;
+  const texto = (Math.abs(v) < paso * 1e-6 ? 0 : v).toFixed(decimales);
+  return `${texto.replace('.', ',')} m`;
 }
 
 /** "0,5 m", "-1 m", "1,5 m": el rotulo de una linea mayor, con coma decimal. */
@@ -160,6 +201,13 @@ export class Entorno {
       this.grupoDeCaja.add(nombre);
     }
 
+    const cajaDelEje = disponible ?? delLayout;
+    if (layout && cajaDelEje) {
+      const abajo = Math.min(cajaDelEje[2][0], delLayout?.[2][0] ?? Infinity, 0);
+      const arriba = Math.max(cajaDelEje[2][1], delLayout?.[2][1] ?? -Infinity);
+      this.ejeZ(cajaDelEje[0][0], cajaDelEje[1][0], abajo, arriba, alto, t.escenaEjeZ, t.escenaRotulo);
+    }
+
     if (layout) {
       // La proyeccion del riel sobre el piso: una polilinea por elemento (sin unir entre elementos no hace falta: son continuos).
       const nodos = aplanarNodos(layout);
@@ -200,6 +248,29 @@ export class Entorno {
       r.center.set(1, 0.5);
       this.grupo.add(r);
     }
+  }
+
+  /**
+   * Eje vertical graduado en (x, y): la linea, una marca por paso (hacia -x,
+   * rotulada) y media marca sin rotulo entre dos, mas el nombre "z" arriba.
+   */
+  private ejeZ(x: number, y: number, desde: number, hasta: number, separacion: number, color: string, colorDeRotulo: string): void {
+    const { paso, marcas } = marcasDelEjeZ(desde, hasta);
+    const largo = separacion * 0.6;
+    const linea: number[] = [x, y, marcas[0]!, x, y, marcas[marcas.length - 1]!];
+    for (const [i, z] of marcas.entries()) {
+      linea.push(x, y, z, x - largo, y, z);
+      if (i < marcas.length - 1) linea.push(x, y, z + paso / 2, x - largo / 2, y, z + paso / 2);
+      const r = rotulo(rotuloDeAltura(z, paso), colorDeRotulo);
+      r.position.set(x - largo * 1.4, y, z);
+      r.center.set(1, 0.5);
+      this.grupo.add(r);
+    }
+    this.grupo.add(segmentos(linea, color));
+    const nombre = rotulo('z', color);
+    nombre.position.set(x, y, marcas[marcas.length - 1]! + separacion / 2);
+    nombre.center.set(0.5, 0);
+    this.grupo.add(nombre);
   }
 
   private vaciar(): void {
