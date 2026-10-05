@@ -169,6 +169,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     panel: 'resultados',
     nodo: null,
     reproduciendo: false,
+    carro: null,
     comparacion: null,
   });
 

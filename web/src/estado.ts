@@ -4,7 +4,7 @@
 import type { ClaveDeMagnitud } from './contrato/magnitudes';
 import type { Diagnostico } from './diagnostico';
 import type { Layout } from './contrato/tipos';
-import type { EjeX, Pestana } from './graficos/series';
+import type { EjeX, Pestana, PosicionDelCarroEnElLayout } from './graficos/series';
 import type { EntradaDeDiseno } from './nucleo/calcular';
 
 /** 'ambos' parte el area principal: sin eso, el cursor ligado grafico <-> 3D no se puede ver. */
@@ -71,6 +71,14 @@ export interface DatosDeEstado {
    * escriben los del instante exacto; el 3D sigue a su frame rate.
    */
   reproduciendo: boolean;
+  /**
+   * Donde esta el carro (entre dos nodos globales consecutivos), o null sin
+   * layout. Lo publica el reproductor en cada cuadro mientras corre, y al
+   * mover la barra, al pausar o al ir a un nodo; lo leen los graficos para
+   * dibujar el marcador del carro. No es el cursor: estado.nodo es lo que
+   * esta bajo el mouse (o el nodo por el que pasa el carro si se reproduce).
+   */
+  carro: PosicionDelCarroEnElLayout | null;
   /**
    * Diseno fijado como A para comparar (fase 4.8), o null. Se guarda el
    * LAYOUT (las curvas) ademas del diseno: recalcular A cada vez costaria

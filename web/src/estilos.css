@@ -370,6 +370,31 @@ html, body {
   pointer-events: none;
 }
 .figura-tooltip[hidden] { display: none; }
+/* Marcador del carro: linea vertical en la abscisa del carro y un punto por
+   curva de datos (figura.ts). Encima de las series, sin tomar el mouse. */
+.figura-carro {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 2px solid var(--grafico-carro);
+  transform: translateX(-1px);
+  pointer-events: none;
+  z-index: 2;
+}
+.figura-carro-punto {
+  position: absolute;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--grafico-carro);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 2;
+}
+.figura-carro[hidden],
+.figura-carro-punto[hidden] { display: none; }
 .figura-tooltip-x { margin-bottom: var(--esp-1); color: var(--texto-2); font-family: var(--cifras); font-variant-numeric: tabular-nums; }
 .figura-tooltip-serie { display: grid; grid-template-columns: auto minmax(0, 1fr) var(--ancho-leyenda-valor); align-items: center; gap: var(--esp-1); }
 .figura-tooltip-muestra { width: var(--esp-2); height: var(--esp-2); border-radius: var(--radio-chico); }

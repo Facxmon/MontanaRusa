@@ -143,6 +143,17 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
     if (layout) {
       const nodo = nodoGlobalDe(layout, donde.elemento, donde.nodo);
       if (estado.get().nodo !== nodo) estado.set({ nodo });
+      // El marcador del carro en los graficos: entre que dos nodos va y cuanto avanzo.
+      const { anterior, posterior, fraccion } = donde.entre;
+      const carroEnElLayout = {
+        nodo: nodoGlobalDe(layout, anterior.elemento, anterior.nodo),
+        siguiente: nodoGlobalDe(layout, posterior.elemento, posterior.nodo),
+        fraccion,
+      };
+      const previo = estado.get().carro;
+      if (!previo || previo.nodo !== carroEnElLayout.nodo || previo.siguiente !== carroEnElLayout.siguiente || previo.fraccion !== fraccion) {
+        estado.set({ carro: carroEnElLayout });
+      }
     }
   }
 

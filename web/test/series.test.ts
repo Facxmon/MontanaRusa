@@ -3,8 +3,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { analizarLayout } from '../src/contrato/cargar';
 import {
+  abscisaDelCarro,
   acompanantesDe,
   columna,
+  columnasDeEnergia,
   curvaDelRecorrido,
   figurasDeDuracion,
   esSobreElRecorrido,
@@ -17,6 +19,9 @@ import {
   sinHuecosEnX,
   ubicacionDeNodo,
   PESTANAS,
+  rangoConValores,
+  primerIndiceDeNodo,
+  valoresEnX,
 } from '../src/graficos/series';
 
 const cargar = (caso: string) =>
@@ -97,6 +102,32 @@ describe('figurasDePestana', () => {
     expect(prototipo.series[0]!.valores[500]).toBeCloseTo(modelo.series[0]!.valores[500]! / factor, 4);
     expect(prototipo.series[1]!.valores[0]).toBe(15);
     expect(modelo.series[1]!.valores[0]).toBeCloseTo(15 * factor, 3);
+  });
+
+  it('la aceleracion normal es v^2 * kappa de la heartline, en m/s^2', () => {
+    const c = extraerColumnas(circuito, 0);
+    const figura = figurasDePestana('cinematica', c, 'arco').find((f) => f.clave === 'aceleracionNormal')!;
+    expect(figura.etiquetaY).toBe('a_n [m/s²]');
+    const v = columna(c, 'velocidad');
+    const k = columna(c, 'curvatura');
+    for (const i of [0, 250, 700]) expect(figura.series[0]!.valores[i]).toBeCloseTo(v[i]! ** 2 * k[i]!, 12);
+  });
+
+  it('arco y altura van contra el tiempo: del modelo si el eje elegido es el arco', () => {
+    const c = extraerColumnas(circuito, null);
+    for (const [ejeX, eje] of [['arco', 'tiempo'], ['tiempo', 'tiempo'], ['tiempoPrototipo', 'tiempoPrototipo']] as const) {
+      const figuras = figurasDePestana('cinematica', c, ejeX);
+      for (const clave of ['arcoContraTiempo', 'alturaContraTiempo']) {
+        const f = figuras.find((d) => d.clave === clave)!;
+        expect(f.x).toEqual(c.x[eje]);
+        // Con otra abscisa que el resto de la pestana, el cursor de uPlot va aparte.
+        expect(f.grupoDeCursor).toBe(ejeX === 'arco' ? 'tiempo' : undefined);
+      }
+    }
+    const arco = figurasDePestana('cinematica', c, 'tiempo').find((d) => d.clave === 'arcoContraTiempo')!;
+    expect(arco.series[0]!.valores).toEqual(c.x.arco);
+    const altura = figurasDePestana('cinematica', c, 'tiempo').find((d) => d.clave === 'alturaContraTiempo')!;
+    expect(altura.series.map((s) => s.valores[10])).toEqual([columna(c, 'z')[10], columna(c, 'zRiel')[10]]);
   });
 
   it('sinHuecosEnX saca los nodos con tiempo null (despues de una parada)', () => {
@@ -253,5 +284,87 @@ describe('G contra duracion sostenida (Figs. 6-10)', () => {
   it('con un elemento elegido se consideran los eventos que tocan sus nodos', () => {
     const figuras = figurasDeDuracion(extraerColumnas(circuito, 2));
     expect(figuras[0]!.series.find((s) => s.puntos)!.etiqueta).not.toMatch(/6\.42/);
+  });
+});
+
+describe('energia mecanica', () => {
+  const c = extraerColumnas(circuito, null);
+  const energia = columnasDeEnergia(c);
+  const e0 = circuito.estadoInicial.energiaTotal!;
+
+  it('E0 es la energia del estado inicial y la del primer nodo', () => {
+    expect(c.energiaInicial).toBe(e0);
+    expect(circuito.elementos[0]!.nodos.energiaTotal![0]).toBeCloseTo(e0, 5);
+  });
+
+  it('cinetica + potencial = mecanica del contrato (la particion de SimularSobreTrack.m)', () => {
+    for (let i = 0; i < c.cantidad; i += 97) {
+      const { cinetica, potencial, mecanica } = energia;
+      if (mecanica[i] === null) continue;
+      // Dentro del redondeo a 6 cifras del contrato.
+      expect(Math.abs(cinetica[i]! + potencial[i]! - mecanica[i]!) / Math.abs(mecanica[i]!)).toBeLessThan(1e-5);
+    }
+  });
+
+  it('la perdida acumulada arranca en 0 y crece: rodadura y arrastre solo quitan energia', () => {
+    const perdida = energia.perdida.filter((v): v is number => v !== null);
+    expect(perdida[0]).toBeCloseTo(0, 6);
+    expect(perdida[perdida.length - 1]!).toBeGreaterThan(0);
+    expect(perdida[perdida.length - 1]!).toBeCloseTo(e0 - energia.mecanica.filter((v) => v !== null).at(-1)!, 12);
+  });
+
+  it('la figura tiene E0 fija y el eje y incluye 0 y E0; con un elemento elegido E0 sigue siendo la del inicio', () => {
+    for (const elegido of [null, 2]) {
+      const figura = figurasDePestana('cinematica', extraerColumnas(circuito, elegido), 'arco').find((f) => f.clave === 'energia')!;
+      const e0Serie = figura.series.find((s) => s.fija)!;
+      expect(e0Serie.valores.every((v) => v === e0)).toBe(true);
+      expect(figura.incluirEnY).toEqual([0, e0]);
+      expect(figura.series.map((s) => s.etiqueta.split(' ')[0])).toEqual(['Mecánica', 'Cinética', 'Potencial', 'Pérdida', 'E₀']);
+    }
+  });
+
+  it('rangoConValores cubre los datos y los obligatorios; el 0 queda pegado al eje', () => {
+    const [bajo, alto] = rangoConValores(0.4, 0.9, [0, 1]);
+    expect(bajo).toBe(0);
+    expect(alto).toBeCloseTo(1.05, 12);
+    const [bajo2] = rangoConValores(-0.1, 0.9, [0, 1]);
+    expect(bajo2).toBeLessThan(-0.1);
+    expect(rangoConValores(null, null, [0, 2])).toEqual([0, 2.1]);
+  });
+});
+
+describe('marcador del carro en los graficos', () => {
+  const c = extraerColumnas(circuito, null);
+  const [velocidad] = figurasDePestana('cinematica', c, 'arco');
+
+  it('la abscisa se interpola entre los dos nodos del carro, en el eje de la figura', () => {
+    const nodos = velocidad!.nodos!;
+    const carro = { nodo: nodos[100]!, siguiente: nodos[101]!, fraccion: 0.25 };
+    const x = abscisaDelCarro(velocidad!, carro)!;
+    expect(x).toBeCloseTo(velocidad!.x[100]! + 0.25 * (velocidad!.x[101]! - velocidad!.x[100]!), 12);
+    const [v] = valoresEnX(velocidad!, x);
+    const v0 = velocidad!.series[0]!.valores[100]!;
+    const v1 = velocidad!.series[0]!.valores[101]!;
+    expect(v).toBeCloseTo(v0 + 0.25 * (v1 - v0), 12);
+  });
+
+  it('en el nodo exacto, el valor del nodo; sin carro o fuera del elemento elegido, no hay marcador', () => {
+    const nodos = velocidad!.nodos!;
+    expect(valoresEnX(velocidad!, velocidad!.x[5]!)[0]).toBe(velocidad!.series[0]!.valores[5]);
+    expect(abscisaDelCarro(velocidad!, null)).toBeNull();
+    const [delPrimero] = figurasDePestana('cinematica', extraerColumnas(circuito, 0), 'arco');
+    const ultimo = nodos[nodos.length - 2]!;
+    expect(abscisaDelCarro(delPrimero!, { nodo: ultimo, siguiente: ultimo + 1, fraccion: 0.5 })).toBeNull();
+  });
+
+  it('con nodos repetidos (A/B) se toma el primero, que es el punto de B', () => {
+    expect(primerIndiceDeNodo([0, 1, 1, 1, 2], 1)).toBe(1);
+    expect(primerIndiceDeNodo([0, 1, 1, 1, 2], 3)).toBeNull();
+  });
+
+  it('valoresEnX no inventa: sin dato a un lado no hay valor, salvo que la figura una huecos', () => {
+    const figura = { x: [0, 1, 2], series: [{ valores: [0, null, 2] }] } as unknown as Parameters<typeof valoresEnX>[0];
+    expect(valoresEnX(figura, 0.5)).toEqual([null]);
+    expect(valoresEnX({ ...figura, unirHuecos: true }, 0.5)).toEqual([0.5]);
   });
 });

@@ -143,6 +143,8 @@
   --escena-rotulo: var(--gris-500);
   --escena-uniones: var(--gris-500);
   --escena-carro: var(--ambar-500);
+  /* Placa del frente de cada carro: dice hacia donde apunta (contrasta con el ambar). */
+  --escena-frente-carro: var(--verde-500);
   --escena-pasajero: var(--rojo-500);
   --escena-pasajero-brillo: var(--rojo-800);
   /* Marcador del nodo bajo el cursor de los graficos. */
@@ -207,6 +209,8 @@
   --grafico-grilla: rgba(var(--gris-400-rgb), 0.14);
   --grafico-franja-a: rgba(var(--blanco-rgb), 0.025);
   --grafico-franja-b: rgba(var(--blanco-rgb), 0.06);
+  /* Marcador del carro en los graficos: el mismo ambar del carro del 3D. */
+  --grafico-carro: var(--ambar-500);
   --serie-1: var(--azul-500);
   --serie-2: var(--naranja-500);
   --serie-3: var(--verde-600);
@@ -273,6 +277,8 @@
   --grafico-grilla: rgba(var(--gris-400-rgb), 0.35);
   --grafico-franja-a: rgba(var(--gris-950-rgb), 0.025);
   --grafico-franja-b: rgba(var(--gris-950-rgb), 0.06);
+  /* Marcador del carro: el ambar del 3D no contrasta sobre blanco, va el oscuro. */
+  --grafico-carro: var(--ambar-800);
   --serie-1: var(--azul-600);
   --serie-2: var(--naranja-500);
   --serie-3: var(--verde-600);
