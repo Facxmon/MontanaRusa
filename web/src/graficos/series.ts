@@ -74,6 +74,14 @@ interface Tramo {
   /** Tiempo acumulado del modelo y del prototipo al entrar al elemento. */
   desfaseTiempo: number;
   desfaseTiempoPrototipo: number;
+  /**
+   * Masa y gravedad con que se simulo el elemento: las de sus ajustes si la
+   * instancia las pisa, si no las globales (la misma regla que el modo de
+   * curvatura, CONTRATO seccion 6). Con ellas se separa la energia en
+   * cinetica y potencial igual que SimularSobreTrack.m.
+   */
+  masa: number;
+  gravedad: number;
 }
 
 export interface Columnas {
@@ -94,6 +102,12 @@ export interface Columnas {
   linea: LineaNormativa;
   /** Elemento elegido, o null para todo el layout. */
   elemento: number | null;
+  /**
+   * E0: la energia mecanica con que arranca el LAYOUT (estadoInicial), en J.
+   * Con un elemento elegido sigue siendo la del inicio del recorrido: la
+   * perdida acumulada se cuenta desde ahi. null si el contrato no la trae.
+   */
+  energiaInicial: number | null;
 }
 
 /**
@@ -145,6 +159,13 @@ export function lineaNormativa(layout: Layout): LineaNormativa {
   };
   LINEAS.set(layout, linea);
   return linea;
+}
+
+/** Un parametro numerico tal como lo uso el elemento: ajustes de la instancia ?? valor global. */
+function parametroDelElemento(layout: Layout, elemento: Elemento, clave: string): number {
+  const propio = (elemento.ajustes as Record<string, unknown> | undefined)?.[clave];
+  const valor = typeof propio === 'number' ? propio : (layout.parametros.valores as Record<string, unknown>)[clave];
+  return typeof valor === 'number' && Number.isFinite(valor) ? valor : NaN;
 }
 
 function factorTiempoDe(elemento: Elemento): number {
@@ -226,6 +247,8 @@ export function extraerColumnas(layout: Layout, elementoElegido: number | null):
         onsetModelo: tripleta(normativo.onsetPresupuestoModelo, tripleta(elemento.resumen.onsetMaximoModelo, [NaN, NaN, NaN])),
         desfaseTiempo: elementoElegido === null ? desfaseTiempo : 0,
         desfaseTiempoPrototipo: elementoElegido === null ? desfaseTiempoPrototipo : 0,
+        masa: parametroDelElemento(layout, elemento, 'masa'),
+        gravedad: parametroDelElemento(layout, elemento, 'gravedad'),
       });
     }
     const duracion = elemento.resumen.tiempoDeRecorrido ?? 0;
@@ -282,6 +305,7 @@ export function extraerColumnas(layout: Layout, elementoElegido: number | null):
     nodos: Int32Array.from(nodos),
     linea: lineaNormativa(layout),
     elemento: elementoElegido,
+    energiaInicial: numero(layout.estadoInicial.energiaTotal) ?? numero(layout.elementos[0]?.nodos.energiaTotal?.[0]),
   };
 }
 
@@ -448,6 +472,86 @@ export function ejeDeTiempo(ejeX: EjeX): Exclude<EjeX, 'arco'> {
   return ejeX === 'arco' ? 'tiempo' : ejeX;
 }
 
+/** Energia cinetica, potencial, mecanica y perdida acumulada del centro de masa, en J (con masa, como el contrato). */
+export interface ColumnasDeEnergia {
+  cinetica: (number | null)[];
+  potencial: (number | null)[];
+  mecanica: (number | null)[];
+  perdida: (number | null)[];
+}
+
+/**
+ * La particion de SimularSobreTrack.m: Ec = m v^2 / 2 con la velocidad del
+ * centro de masa y Ep = m g z con la z de la heartline; la mecanica es la
+ * energiaTotal del contrato (Ec + Ep del modelo). La perdida acumulada es
+ * E0 - E: el contrato no exporta la energia disipada por nodo (el resumen
+ * del MATLAB la tiene, Sim.EnergiaDisipadaRodadura/Arrastre, pero el
+ * exportador no la emite), y E0 - E es esa energia, la que se llevaron la
+ * rodadura y el arrastre desde el inicio (salvo el error de integracion y
+ * el redondeo a 6 cifras del contrato).
+ */
+export function columnasDeEnergia(columnas: Columnas): ColumnasDeEnergia {
+  const cinetica: (number | null)[] = [];
+  const potencial: (number | null)[] = [];
+  for (const tramo of columnas.tramos) {
+    const n = tramo.elemento.nodos;
+    for (let i = tramo.desde; i < n.numeroDeNodos; i++) {
+      const v = numero(n.velocidad[i]);
+      const z = numero(n.z[i]);
+      const ec = v === null ? null : 0.5 * tramo.masa * v * v;
+      const ep = z === null ? null : tramo.masa * tramo.gravedad * z;
+      cinetica.push(ec !== null && Number.isFinite(ec) ? ec : null);
+      potencial.push(ep !== null && Number.isFinite(ep) ? ep : null);
+    }
+  }
+  const mecanica = columna(columnas, 'energiaTotal');
+  const e0 = columnas.energiaInicial;
+  const perdida = mecanica.map((e) => (e === null || e0 === null ? null : e0 - e));
+  return { cinetica, potencial, mecanica, perdida };
+}
+
+function figuraDeEnergia(columnas: Columnas, ejeX: EjeX): DatosDeFigura {
+  const { cinetica, potencial, mecanica, perdida } = columnasDeEnergia(columnas);
+  const e0 = columnas.energiaInicial;
+  const series: SerieDeFigura[] = [
+    { etiqueta: 'Mecánica (cinética + potencial)', valores: mecanica, color: SERIE[0], ancho: 2 },
+    { etiqueta: 'Cinética (½·m·v²)', valores: cinetica, color: SERIE[1], ancho: 1.4 },
+    { etiqueta: 'Potencial (m·g·z de la heartline)', valores: potencial, color: SERIE[2], ancho: 1.4 },
+    {
+      etiqueta: 'Pérdida acumulada (E₀ − mecánica)',
+      valores: perdida,
+      color: SERIE[0],
+      ancho: 1.4,
+      trazos: [6, 3],
+      ayuda: 'Lo que la rodadura y el arrastre se llevaron desde el inicio del recorrido: E₀ menos la energía mecánica en ese punto.',
+    },
+  ];
+  if (e0 !== null) {
+    series.push({
+      etiqueta: 'E₀ (energía inicial)',
+      valores: constante(e0, columnas.cantidad),
+      color: COLOR_CERO,
+      ancho: 1.2,
+      trazos: [8, 4],
+      fija: true,
+      ayuda: 'Energía mecánica con que arranca el recorrido. Siempre visible: es la referencia de las otras curvas.',
+    });
+  }
+  return {
+    clave: 'energia',
+    titulo: 'Energía del centro de masa — cinética, potencial, mecánica y pérdida',
+    etiquetaX: ETIQUETA_DE_EJE[ejeX],
+    etiquetaY: 'E [J]',
+    x: columnas.x[ejeX] as number[],
+    decimalesX: DECIMALES_DE_EJE[ejeX],
+    ...formatoDe('energiaTotal'),
+    series,
+    franjas: columnas.franjas[ejeX],
+    // El eje y siempre muestra el 0 y E0: la escala no depende del minimo que alcance la mecanica.
+    incluirEnY: e0 === null ? [0] : [0, e0],
+  };
+}
+
 /** a_n = v^2 * kappa de la heartline, nodo a nodo: v del centro de masa y curvatura de la heartline, las dos del contrato. */
 export function aceleracionNormal(columnas: Columnas): (number | null)[] {
   const curvatura = columna(columnas, 'curvatura');
@@ -508,17 +612,7 @@ export function figurasDeCinematica(columnas: Columnas, ejeX: EjeX): DatosDeFigu
       ],
       franjas: columnas.franjas[ejeX],
     },
-    {
-      clave: 'energia',
-      titulo: 'Energía mecánica total del centro de masa',
-      etiquetaX: ETIQUETA_DE_EJE[ejeX],
-      etiquetaY: 'E [J]',
-      x,
-      decimalesX: DECIMALES_DE_EJE[ejeX],
-      ...formatoDe('energiaTotal'),
-      series: [{ etiqueta: 'Energía total', valores: columna(columnas, 'energiaTotal'), color: SERIE[0], ancho: 1.6 }],
-      franjas: columnas.franjas[ejeX],
-    },
+    figuraDeEnergia(columnas, ejeX),
     {
       clave: 'arcoContraTiempo',
       titulo: 'Arco recorrido contra el tiempo',
@@ -799,6 +893,23 @@ export function figurasDePestana(pestana: Pestana, columnas: Columnas, ejeX: Eje
   // cursor del grafico, el marcador del 3D y el reproductor hablen de lo mismo.
   const nodos = Array.from(columnas.nodos);
   return figuras.map((figura) => sinHuecosEnX({ ...figura, nodos }));
+}
+
+/**
+ * Rango del eje y que cubre los datos y los valores obligatorios, con un
+ * margen del 5 % arriba y abajo (abajo no si el extremo es un valor
+ * obligatorio que acota los datos: el 0 queda pegado al eje). Puro.
+ */
+export function rangoConValores(minimo: number | null, maximo: number | null, obligatorios: readonly number[]): [number, number] {
+  const valores = [...obligatorios, ...[minimo, maximo].filter((v): v is number => v !== null && Number.isFinite(v))];
+  let bajo = Math.min(...valores);
+  let alto = Math.max(...valores);
+  if (!Number.isFinite(bajo) || !Number.isFinite(alto)) return [0, 1];
+  const margen = (alto - bajo || Math.abs(alto) || 1) * 0.05;
+  const datosPorDebajo = minimo !== null && Number.isFinite(minimo) && minimo < Math.min(...obligatorios);
+  if (datosPorDebajo || obligatorios.length === 0) bajo -= margen;
+  alto += margen;
+  return [bajo, alto];
 }
 
 /** Series que acompanan a la de indice `lider` (base 0 en `series`): se prenden y apagan con ella. */

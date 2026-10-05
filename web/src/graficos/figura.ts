@@ -26,7 +26,7 @@ import 'uplot/dist/uPlot.min.css';
 import { escribirAlmacen, leerAlmacen } from '../paneles/almacen';
 import { formatearNumero, SIN_DATO, type Notacion } from '../paneles/formato';
 import { fuenteDeCanvas, tema } from '../tema';
-import { acompanantesDe, valorEnElCursor } from './series';
+import { acompanantesDe, rangoConValores, valorEnElCursor } from './series';
 
 /**
  * Colores simbolicos de las series: series.ts no toca el DOM (se testea en
@@ -56,6 +56,8 @@ export interface SerieDeFigura {
   ayuda?: string;
   /** Dibuja los puntos (p. ej. un punto marcado solo, sin linea). */
   puntos?: boolean;
+  /** Siempre visible: la leyenda no la apaga (E0 en el grafico de energia). */
+  fija?: boolean;
 }
 
 export interface Franja {
@@ -101,6 +103,11 @@ export interface DatosDeFigura {
    * nodo (estado.nodo) y el marcador del carro la siguen igual.
    */
   grupoDeCursor?: string;
+  /**
+   * Valores que el eje y incluye siempre al autoescalar (el 0 y E0 en el de
+   * energia), ademas del rango de los datos. Un zoom explicito en y manda.
+   */
+  incluirEnY?: number[];
 }
 
 function colorDeSerie(color: ColorDeSerie): string {
@@ -169,7 +176,9 @@ export function opcionesDeFigura(datos: DatosDeFigura, tamano: TamanoDeFigura, c
         }
       : { show: false },
     legend: { show: claveDeSincronizacion !== null, live: true },
-    scales: { x: { time: false } },
+    scales: datos.incluirEnY
+      ? { x: { time: false }, y: { range: (_u, minimo, maximo) => rangoConValores(minimo, maximo, datos.incluirEnY!) } }
+      : { x: { time: false } },
     axes: [
       { ...ejeComun, label: datos.etiquetaX, size: 50 * escala },
       { ...ejeComun, label: datos.etiquetaY, size: 60 * escala },
@@ -411,6 +420,11 @@ export class Figura {
       setSeries: [
         (u: uPlot, indice: number | null, opciones: uPlot.Series) => {
           if (indice === null || indice < 1 || opciones.show === undefined) return;
+          // Una serie fija no se apaga: se vuelve a prender en el acto.
+          if (!opciones.show && datos.series[indice - 1]?.fija) {
+            u.setSeries(indice, { show: true });
+            return;
+          }
           for (const j of acompanantesDe(datos.series, indice - 1)) {
             if (u.series[j + 1]?.show !== opciones.show) u.setSeries(j + 1, { show: opciones.show });
           }

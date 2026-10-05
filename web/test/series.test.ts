@@ -5,6 +5,7 @@ import { analizarLayout } from '../src/contrato/cargar';
 import {
   acompanantesDe,
   columna,
+  columnasDeEnergia,
   curvaDelRecorrido,
   figurasDeDuracion,
   esSobreElRecorrido,
@@ -17,6 +18,7 @@ import {
   sinHuecosEnX,
   ubicacionDeNodo,
   PESTANAS,
+  rangoConValores,
 } from '../src/graficos/series';
 
 const cargar = (caso: string) =>
@@ -279,5 +281,51 @@ describe('G contra duracion sostenida (Figs. 6-10)', () => {
   it('con un elemento elegido se consideran los eventos que tocan sus nodos', () => {
     const figuras = figurasDeDuracion(extraerColumnas(circuito, 2));
     expect(figuras[0]!.series.find((s) => s.puntos)!.etiqueta).not.toMatch(/6\.42/);
+  });
+});
+
+describe('energia mecanica', () => {
+  const c = extraerColumnas(circuito, null);
+  const energia = columnasDeEnergia(c);
+  const e0 = circuito.estadoInicial.energiaTotal!;
+
+  it('E0 es la energia del estado inicial y la del primer nodo', () => {
+    expect(c.energiaInicial).toBe(e0);
+    expect(circuito.elementos[0]!.nodos.energiaTotal![0]).toBeCloseTo(e0, 5);
+  });
+
+  it('cinetica + potencial = mecanica del contrato (la particion de SimularSobreTrack.m)', () => {
+    for (let i = 0; i < c.cantidad; i += 97) {
+      const { cinetica, potencial, mecanica } = energia;
+      if (mecanica[i] === null) continue;
+      // Dentro del redondeo a 6 cifras del contrato.
+      expect(Math.abs(cinetica[i]! + potencial[i]! - mecanica[i]!) / Math.abs(mecanica[i]!)).toBeLessThan(1e-5);
+    }
+  });
+
+  it('la perdida acumulada arranca en 0 y crece: rodadura y arrastre solo quitan energia', () => {
+    const perdida = energia.perdida.filter((v): v is number => v !== null);
+    expect(perdida[0]).toBeCloseTo(0, 6);
+    expect(perdida[perdida.length - 1]!).toBeGreaterThan(0);
+    expect(perdida[perdida.length - 1]!).toBeCloseTo(e0 - energia.mecanica.filter((v) => v !== null).at(-1)!, 12);
+  });
+
+  it('la figura tiene E0 fija y el eje y incluye 0 y E0; con un elemento elegido E0 sigue siendo la del inicio', () => {
+    for (const elegido of [null, 2]) {
+      const figura = figurasDePestana('cinematica', extraerColumnas(circuito, elegido), 'arco').find((f) => f.clave === 'energia')!;
+      const e0Serie = figura.series.find((s) => s.fija)!;
+      expect(e0Serie.valores.every((v) => v === e0)).toBe(true);
+      expect(figura.incluirEnY).toEqual([0, e0]);
+      expect(figura.series.map((s) => s.etiqueta.split(' ')[0])).toEqual(['Mecánica', 'Cinética', 'Potencial', 'Pérdida', 'E₀']);
+    }
+  });
+
+  it('rangoConValores cubre los datos y los obligatorios; el 0 queda pegado al eje', () => {
+    const [bajo, alto] = rangoConValores(0.4, 0.9, [0, 1]);
+    expect(bajo).toBe(0);
+    expect(alto).toBeCloseTo(1.05, 12);
+    const [bajo2] = rangoConValores(-0.1, 0.9, [0, 1]);
+    expect(bajo2).toBeLessThan(-0.1);
+    expect(rangoConValores(null, null, [0, 2])).toEqual([0, 2.1]);
   });
 });
