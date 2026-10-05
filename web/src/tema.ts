@@ -52,6 +52,7 @@ const TOKENS = {
   escenaGrilla: '--escena-grilla',
   escenaUniones: '--escena-uniones',
   escenaCarro: '--escena-carro',
+  escenaFrenteCarro: '--escena-frente-carro',
   escenaPasajero: '--escena-pasajero',
   escenaPasajeroBrillo: '--escena-pasajero-brillo',
   escenaMarcador: '--escena-marcador',

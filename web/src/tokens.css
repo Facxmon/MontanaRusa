@@ -143,6 +143,8 @@
   --escena-rotulo: var(--gris-500);
   --escena-uniones: var(--gris-500);
   --escena-carro: var(--ambar-500);
+  /* Placa del frente de cada carro: dice hacia donde apunta (contrasta con el ambar). */
+  --escena-frente-carro: var(--verde-500);
   --escena-pasajero: var(--rojo-500);
   --escena-pasajero-brillo: var(--rojo-800);
   /* Marcador del nodo bajo el cursor de los graficos. */
