@@ -74,7 +74,8 @@ queda `https://<usuario>.github.io/MontanaRusa/` (`base` en `vite.config.ts`).
 
 Vía 3D coloreada por magnitud, gráficos 2D (G con bandas normativas, jerk, cinemática, roll, curvatura),
 pestaña Diseño con parámetros editables que recalculan la vía en el navegador (Web Worker sobre el port
-de la física), carro recorriendo la vía con play/pausa, y descarga del JSON del contrato.
+de la física), carro (o tren de carros) recorriendo la vía con play/pausa y su posición marcada en todos los
+gráficos, eje z graduado en el 3D, y descarga del JSON del contrato.
 
 Desde la fase 1 (`DISENO.md`), cada instancia de elemento de la secuencia puede pisar sus parámetros
 geométricos sobre los globales (dos hélices con radios distintos): la secuencia es la navegación, la

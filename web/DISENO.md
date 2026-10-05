@@ -592,6 +592,39 @@ elemento se construye con sus propios `Parametros`. Lo que faltaba era la interf
   Safari abren sin animar.
 - Contenido de la portada (textos, video, contacto): lo escribe el autor.
 
+# Gráficos nuevos y tren de carros (2026-10-05)
+
+Cinco cambios de visualización, sin tocar el núcleo, el MATLAB, los golden ni el contrato: todo sale de
+campos que el JSON ya trae (`nodos.arco`, `tiempo`, `z`, `zRiel`, `velocidad`, `curvatura`,
+`energiaTotal`, `estadoInicial.energiaTotal`, `parametros.valores.masa`, `gravedad`, `numeroDeCarros`,
+`largoCarro`). Todo en SI; las figuras usan las mismas unidades y el mismo estilo que las existentes.
+
+| Qué | Cómo |
+|---|---|
+| Arco y altura contra el tiempo | Pestaña **Cinemática**. Van contra el tiempo elegido en el selector (modelo o prototipo); con el eje en arco, contra el tiempo del modelo (arco contra arco no dice nada). La altura dibuja la heartline (centro de masa) y el riel, como la figura de velocidad. Como su abscisa puede diferir de la del resto de la pestaña, llevan su propio grupo de cursor de uPlot (`grupoDeCursor`, uPlot sincroniza por valor de x); el cursor ligado por nodo y el marcador del carro las siguen igual. |
+| Aceleración normal | **a_n = v²·κ**, con la velocidad del centro de masa y la curvatura de la heartline, nodo a nodo, en m/s² como la tangencial (`aceleracionNormal` en `graficos/series.ts`). |
+| Energía | Reemplaza a "Energía mecánica total". Curvas: **mecánica** (`energiaTotal` del contrato), **cinética** ½·m·v² y **potencial** m·g·z de la heartline (la partición de `SimularSobreTrack.m`, con la masa y la gravedad de cada elemento: `ajustes ?? parametros.valores`), **pérdida acumulada** E₀ − mecánica (el contrato no exporta la energía disipada por nodo) y **E₀** horizontal. Se mantiene la convención existente: energía en J, con masa. E₀ es `estadoInicial.energiaTotal` (con un elemento elegido sigue siendo la del inicio del recorrido) y es una serie **fija**: la leyenda no la apaga. El eje Y **siempre incluye 0 y E₀** (`incluirEnY` + `rangoConValores`); antes se reescalaba al rango de la mecánica. Un zoom explícito en Y sigue mandando. |
+| Marcador del carro en los gráficos | El reproductor publica `estado.carro` (entre qué dos nodos globales va el carro y cuánto avanzó) en cada cuadro, al mover la barra, al pausar y al ir a un nodo desde un gráfico. Cada figura sobre el recorrido dibuja una **línea vertical** en la abscisa del carro, interpolada en su propio eje (`abscisaDelCarro`), y un **punto** sobre cada curva de datos (no sobre límites ni referencias; `valoresEnX`). Son nodos del DOM sobre el área de dibujo: moverlos no redibuja el canvas, así el marcador sigue al 3D a su frame rate. No es el cursor: `estado.nodo` sigue siendo lo que está bajo el mouse. Color `--grafico-carro` (el ámbar del carro; en tema claro el ámbar oscuro). |
+| Eje z graduado | En la esquina de x e y mínimos de la caja disponible (o de la del layout si no hay), del color del eje z del gizmo, con marcas, medias marcas y rótulos ("0,5 m"). Cubre de la z más baja a la más alta de las dos cajas, incluido lo que quede bajo el piso, con un paso redondo (1, 2, 2,5 o 5 × 10ⁿ, a lo sumo 5 intervalos) que sale de ese alto: se rehace con cada layout (`pasoDeGraduacion`, `marcasDelEjeZ` en `escena/entorno.ts`). |
+| Tren de carros | Con `numeroDeCarros` > 1 se dibujan todos (misma geometría que el carro de siempre), cada uno con su marco sobre el riel (`marcoEnArco` en `escena/carro.ts`). La posición que calcula el modelo es la del **primer** carro, que queda donde estaba; los demás van detrás a (largo + separación) de arco de riel y, antes del inicio de la vía, siguen en recta por la tangente del primer nodo. Cada carro lleva una **placa de color en el frente** (`--escena-frente-carro`, verde) que dice hacia dónde apunta. |
+
+## Decisiones abiertas
+
+- **Separación entre carros**: el modelo no tiene ese parámetro (`ParametrosPorDefecto.m` declara
+  `NumeroDeCarros` y `LargoCarro`, nada más) y agregarlo es un cambio del MATLAB. Mientras tanto es una
+  constante visual, `SEPARACION_ENTRE_CARROS_RELATIVA` = 0,15 × largo, que no entra en ningún cálculo
+  (TODO en `escena/carro.ts`).
+- **Dónde va el tren respecto de la posición del modelo**: el modelo es una masa puntual y da una sola
+  posición por instante. Se eligió que sea la del primer carro (con un carro la vista no cambia); con la
+  masa puntual como centro de masa del tren, lo coherente sería centrar el tren en ella. Queda abierto
+  junto con el diseño definitivo del carro.
+- **Pérdida acumulada**: es E₀ − mecánica. Si el contrato llegara a exportar la energía disipada por
+  nodo (`Sim.EnergiaDisipadaRodadura/Arrastre` existen en el MATLAB), convendría graficar esa.
+- **Masa por elemento**: si una instancia pisa `masa` o `gravedad`, cinética y potencial usan las suyas,
+  pero E₀ es la del inicio con la masa global: la pérdida deja de ser solo disipación.
+
+---
+
 # Mejoras de interfaz (2026-09-30)
 
 Once cambios de uso, sin tocar el núcleo, los golden ni el contrato (el JSON no cambia: todo sale de
