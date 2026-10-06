@@ -37,7 +37,10 @@ function Tren = SimularTren(Geo, Parametros, Inicio, ArcoFinal)
     Arco = [Inicio.Arco; EnVia];
     if ArcoFinal > Arco(end) + 1e-9
         Paso = Parametros.PasoSimulacion;
-        Cantidad = max(1, ceil((ArcoFinal - Arco(end)) / Paso));
+        % El cociente suele ser un entero (la distancia del ultimo carro sobre el
+        % paso) mas ruido de redondeo del arco: sin el 1e-9, un ulp de diferencia
+        % en el final de la via cambia la cantidad de pasos.
+        Cantidad = max(1, ceil((ArcoFinal - Arco(end)) / Paso - 1e-9));
         Arco = [Arco; Arco(end) + (ArcoFinal - Arco(end))*(1:Cantidad).'/Cantidad];
     end
     n = numel(Arco);
