@@ -26,5 +26,11 @@ function Layout = LayoutAgregarElemento(Layout, Elemento, EstadoSalida, Reporte)
     % Los eventos sostenidos de la norma se miden de corrido en todo el
     % circuito: el elemento nuevo puede alargar un evento del anterior, asi
     % que se vuelve a verificar el layout entero.
-    Layout = VerificarLayoutNormativo(Layout);
+    % Con un tren de varios carros se simula el tren sobre la via completa y
+    % se verifica cada carro (incluye la verificacion normativa).
+    if round(Elemento.Parametros.NumeroDeCarros) > 1
+        Layout = VerificarTrenDelLayout(Layout);
+    else
+        Layout = VerificarLayoutNormativo(Layout);
+    end
 end

@@ -12,6 +12,16 @@ function [Layout, Avisos] = LayoutResimular(Layout, Parametros)
     Parametros = Layout.Parametros;
 
     Avisos = {};
+
+    % Tren de varios carros: la dinamica es la del tren entero sobre la via
+    % completa (VerificarTrenDelLayout), no elemento por elemento.
+    if round(Parametros.NumeroDeCarros) > 1
+        for i = 1:numel(Layout.Elementos)
+            Layout.Elementos{i}.Elemento.Parametros = Parametros;
+        end
+        Layout = VerificarTrenDelLayout(Layout);
+        return
+    end
     Estado = Layout.EstadoInicial;
 
     for i = 1:numel(Layout.Elementos)

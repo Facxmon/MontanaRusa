@@ -118,6 +118,46 @@ Archivos{end} = fullfile(CarpetaTemporal, 'circuito-demolayout.json');
 Documento = LayoutAJson(Layout, Archivos{end});
 ImprimirFila('circuito-demolayout', 'los cuatro', 'ArcoCircular', Documento, Archivos{end});
 
+%% ===================== TRENES DE VARIOS CARROS ==========================
+% Tres carros. 'tren-loop-gconstante': el loop de 'loop-gconstante' (mismo
+% setup de un elemento) disenado para el primer carro, que es el caso por
+% defecto. 'tren-circuito': el loop y el over-banked turn de DemoLayout con
+% busqueda del carro critico: ejercita el tren cruzando un empalme y la
+% eleccion del carro de diseno.
+Parametros = ParametrosPorDefecto();
+Parametros.RadioDelLoop            = 0.30;
+Parametros.MetodoDeAcoplamiento    = 'A';
+Parametros.CalcularVelocidadMinima = false;
+Parametros.ModoCurvatura           = 'FuerzaGConstante';
+Parametros.NumeroDeCarros          = 3;
+Parametros.DisenoDelTren           = 'PrimerCarro';
+Estado = EstadoInicial(PosicionDeEntrada, [1 0 0], [0 0 1], VelocidadDeEntrada, Parametros);
+Layout = LayoutNuevo(Estado, Parametros);
+[Estado, Elemento, Reporte] = ElementoLoopVertical(Estado, Parametros, Layout);
+Layout = LayoutAgregarElemento(Layout, Elemento, Estado, Reporte);
+Archivos{end+1} = fullfile(CarpetaTemporal, 'tren-loop-gconstante.json');
+Documento = LayoutAJson(Layout, Archivos{end});
+ImprimirFila('tren-loop-gconstante', 'LoopVertical', 'FuerzaGConstante', Documento, Archivos{end});
+
+Parametros = ParametrosPorDefecto();
+Parametros.ModoCurvatura           = 'ArcoCircular';
+Parametros.MetodoDeAcoplamiento    = 'A';
+Parametros.CalcularVelocidadMinima = false;
+Parametros.RadioDelLoop     = 0.30;
+Parametros.RadioDelGiro     = 0.80;
+Parametros.NumeroDeCarros   = 3;
+Parametros.DisenoDelTren    = 'CarroCritico';
+Secuencia = {@ElementoLoopVertical, @ElementoOverBankedTurn};
+Estado = EstadoInicial([0, 0, 1.00], [1, 0, 0], [0, 0, 1], 4.50, Parametros);
+Layout = LayoutNuevo(Estado, Parametros);
+for i = 1:numel(Secuencia)
+    [Estado, Elemento, Reporte] = Secuencia{i}(Estado, Parametros, Layout);
+    Layout = LayoutAgregarElemento(Layout, Elemento, Estado, Reporte);
+end
+Archivos{end+1} = fullfile(CarpetaTemporal, 'tren-circuito.json');
+Documento = LayoutAJson(Layout, Archivos{end});
+ImprimirFila('tren-circuito', 'loop + OBT', 'ArcoCircular', Documento, Archivos{end});
+
 %% ===================== COPIA A golden/ =================================
 for i = 1:numel(Archivos)
     [~, Nombre, Extension] = fileparts(Archivos{i});

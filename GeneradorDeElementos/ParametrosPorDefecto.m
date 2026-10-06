@@ -173,6 +173,12 @@ Parametros.AlturaMinimaSuelo       = 0.05;   % [m] z minimo admisible del riel
 Parametros.ArcoMinimoAutointerferencia = 0.30;   % [m] ignora vecinos por construccion
 Parametros.DistanciaMinimaEntreVias    = 0.02;   % [m] separacion libre exigida
 
+% --- Acople entre carros (solo con NumeroDeCarros > 1) ---
+% Angulo que la barra del acople puede formar con el eje de cada carro. Con
+% los carros a arco constante sobre el riel vale (LargoCarro + Separacion)*kappa/2.
+% PROVISORIO Y LAXO: falta el dato del acople real.
+Parametros.AnguloMaximoDeAcople = pi/4;   % [rad]
+
 %% =================================================================
 %% 4. PARAMETROS GENERALES
 %% =================================================================
@@ -203,6 +209,11 @@ Parametros.AnchoVia           = 0.06;    % [m] trocha
 Parametros.Holgura            = 0.010;   % [m] margen sobre la envolvente
 Parametros.DiametroRueda      = 0.0136;  % [m] piso impuesto por el rodamiento minimo
 Parametros.AreaFrontal        = 0.0036;  % [m^2] proyeccion frontal de un carro
+% Separacion entre carros consecutivos, de paragolpe a paragolpe, medida como
+% arco sobre el riel: los carros van a (LargoCarro + Separacion) de arco uno
+% del otro. El minimo lo fija la interferencia entre cajas en la curva mas
+% cerrada (criterio posterior); el maximo, el angulo del acople.
+Parametros.SeparacionEntreCarros = 0.040;  % [m] el loop por defecto (R 0.30 m) pide 0.033 m
 
 % Distancia del riel al centro de masa del pasajero (la heartline), medida
 % sobre U. NO es un parametro de evaluacion: es la separacion fisica que
@@ -241,6 +252,19 @@ Parametros.DistanciaHeartlineACabeza = 0.030;   % [m]
 %            la geometria que queda es la del metodo A.
 Parametros.MetodoDeAcoplamiento    = 'A';
 Parametros.CalcularVelocidadMinima = false;   % biseccion de v0 minima; cuesta decenas de generaciones
+% Tren (NumeroDeCarros > 1). Calcular las G de cada carro es barato: con
+% la simulacion del tren hecha, cada carro cuesta centesimas de segundo
+% (medido 2026-10: 3 carros, 83.5 s con todos contra 83.6 s solo el primero).
+% Lo caro es redisenar la via para un carro: un punto fijo de 3 a 7
+% generaciones por elemento (DisenarParaElTren). DisenoDelTren:
+%   'Particula'     la via se disena con la masa puntual, como con un carro,
+%                   y despues se simula y verifica el tren. Lo mas rapido.
+%   'PrimerCarro'   cada elemento se disena para el primer carro (de 5 a 12
+%                   veces lo que tarda con un carro).
+%   'CarroCritico'  se disena para cada carro y se queda el que deja el menor
+%                   pico de G entre todos (otra vez eso por cada carro).
+Parametros.CalcularTodosLosCarros = true;            % simular y verificar todos los carros, o solo el primero
+Parametros.DisenoDelTren          = 'PrimerCarro';
 
 %% ------------------------ Escalado (Froude) ---------------------------
 % lambda NO es una propiedad del modelo sino de un emparejamiento entre una
@@ -262,6 +286,9 @@ Parametros.PasoBusquedaVelocidad = 0.010;   % [m] paso grueso para la biseccion 
 Parametros.TolNorma                = 1e-12;
 Parametros.TolPuntoFijo            = 1e-8;    % [m/s] cambio maximo de v entre iteraciones
 Parametros.MaxIteracionesPuntoFijo = 60;
+% Diseno para un carro del tren (DisenarParaElTren): 5 mm/s mueven la G del
+% carro de diseno unas centesimas, muy por debajo de TolObjetivoDeG.
+Parametros.TolVelocidadDelTren     = 5e-3;    % [m/s]
 Parametros.MaxIteracionesCierre    = 6;
 Parametros.MaxIteracionesAjuste    = 8;
 Parametros.MargenDeOnset           = 0.002;  % las transiciones se alargan este margen sobre lo justo

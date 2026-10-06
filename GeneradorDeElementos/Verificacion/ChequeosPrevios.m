@@ -64,6 +64,16 @@ function Criterios = ChequeosPrevios(EstadoEntrada, Parametros, Receta)
     Criterios = AgregarCriterio(Criterios, 'Radio nominal fabricable', 'MayorOIgual', ...
         RadioNominal, Parametros.RadioMinimoFabricable, 'm', ...
         'En los modos que dependen de v el radio real puede ser menor: ver el chequeo posterior.');
+
+    %% --- Tren: rango de la separacion entre carros --------------------------
+    % El minimo depende de la curvatura (ChequeosPosteriores); el tope duro
+    % es un largo de carro: mas alla el acople es una barra larga que corta
+    % la curva.
+    if round(Parametros.NumeroDeCarros) > 1
+        Criterios = AgregarCriterio(Criterios, 'Separacion entre carros no mayor que un carro', 'MenorOIgual', ...
+            Parametros.SeparacionEntreCarros, Parametros.LargoCarro, 'm', ...
+            'Tope duro de la separacion; el minimo lo fija la interferencia en la curva mas cerrada.');
+    end
 end
 
 %% ========================= auxiliares =====================================

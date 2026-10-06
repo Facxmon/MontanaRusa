@@ -89,6 +89,11 @@ function [Derivada, Punto] = DerivadaDeVia(Arco, y, Contexto)
     DerivadaAlturaCentroDeMasa = (1 - d*CurvaturaArribaCarro)*Punto.VersorTangente(3) ...
                                + d*VelocidadRoll*Punto.VersorLateral(3);
     DerivadaVelocidadCuadrado  = -2*g*DerivadaAlturaCentroDeMasa - 2*FuerzaResistencia/Parametros.Masa;
+    % Tren: la velocidad no es la de una particula sino la del carro para el
+    % que se disena el elemento, que sale de la simulacion del tren completo.
+    if ~isempty(Contexto.DerivadaImpuesta)
+        DerivadaVelocidadCuadrado = Contexto.DerivadaImpuesta(Arco);
+    end
 
     Punto.CurvaturaArriba       = CurvaturaArriba;
     Punto.CurvaturaLateral      = CurvaturaLateral;

@@ -61,7 +61,7 @@ end
 
 %% ========================= bloques del contrato ===========================
 function Meta = MetaAJson()
-    Meta.versionContrato  = '1.2.0';
+    Meta.versionContrato  = '1.3.0';
     Meta.generadoPor      = 'matlab';
     Meta.versionGenerador = VersionDelRepo();
     Meta.generadoEn       = char(datetime('now', 'TimeZone', 'UTC', ...
@@ -132,6 +132,11 @@ end
 
 function Estado = EstadoAJson(EstadoMatlab)
 %ESTADOAJSON Espejo del contrato de Estado (EstadoInicial.m), en camelCase.
+%   EstadoSalida.Tren (el estado del tren para encadenar el elemento
+%   siguiente) es interno del calculo y no se exporta.
+    if isfield(EstadoMatlab, 'Tren')
+        EstadoMatlab = rmfield(EstadoMatlab, 'Tren');
+    end
     Estado = EstructuraACamelCase(EstadoMatlab);
 end
 
@@ -153,6 +158,55 @@ function Elemento = ElementoAJson(Registro, Posicion)
     Elemento.resumen          = EstructuraACamelCase(Reporte.Resumen);
     Elemento.criterios        = CriteriosAJson(Reporte);
     Elemento.estadoSalida     = EstadoAJson(Registro.EstadoSalida);
+    % Tren de varios carros (desde 1.3.0): lo que vive cada carro calculado.
+    if isfield(ElementoMatlab, 'SimCarros') && round(ElementoMatlab.Parametros.NumeroDeCarros) > 1
+        Elemento.carros = CarrosAJson(ElementoMatlab, Reporte);
+    end
+end
+
+function Lista = CarrosAJson(ElementoMatlab, Reporte)
+%CARROSAJSON Un objeto por carro calculado: sus columnas dinamicas sobre los
+%   mismos nodos del elemento (el nodo k es el carro PARADO en el nodo k, con
+%   su propio reloj) y sus lineas de criterio que dependen de la dinamica.
+    Lista = {};
+    for i = 1:numel(ElementoMatlab.SimCarros)
+        Sim = ElementoMatlab.SimCarros{i};
+        if isempty(Sim)
+            continue
+        end
+        Carro.numero = int32(i);
+        Carro.nodos  = NodosDelCarroAJson(Sim, size(ElementoMatlab.Track.PuntosRiel, 1));
+        Carro.criterios.posteriores = ListaDeStructs(Reporte.Carros{i}.Posteriores);
+        Carro.criterios.normativo   = EstructuraACamelCase(Reporte.Carros{i}.Normativo);
+        Lista{end+1} = Carro; %#ok<AGROW>
+    end
+end
+
+function Nodos = NodosDelCarroAJson(Sim, NumeroDeNodos)
+    Nodos.tiempo                = Sim.Tiempo;
+    Nodos.velocidad             = Sim.VelocidadCentroDeMasa;
+    Nodos.velocidadRiel         = Sim.Velocidad;
+    Nodos.aceleracionTangencial = Sim.AceleracionTangencial;
+    Nodos.gx = Sim.Gx;
+    Nodos.gy = Sim.Gy;
+    Nodos.gz = Sim.Gz;
+    Nodos.jerkGx = Sim.JerkGx;
+    Nodos.jerkGy = Sim.JerkGy;
+    Nodos.jerkGz = Sim.JerkGz;
+    Nodos.gyCabeza = Sim.GyCabeza;
+    Nodos.gzCabeza = Sim.GzCabeza;
+    Nodos.fuerzaNormal = Sim.FuerzaNormal;
+    if isempty(Sim.PuntoDeParada)
+        Nodos.puntoDeParada = NaN;
+    else
+        Nodos.puntoDeParada = int32(Sim.PuntoDeParada - 1);
+    end
+    Columnas = setdiff(fieldnames(Nodos), {'puntoDeParada'});
+    for i = 1:numel(Columnas)
+        if size(Nodos.(Columnas{i}), 1) ~= NumeroDeNodos
+            error('LayoutAJson:LargoDeColumna', 'carros[].nodos.%s no tiene %d filas.', Columnas{i}, NumeroDeNodos);
+        end
+    end
 end
 
 function Usados = ParametrosUsados(ElementoMatlab)
@@ -218,6 +272,12 @@ function Nodos = NodosAJson(Track, Sim)
 
     Nodos.fuerzaNormal = Sim.FuerzaNormal;
     Nodos.energiaTotal = Sim.EnergiaTotal;
+    % Desde 1.3.0. Con varios carros son las del TREN entero con el carro 1
+    % en el nodo; la disipada arranca en 0 en cada elemento, como el tiempo.
+    Nodos.energiaCinetica         = Sim.EnergiaCinetica;
+    Nodos.energiaPotencial        = Sim.EnergiaPotencial;
+    Nodos.energiaDisipadaRodadura = Sim.EnergiaDisipadaRodadura;
+    Nodos.energiaDisipadaArrastre = Sim.EnergiaDisipadaArrastre;
 
     if isempty(Sim.PuntoDeParada)
         Nodos.puntoDeParada = NaN;   % se escribe como null
@@ -296,6 +356,33 @@ function Resumen = ResumenLayoutAJson(Layout)
     Todos = [PuntosRiel; PuntosHeartline];
     Resumen.boundingBox            = [min(Todos, [], 1); max(Todos, [], 1)].';   % [[xmin,xmax],[ymin,ymax],[zmin,zmax]]
     Resumen.todosLosCriteriosPasan = all(TodosPasan);
+    if isfield(Layout, 'Tren') && ~isempty(Layout.Tren)
+        Resumen.tren = TrenAJson(Layout);
+    end
+end
+
+function Tren = TrenAJson(Layout)
+%TRENAJSON Lo que el visualizador necesita para animar el tren entero.
+%   desfasesDeTiempo(i) es cuando el carro i llega al inicio de la via,
+%   contado desde que llega el primero: el reloj del carro i en el layout es
+%   ese desfase mas sus tiempos por elemento. tiempoDeSalida es cuando el
+%   ultimo carro termina de recorrer la via.
+    T = Layout.Tren;
+    P = Layout.Parametros;
+    Valido = ~isnan(T.VelocidadRielCuadrado);
+    Conservar = Valido & [true; diff(T.Arco) > 1e-9];
+    Reloj = @(Arco) EvaluarEnArco(T.Arco(Conservar), T.Tiempo(Conservar), Arco);
+    Inicio = Layout.Elementos{1}.Elemento.Track.LongitudArco(1);
+    Fin = Layout.Elementos{end}.Elemento.Track.LongitudArco(end);
+    Cero = Reloj(Inicio);
+    Calculados = find(~cellfun(@isempty, Layout.Elementos{1}.Elemento.SimCarros));
+
+    Tren.numeroDeCarros   = int32(numel(T.Distancias));
+    Tren.longitudDelTren  = numel(T.Distancias)*P.LargoCarro + (numel(T.Distancias) - 1)*P.SeparacionEntreCarros;
+    Tren.distancias       = T.Distancias;
+    Tren.desfasesDeTiempo = Reloj(Inicio + T.Distancias) - Cero;
+    Tren.tiempoDeSalida   = Reloj(Fin + T.Distancias(end)) - Cero;
+    Tren.carrosCalculados = num2cell(int32(Calculados(:).'));   % cell: siempre array, aunque sea uno
 end
 
 %% ========================= auxiliares =====================================

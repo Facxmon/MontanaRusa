@@ -619,6 +619,85 @@ Resultados = Anotar(Resultados, 'Peralte alineado a la fuerza: Gy de balance nul
             DiagnosticoF.ResidualAlineacionPeralte, DiagnosticoF.OnsetLateralGenerado, DiagnosticoF.Escala.OnsetMaximo(2), ...
             DiagnosticoF.OnsetVerticalGenerado, DiagnosticoF.Escala.OnsetMaximo(3), max(abs(ElementoFuerza.Sim.Gy))));
 
+%% --- Test 20: el tren de un carro es la masa puntual -------------------
+% La ecuacion del tren (SimularTren) con un solo carro tiene que ser la de
+% la particula: se integra el tren sobre el loop de la particula y se
+% compara la velocidad del centro de masa nodo a nodo.
+Parametros = ParametrosBase;
+Parametros.ModoCurvatura = 'ArcoCircular';
+Estado = EstadoDeEnsayo(Parametros);
+[~, Elemento] = ElementoLoopVertical(Estado, Parametros);
+ParametrosTren = Elemento.Parametros;
+Geo = GeometriaDelTren({Elemento.Track}, ParametrosTren);
+TrenUno = SimularTren(Geo, ParametrosTren, InicioDelTren(Estado, Elemento.Track, ParametrosTren), Elemento.Track.LongitudArco(end));
+SimUno = SimDelCarro(Elemento.Track, TrenUno, 1, ParametrosTren);
+ErrorTren = max(abs(SimUno.VelocidadCentroDeMasa - Elemento.Sim.VelocidadCentroDeMasa) ./ Elemento.Sim.VelocidadCentroDeMasa);
+Resultados = Anotar(Resultados, 'El tren de un carro es la masa puntual', ErrorTren < 1e-4, ...
+    sprintf('error relativo maximo en v = %.3e (limite 1e-4)', ErrorTren));
+
+%% --- Test 21: la energia del tren se conserva sin perdidas --------------
+% Tres carros, sin rodadura ni arrastre: la energia del tren (suma de los
+% carros, cada uno con su altura y su factor de heartline) es constante
+% mientras el primero recorre la via y el ultimo termina de salir.
+% Limite 1e-5 y no 1e-9 como la particula: la ecuacion del tren necesita
+% dJ^2/ds (el factor de heartline de cada carro), que se toma numericamente
+% sobre los nodos (medido: 2.8e-6, unos 1e-5 m/s).
+Parametros = ParametrosBase;
+Parametros.ModoCurvatura = 'ArcoCircular';
+Parametros.CrrPortantes = 0; Parametros.CrrGuia = 0; Parametros.CrrRetencion = 0;
+Parametros.ModelarArrastre = false;
+Parametros.NumeroDeCarros = 3;
+Parametros.DisenoDelTren = 'Particula';
+Estado = EstadoDeEnsayo(Parametros);
+Layout = LayoutNuevo(Estado, Parametros);
+[EstadoTren, ElementoTren, ReporteTren] = ElementoLoopVertical(Estado, Parametros, Layout);
+Layout = LayoutAgregarElemento(Layout, ElementoTren, EstadoTren, ReporteTren);
+EnergiaTren = Layout.Tren.EnergiaCinetica + Layout.Tren.EnergiaPotencial;
+EnergiaTren = EnergiaTren(~isnan(EnergiaTren));
+VariacionTren = (max(EnergiaTren) - min(EnergiaTren)) / EnergiaTren(1);
+Resultados = Anotar(Resultados, 'La energia del tren se conserva sin perdidas', VariacionTren < 1e-5 && numel(ElementoTren.SimCarros) == 3, ...
+    sprintf('variacion relativa %.3e (limite 1e-5) sobre %d nodos del primer carro', VariacionTren, numel(EnergiaTren)));
+
+%% --- Test 22: el carro de diseno sigue la curva del modo ------------------
+% Dos carros en FuerzaGConstante, DisenoDelTren = 'PrimerCarro': el
+% elemento se redisena con la velocidad del primer carro, que tiene que
+% recibir en el arco la G pedida; el segundo pasa por los mismos puntos a
+% otra velocidad y no.
+Parametros = ParametrosBase;
+Parametros.ModoCurvatura = 'FuerzaGConstante';
+Parametros.NumeroDeCarros = 2;
+Parametros.DisenoDelTren = 'PrimerCarro';
+Estado = EstadoDeEnsayo(Parametros);
+[~, ElementoTren, ReporteTren] = ElementoLoopVertical(Estado, Parametros);
+Arco = ElementoTren.Track.SubTramos(strcmp({ElementoTren.Track.SubTramos.Nombre}, 'ArcoPrincipal'));
+Rango = Arco.IndiceInicio:Arco.IndiceFin;
+DesvioPrimero = max(abs(ElementoTren.SimCarros{1}.Gz(Rango) - Parametros.FuerzaGObjetivo));
+DesvioSegundo = max(abs(ElementoTren.SimCarros{2}.Gz(Rango) - Parametros.FuerzaGObjetivo));
+Resultados = Anotar(Resultados, 'El carro de diseno sigue la curva del modo', ...
+    ReporteTren.Resumen.CarroDeDiseno == 1 && DesvioPrimero < Parametros.TolObjetivoDeG && DesvioSegundo > DesvioPrimero, ...
+    sprintf('desvio de Gz en el arco: carro 1 %.4f G (limite %.2f), carro 2 %.4f G; %d iteraciones', ...
+            DesvioPrimero, Parametros.TolObjetivoDeG, DesvioSegundo, ReporteTren.Tren.Iteraciones));
+
+%% --- Test 23: separacion minima entre carros -------------------------------
+% En recta alcanza con la Holgura; en una curva vertical de radio R hacia el
+% pasajero las cajas convergen arriba y la separacion exigida es
+% 2R*atan((l + Holgura)/(2(R - AltoCarro))) - l.
+Parametros = ParametrosBase;
+Parametros.NumeroDeCarros = 3;
+Radio = 0.33;
+TrackSintetico.VectorCurvatura   = [0 0 0; 0 0 1/Radio];
+TrackSintetico.VersorArribaCarro = [0 0 1; 0 0 1];
+TrackSintetico.VersorLateral     = [0 1 0; 0 1 0];
+Lineas = CriteriosDelTren(TrackSintetico, Parametros);
+Exigida = Lineas(strcmp({Lineas.Nombre}, 'Separacion entre carros sin interferencia')).Limite;
+Esperada = 2*Radio*atan((Parametros.LargoCarro + Parametros.Holgura)/(2*(Radio - Parametros.AltoCarro))) - Parametros.LargoCarro;
+TrackSintetico.VectorCurvatura = [0 0 0; 0 0 0];
+Lineas = CriteriosDelTren(TrackSintetico, Parametros);
+EnRecta = Lineas(strcmp({Lineas.Nombre}, 'Separacion entre carros sin interferencia')).Limite;
+Resultados = Anotar(Resultados, 'Separacion minima entre carros', ...
+    abs(Exigida - Esperada) < 1e-12 && abs(EnRecta - Parametros.Holgura) < 1e-12, ...
+    sprintf('curva de %.2f m: %.4f m (formula %.4f m); recta: %.4f m (Holgura %.4f m)', Radio, Exigida, Esperada, EnRecta, Parametros.Holgura));
+
 %% --- Resumen ----------------------------------------------------------
 fprintf('\n');
 NoPasan = 0;
