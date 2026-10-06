@@ -26,6 +26,7 @@ const inicial: DatosDeEstado = {
   nodo: null,
   reproduciendo: false,
   carro: null,
+  carroAnalizado: null,
   comparacion: null,
 };
 

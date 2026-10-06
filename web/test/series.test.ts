@@ -292,9 +292,9 @@ describe('energia mecanica', () => {
   const energia = columnasDeEnergia(c);
   const e0 = circuito.estadoInicial.energiaTotal!;
 
-  it('E0 es la energia del estado inicial y la del primer nodo', () => {
-    expect(c.energiaInicial).toBe(e0);
-    expect(circuito.elementos[0]!.nodos.energiaTotal![0]).toBeCloseTo(e0, 5);
+  it('E0 es la energia del primer nodo (con un carro, la del estado inicial)', () => {
+    expect(c.energiaInicial).toBe(circuito.elementos[0]!.nodos.energiaTotal![0]);
+    expect(c.energiaInicial!).toBeCloseTo(e0, 5);
   });
 
   it('cinetica + potencial = mecanica del contrato (la particion de SimularSobreTrack.m)', () => {
@@ -306,11 +306,14 @@ describe('energia mecanica', () => {
     }
   });
 
-  it('la perdida acumulada arranca en 0 y crece: rodadura y arrastre solo quitan energia', () => {
+  it('la perdida acumulada es la disipada exportada, acumulada sobre el recorrido, y coincide con E0 - E', () => {
     const perdida = energia.perdida.filter((v): v is number => v !== null);
-    expect(perdida[0]).toBeCloseTo(0, 6);
-    expect(perdida[perdida.length - 1]!).toBeGreaterThan(0);
-    expect(perdida[perdida.length - 1]!).toBeCloseTo(e0 - energia.mecanica.filter((v) => v !== null).at(-1)!, 12);
+    expect(perdida[0]).toBe(0);
+    const total = circuito.elementos.reduce((s, e) => s + e.resumen.energiaDisipadaRodadura! + e.resumen.energiaDisipadaArrastre!, 0);
+    expect(perdida[perdida.length - 1]!).toBeCloseTo(total, 4);
+    // E0 - E es la misma energia salvo el error de integracion y el redondeo a 6 cifras.
+    const balance = e0 - energia.mecanica.filter((v) => v !== null).at(-1)!;
+    expect(Math.abs(perdida[perdida.length - 1]! - balance) / balance).toBeLessThan(1e-4);
   });
 
   it('la figura tiene E0 fija y el eje y incluye 0 y E0; con un elemento elegido E0 sigue siendo la del inicio', () => {

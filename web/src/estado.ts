@@ -4,6 +4,7 @@
 import type { ClaveDeMagnitud } from './contrato/magnitudes';
 import type { Diagnostico } from './diagnostico';
 import type { Layout } from './contrato/tipos';
+import { carroPorDefecto, layoutDelCarro } from './contrato/carros';
 import type { EjeX, Pestana, PosicionDelCarroEnElLayout } from './graficos/series';
 import type { EntradaDeDiseno } from './nucleo/calcular';
 
@@ -80,6 +81,14 @@ export interface DatosDeEstado {
    */
   carro: PosicionDelCarroEnElLayout | null;
   /**
+   * El carro del tren que se esta analizando (1 = el primero), con el layout
+   * para el que se eligio: al cambiar de layout deja de valer y manda el
+   * carro por defecto (carroPorDefecto: el peor entre el primero y el
+   * ultimo). null = el por defecto. Lo eligen el clic sobre un carro del 3D
+   * y el selector del reproductor.
+   */
+  carroAnalizado: { layout: Layout; numero: number } | null;
+  /**
    * Diseno fijado como A para comparar (fase 4.8), o null. Se guarda el
    * LAYOUT (las curvas) ademas del diseno: recalcular A cada vez costaria
    * segundos, y un golden no tiene diseno hasta que se lo abre.
@@ -128,4 +137,25 @@ export function crearEstado(inicial: DatosDeEstado): Estado {
  */
 export function esRecalculo(nuevo: DatosDeEstado, anterior: DatosDeEstado): boolean {
   return nuevo.layout !== anterior.layout && nuevo.layout !== null && anterior.layout !== null && nuevo.fuente === 'diseno' && anterior.fuente === 'diseno';
+}
+
+/** Numero del carro que se analiza en el layout en pantalla (1 si no hay layout). */
+export function numeroDeCarroAnalizado(estado: DatosDeEstado): number {
+  if (!estado.layout) return 1;
+  return estado.carroAnalizado && estado.carroAnalizado.layout === estado.layout ? estado.carroAnalizado.numero : carroPorDefecto(estado.layout);
+}
+
+/**
+ * El layout visto desde el carro que se analiza (layoutDelCarro): lo que
+ * usan los graficos, los valores en el cursor y el color de la via. El
+ * veredicto global sigue usando estado.layout, donde cada linea dinamica es
+ * la del peor carro.
+ */
+export function layoutAnalizado(estado: DatosDeEstado): Layout | null {
+  return estado.layout ? layoutDelCarro(estado.layout, numeroDeCarroAnalizado(estado)) : null;
+}
+
+/** true si cambio el carro que se analiza (por eleccion o por cambio de layout). */
+export function cambioElCarroAnalizado(nuevo: DatosDeEstado, anterior: DatosDeEstado): boolean {
+  return layoutAnalizado(nuevo) !== layoutAnalizado(anterior) || numeroDeCarroAnalizado(nuevo) !== numeroDeCarroAnalizado(anterior);
 }

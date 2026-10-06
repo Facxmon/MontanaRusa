@@ -161,6 +161,14 @@ export class Via {
     this.marcador.visible = true;
   }
 
+  /**
+   * Otras columnas para colorear sobre la misma geometria (el layout visto
+   * desde otro carro del tren): mismos nodos, otros valores.
+   */
+  usarColumnasDe(layout: Layout): void {
+    if (this.layout && layout.elementos.length === this.layout.elementos.length) this.layout = layout;
+  }
+
   /** Solo reescribe los atributos de color; la geometria no se toca. */
   recolorear(magnitud: ClaveDeMagnitud, elementoResaltado: number | null): void {
     if (!this.layout || !this.nodos || !this.geometriaDelTubo || !this.tuboMesh || !this.heartline) return;

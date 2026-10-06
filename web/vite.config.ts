@@ -21,7 +21,9 @@ export default defineConfig({
     },
     target: 'es2022',
     sourcemap: true,
-    // Three.js + uPlot + la app van en un solo chunk (~716 kB minificado, 207 kB gzip desde la fase 4): es esperable.
-    chunkSizeWarningLimit: 750,
+    // Three.js + uPlot + la app van en un solo chunk: es esperable. ~795 kB minificado (232 kB gzip) desde el
+    // tren de varios carros (2026-10), que suma el nucleo del tren y las geometrias de extrusion y torno de los
+    // disenos del carro.
+    chunkSizeWarningLimit: 850,
   },
 });

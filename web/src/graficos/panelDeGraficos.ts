@@ -12,7 +12,7 @@
 // nodo GLOBAL en estado.nodo, que es lo que leen el marcador de la via 3D,
 // el bloque de valores del panel lateral y el reproductor (fase 3.6).
 
-import type { Estado } from '../estado';
+import { cambioElCarroAnalizado, layoutAnalizado, type Estado } from '../estado';
 import { alCambiarTema } from '../tema';
 import { franjaDeComparacion } from '../paneles/comparar';
 import { leerAlmacen, escribirAlmacen } from '../paneles/almacen';
@@ -172,7 +172,9 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
   document.addEventListener('keydown', alTeclear);
 
   const dibujarFiguras = () => {
-    const { layout, elemento, pestana, ejeX, vista } = estado.get();
+    const { elemento, pestana, ejeX, vista } = estado.get();
+    // El carro que se analiza (tren de varios carros): sus columnas, no las del primero.
+    const layout = layoutAnalizado(estado.get());
     for (const f of figuras) f.destruirDelTodo();
     figuras = [];
     datosDeFiguras = [];
@@ -316,7 +318,8 @@ export function montarPanelDeGraficos(contenedor: HTMLElement, estado: Estado, a
       nuevo.pestana !== anterior.pestana ||
       nuevo.ejeX !== anterior.ejeX ||
       nuevo.vista !== anterior.vista ||
-      nuevo.comparacion !== anterior.comparacion
+      nuevo.comparacion !== anterior.comparacion ||
+      cambioElCarroAnalizado(nuevo, anterior)
     ) {
       dibujarFiguras();
       return;

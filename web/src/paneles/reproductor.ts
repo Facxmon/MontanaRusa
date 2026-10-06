@@ -8,7 +8,8 @@
 
 import type { Carro } from '../escena/carro';
 import type { Escena } from '../escena/escena';
-import type { Estado } from '../estado';
+import { numeroDeCarroAnalizado, type Estado } from '../estado';
+import { carrosCalculados, numeroDeCarros } from '../contrato/carros';
 import { nodoGlobalDe, ubicacionDeNodo } from '../graficos/series';
 import { el } from './dom';
 import { numeroDeMagnitud, SIN_DATO } from './formato';
@@ -55,6 +56,14 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
   casillaSeguir.addEventListener('change', () => {
     seguir = casillaSeguir.checked;
   });
+  // Carro analizado (tren de varios carros): el HUD, los graficos y el color
+  // de la via son los de ese carro. Tambien se elige con un clic en el 3D.
+  const selectorDeCarro = el('select', { class: 'reproductor-carro', title: 'Carro que se analiza (también con un clic sobre el carro en el 3D)' });
+  selectorDeCarro.addEventListener('change', () => {
+    const { layout } = estado.get();
+    if (layout) estado.set({ carroAnalizado: { layout, numero: Number(selectorDeCarro.value) } });
+  });
+  const etiquetaDeCarro = el('label', { class: 'reproductor-opcion' }, 'analizar ', selectorDeCarro);
   const casillaCarro = el('input', { type: 'checkbox' });
   casillaCarro.checked = true;
   casillaCarro.addEventListener('change', () => {
@@ -88,6 +97,7 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
     selectorDeVelocidad,
     el('label', { class: 'reproductor-opcion' }, casillaSeguir, ' seguir'),
     el('label', { class: 'reproductor-opcion' }, casillaCarro, ' carro'),
+    etiquetaDeCarro,
     hud,
   );
 
@@ -173,14 +183,33 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
   };
   document.addEventListener('keydown', alTeclear);
 
+  /** Opciones del selector de carro: los calculados, con el analizado elegido. */
+  const armarSelectorDeCarro = () => {
+    const e = estado.get();
+    const cantidad = e.layout ? numeroDeCarros(e.layout) : 1;
+    const calculados = e.layout ? carrosCalculados(e.layout) : [1];
+    selectorDeCarro.replaceChildren(
+      ...Array.from({ length: cantidad }, (_, i) => {
+        const numero = i + 1;
+        const nombre = numero === 1 ? '1 (primero)' : numero === cantidad ? `${numero} (último)` : String(numero);
+        const opcion = el('option', { value: String(numero) }, nombre);
+        opcion.disabled = !calculados.includes(numero);
+        return opcion;
+      }),
+    );
+    selectorDeCarro.value = String(numeroDeCarroAnalizado(e));
+    etiquetaDeCarro.hidden = cantidad <= 1;
+  };
+
   const reiniciar = () => {
     const { layout } = estado.get();
     ponerReproduciendo(false);
     tiempo = 0;
     if (layout) {
-      carro.construir(layout);
+      carro.construir(layout, numeroDeCarroAnalizado(estado.get()));
       carro.mostrar(mostrarCarro);
     }
+    armarSelectorDeCarro();
     barra.max = String(Math.max(carro.duracion, 0.001));
     barra.value = '0';
     contenedor.hidden = !layout || carro.duracion <= 0;
@@ -188,7 +217,17 @@ export function montarReproductor(contenedor: HTMLElement, estado: Estado, escen
   };
   reiniciar();
   const cancelar = estado.suscribir((nuevo, anterior) => {
-    if (nuevo.layout !== anterior.layout) reiniciar();
+    if (nuevo.layout !== anterior.layout) {
+      reiniciar();
+      return;
+    }
+    // Otro carro analizado: mismo instante, otro carro resaltado y otros valores.
+    const numero = numeroDeCarroAnalizado(nuevo);
+    if (numero !== numeroDeCarroAnalizado(anterior)) {
+      carro.analizar(numero);
+      selectorDeCarro.value = String(numero);
+      actualizar(0, true);
+    }
   });
   return {
     destruir() {

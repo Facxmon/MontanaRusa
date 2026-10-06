@@ -8,6 +8,7 @@ import { destellarCambios, el, fila, tarjeta, vaciar, valoresPorClave } from './
 import { decimalesDeUnidad, formatear, formatearNumero } from './formato';
 import { textoDeInerte } from './parametros';
 import { elementosConModoPropio, modoDelElemento } from '../contrato/modo';
+import { numeroDeCarros } from '../contrato/carros';
 import type { NombreDeParametro } from '../nucleo/tipos';
 
 function tablaDelLayout(resumen: ResumenLayout, layout: Layout): HTMLElement {
@@ -26,12 +27,28 @@ function tablaDelLayout(resumen: ResumenLayout, layout: Layout): HTMLElement {
       resumen.todosLosCriteriosPasan ? 'pasa' : 'falla',
     ),
   ];
+  // Tren de varios carros: cuantos, cuanto mide y cuando sale el ultimo (el reproductor dura eso).
+  const tren = resumen.tren;
+  if (tren) {
+    filas.splice(3, 0,
+      fila('Tren', `${tren.numeroDeCarros} carros · ${formatear(tren.longitudDelTren, 'm')}`),
+      fila('Sale el último carro', formatear(tren.tiempoDeSalida, 's')),
+    );
+  }
   return el('table', { class: 'tabla' }, el('tbody', {}, filas));
 }
 
-function tablaDelElemento(resumen: ResumenElemento, modo: string): HTMLElement {
+/** "carro 2 (de 3)" o "masa puntual": a que carro se asigno la curva del modo en este elemento. */
+export function textoDelCarroDeDiseno(resumen: ResumenElemento, cantidad: number): string | null {
+  if (cantidad <= 1) return null;
+  return resumen.carroDeDiseno ? `carro ${resumen.carroDeDiseno} (de ${cantidad})` : 'ninguno (masa puntual)';
+}
+
+function tablaDelElemento(resumen: ResumenElemento, modo: string, cantidadDeCarros = 1): HTMLElement {
+  const carroDeDiseno = textoDelCarroDeDiseno(resumen, cantidadDeCarros);
   const filas = [
     fila('Modo de curvatura', modo),
+    ...(carroDeDiseno ? [fila('Carro que sigue la curva del modo', carroDeDiseno)] : []),
     fila('Método', resumen.metodo ?? '—'),
     fila('Longitud recorrida', formatear(resumen.longitudRecorrida, 'm')),
     fila('Altura sobre la entrada', formatear(resumen.alturaMaxima, 'm')),
@@ -115,7 +132,7 @@ export function montarResumenElemento(contenedor: HTMLElement, estado: Estado): 
         { class: 'ayuda' },
         `${e.nodos.numeroDeNodos} nodos · ${e.subtramos.map((s) => `${s.nombre} ${s.indiceInicio}–${s.indiceFin}`).join(' · ')}`,
       ),
-      tablaDelElemento(e.resumen, modoDelElemento(layout, elemento)),
+      tablaDelElemento(e.resumen, modoDelElemento(layout, elemento), numeroDeCarros(layout)),
       // Los inertes viajan en el layout desde la fase 1: ajustes que se
       // aplicaron y que ni el modo ni el tipo de este elemento consumen.
       ...(e.inertes ?? []).map((nombre) =>
