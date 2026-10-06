@@ -115,6 +115,12 @@ Qué consume cada modo lo declara `ParametrosDelModo`; qué consume cada element
 | $d_i$ | `DistanciasDelTren` | arco del riel del carro $i$ detrás del primero, $(i-1)(L_{carro}+g_{carros})$ | m | generador §16 | — |
 | $J_i$ | — | factor de la heartline del carro $i$ en su posición (§14.4) | adimensional | generador §16 | — |
 | $w$ | `Tren.VelocidadRielCuadrado` | velocidad del riel del tren al cuadrado, común a todos los carros | m²/s² | generador §16 | — |
+| $X$ | `Manta.Arco` | arco de la vía por el que pasa el punto del tren; abscisa de la manta de aceleraciones | m | generador §16.1 | — |
+| $y$ | `Manta.Posicion` | posición en el tren respecto de su centro, positiva hacia adelante, de $-L_{tren}/2$ a $+L_{tren}/2$ | m | generador §16.1 | — |
+| $L_{tren}$ | `Manta.LargoTren` | largo del tren de paragolpe a paragolpe, $d_N + L_{carro}$ | m | generador §16.1 | 0.10 m con un carro |
+| — | `Desfase` (`MarchaEnElTren`) | arco que el primer carro va por delante de un punto del tren: $d_i$ para el carro $i$, $d_N/2 - y$ para el punto $y$ | m | generador §16.1 | — |
+| $G(X, y)$ | `Manta.Gx`, `Manta.Gy`, `Manta.Gz`, `Manta.GModulo` | G al brazo de verificación del punto $y$ del tren cuando pasa por $X$, con la velocidad del tren de ese instante | G | generador §16.1 | — |
+| — | `Manta.Carros` | G de cada carro tal como las tiene el layout (`SimCarros{i}`, o el `Sim` de la partícula con un carro), sobre los mismos nodos que la manta, y su $y$; se grafican encima de la manta | G | generador §16.1 | — |
 | $D_{rueda}$ | `Parametros.DiametroRueda` | diámetro de rueda, piso impuesto por el rodamiento mínimo | m | memoria §9.2 | 0.0136 m, **SIN CERRAR** |
 | $d$ | `Parametros.DistanciaHeartline` | ver bloque 2 | m | memoria §3.1 | 0.030 m; offset físico riel → heartline |
 | $e$ | `Parametros.DistanciaHeartlineACabeza` | ver bloque 2 | m | memoria §3.1 | 0.030 m, **SIN CERRAR** — no es una medida antropométrica. A $\lambda\approx22$ un offset corazón-cabeza real de ~0.25 m daría ~0.011 m |

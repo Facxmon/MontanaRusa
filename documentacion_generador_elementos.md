@@ -55,6 +55,8 @@ Ver la tabla completa en [`NOMENCLATURA.md`](NOMENCLATURA.md).
 13. [Discrepancias con la consigna](#13-discrepancias-con-la-consigna)
 14. [El modelo de heartline: tres curvas](#14-el-modelo-de-heartline-tres-curvas)
 15. [Otras limitaciones y próximos pasos](#15-otras-limitaciones-y-próximos-pasos)
+16. [El tren de varios carros](#16-el-tren-de-varios-carros)
+   - [16.1 La manta de aceleraciones](#161-la-manta-de-aceleraciones)
 
 ---
 
@@ -63,7 +65,8 @@ Ver la tabla completa en [`NOMENCLATURA.md`](NOMENCLATURA.md).
 ```matlab
 run('DemoElemento.m')         % un elemento en detalle: reporte y gráficos
 run('DemoLayout.m')           % los cuatro elementos encadenados en un circuito
-run('TestsValidacion.m')      % diecinueve tests, termina con error si alguno falla
+run('DemoManta.m')            % el mismo circuito con un tren de cuatro carros: G en cada punto del tren
+run('TestsValidacion.m')      % veinticinco tests, termina con error si alguno falla
 ```
 
 Todos los parámetros de entrada están agrupados en [`ParametrosPorDefecto.m`](GeneradorDeElementos/ParametrosPorDefecto.m), en cuatro bloques: **parámetros del modo de curvatura**, **parámetros geométricos de cada elemento**, **criterios de aceptación** y parámetros generales. Los que dependen de investigación pendiente (disponibilidad de rodamientos en Argentina, tolerancia de la impresora) están marcados como **SIN CERRAR** ahí mismo. La tabla completa de esos parámetros, con símbolo, unidad y sección donde se usan, está en [`NOMENCLATURA.md` bloque 3](NOMENCLATURA.md#3-parámetros-de-entrada-del-generador-parametrospordefectom).
@@ -454,7 +457,7 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 
 ## 11. Tests de validación
 
-`TestsValidacion.m` implementa **veintitrés** tests y termina con error si alguno falla. Todos pasan por la API pública de los elementos, para que lo que se verifica sea el mismo camino que usa el usuario.
+`TestsValidacion.m` implementa **veinticinco** tests y termina con error si alguno falla. Todos pasan por la API pública de los elementos, para que lo que se verifica sea el mismo camino que usa el usuario.
 
 | # | Test | Resultado típico |
 |---|---|---|
@@ -481,8 +484,10 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 | 21 | La energía del tren se conserva sin pérdidas (tres carros, rodadura y arrastre nulos) | variación relativa $2.8\cdot10^{-6}$ (límite $10^{-5}$: la ecuación del tren usa $dJ^2/ds$ numérica) |
 | 22 | El carro de diseño sigue la curva del modo (dos carros, `FuerzaGConstante`, `DisenoDelTren = 'PrimerCarro'`) | desvío de $G_z$ en el arco: carro 1 0.008 G (límite 0.05), carro 2 0.72 G; 6 iteraciones |
 | 23 | Separación mínima entre carros: en recta, la `Holgura`; en curva, $2R\arctan\frac{\ell + H}{2(R - h)} - \ell$ | curva de 0.33 m: 0.0326 m; recta: 0.0100 m |
+| 24 | La manta pasa por la línea de cada carro: en el centro de cada carro, `MantaDeAceleraciones` da la G de `SimCarros{i}` (tres carros, con pérdidas) ([§16.1](#161-la-manta-de-aceleraciones)) | $1.3\cdot10^{-13}$ G lejos del final de `Layout.Tren` (límite $10^{-9}$); $8\cdot10^{-4}$ G en la $G_x$ del último carro en los últimos nodos, donde termina la simulación de referencia (límite $10^{-3}$) |
+| 25 | Con un carro, el centro de la manta es la partícula, y la manta va de paragolpe a paragolpe | $G_y$, $G_z$: $2\cdot10^{-5}$ G (límite $10^{-4}$); $G_x$: $1.9\cdot10^{-3}$ G en nodos sueltos (extremos y saltos de curvatura, donde la derivada numérica amplifica los $2\cdot10^{-6}$ de $v$ del test 20; límite $5\cdot10^{-3}$) |
 
-**Nota de discrepancia doc↔código corregida.** Una versión anterior de este documento decía en prosa "los ocho son ejecutables" pero la tabla sólo listaba siete filas, sin el test de encadenamiento. Se corrigió agregando la fila que faltaba. Hoy son **veintitrés**: los tests 9 y 10 se agregaron junto con el modelo de heartline de [§14](#14-el-modelo-de-heartline-tres-curvas), el 11 fija la hipótesis del eje de roll, el 12 es el que hubiera cazado el error de proyección de la hélice y el 13 cubre el $G_y$ del dive loop; el 14 verifica que `FactorDeSeguridadNormativo` escala el objetivo del modo y no la verificación; el 15 fija que el diseño es $C^2$ en roll (rampas $C^2$ y objetivo $C^1$, onset lateral independiente del paso); el 16 es el caso de referencia de los dos bugs del reloj único y del signo del peralte en la cúspide ([§5](#5-los-modos-de-curvatura) y [§12.3](#123-dos-ángulos-de-roll-distintos-y-sólo-uno-se-ve-en-la-vía)); el 17 fija la ley lineal del modo `Clotoide` (§5.2), el 18 y el 19 las dos definiciones del peralte alineado al CIR (§5.3), y del 20 al 23 cubren el tren de varios carros ([§16](#16-el-tren-de-varios-carros)).
+**Nota de discrepancia doc↔código corregida.** Una versión anterior de este documento decía en prosa "los ocho son ejecutables" pero la tabla sólo listaba siete filas, sin el test de encadenamiento. Se corrigió agregando la fila que faltaba. Hoy son **veinticinco**: los tests 9 y 10 se agregaron junto con el modelo de heartline de [§14](#14-el-modelo-de-heartline-tres-curvas), el 11 fija la hipótesis del eje de roll, el 12 es el que hubiera cazado el error de proyección de la hélice y el 13 cubre el $G_y$ del dive loop; el 14 verifica que `FactorDeSeguridadNormativo` escala el objetivo del modo y no la verificación; el 15 fija que el diseño es $C^2$ en roll (rampas $C^2$ y objetivo $C^1$, onset lateral independiente del paso); el 16 es el caso de referencia de los dos bugs del reloj único y del signo del peralte en la cúspide ([§5](#5-los-modos-de-curvatura) y [§12.3](#123-dos-ángulos-de-roll-distintos-y-sólo-uno-se-ve-en-la-vía)); el 17 fija la ley lineal del modo `Clotoide` (§5.2), el 18 y el 19 las dos definiciones del peralte alineado al CIR (§5.3), del 20 al 23 cubren el tren de varios carros ([§16](#16-el-tren-de-varios-carros)), y el 24 y el 25, la manta de aceleraciones ([§16.1](#161-la-manta-de-aceleraciones)).
 
 **Test 2 excluye los nodos cuyo esquema de tres puntos cruza una frontera de sub-tramo.** Ahí $d\kappa/ds$ salta y la circunferencia por tres puntos devuelve un promedio de dos curvaturas distintas: el error sube a $4.6\times10^{-3}$. Es una limitación del estimador discreto, no de la geometría generada — y es exactamente la fragilidad que ya documenta [`documentacion_analisis_energia.md` §4](documentacion_analisis_energia.md#4-radio-de-giro-curvatura-local).
 
@@ -663,3 +668,68 @@ un carro: de 3 a 7 regeneraciones por elemento. Loop `FuerzaGConstante`: 7.2 s c
 diseñando para el primero, 190 s buscando el crítico; circuito de `DemoLayout` en `ArcoCircular`: 29.8 s
 contra 149.5 s. Detalle de la interfaz y decisiones abiertas en [`web/DISENO.md`](web/DISENO.md); el
 contrato en [`CONTRATO_VISUALIZADOR.md`](CONTRATO_VISUALIZADOR.md) §6.5.
+
+### 16.1 La manta de aceleraciones
+
+Las G de cada carro son líneas sueltas, una por carro y en su centro. `MantaDeAceleraciones(Layout)` calcula la
+superficie continua $G(X, y)$, donde:
+- $X$ es el arco de la vía;
+- $y$ es la posición en el tren respecto de su centro, positiva hacia adelante. Va de $-L_{tren}/2$ (paragolpe
+  trasero) a $+L_{tren}/2$ (delantero), con $L_{tren} = d_N + \ell$.
+
+`GraficarManta` dibuja cuatro figuras: $G_x$, $G_y$, $G_z$ y $\lvert G\rvert$. Encima de cada una van:
+- la línea del centro del tren, que sale de la manta;
+- la línea de cada carro, con los datos que el layout ya tenía (`Manta.Carros`): `SimCarros{i}` o, con un carro,
+  el `Sim` de la partícula. No se recalculan, así que tienen que caer sobre la superficie.
+
+`DemoManta.m` corre el circuito de `DemoLayout` con cuatro carros.
+
+**Modelo de tren continuo.** Cada punto del tren va sobre el riel a $y$ de arco del centro, y todo el tren
+comparte la velocidad del riel. Cuando el punto $y$ pasa por $X$, el centro del tren está en $X - y$ y el primer
+carro va $d_N/2 - y$ por delante del punto. Por eso:
+
+$$G(X, y) = G\big(\text{geometría en } X,\; v_{tren}\ \text{con el centro en } X - y\big)$$
+
+**Es el cálculo completo, no solo $v^2/R$.** Es el mismo de `MagnitudesDinamicas`:
+- vector curvatura y marco del carro en $X$;
+- roll y velocidad angular completa (§14.3);
+- transporte al brazo de verificación;
+- gravedad.
+
+Lo único que cambia con $y$ es la velocidad (`MarchaEnElTren`, la mitad cinemática de `SimDelCarro`). La
+aceleración tangencial $dv/dt$ es la misma en todo el tren. La $G_x$, en cambio, no lo es: un punto en una
+pendiente distinta de la del resto del tren siente la diferencia entre la gravedad local y la desaceleración
+común. Una partícula suelta sobre vía sin pérdidas tiene $G_x \approx 0$ (§12.4); el tren no.
+
+**Propiedades:**
+- en el centro de cada carro la manta es exactamente la línea de ese carro (test 24);
+- con un carro, la columna $y = 0$ es la partícula (test 25).
+
+**La velocidad es la del tren simulado, no la de una partícula suelta.** La manta integra su propio tren
+(`SimularTren`) con $\ell/2$ más de prolongación, para que el paragolpe trasero termine de salir.
+- Con un carro, la velocidad del tren es la de la partícula.
+- Con varios carros difieren, porque la energía del tren está repartida a lo largo de la vía.
+- Además, con `DisenoDelTren = 'PrimerCarro'` (el valor por defecto con N > 1) la vía se diseña para el primer
+  carro. Por eso la columna $y = 0$ no es la G con la que se diseñó.
+
+**Huecos (NaN).**
+- El tren arranca con el centro del primer carro en el inicio de la vía. Los puntos de adelante pasaron por los
+  primeros nodos antes de $t = 0$, y ahí no hay estado.
+- Si el tren se para, todo lo que viene después queda en NaN.
+
+**Dentro de un carro el modelo es una aproximación.** Un carro es rígido y su frente no va sobre el riel, sino
+sobre la cuerda. Lo exacto sería el transporte de cuerpo rígido desde el centro del carro con
+$\mathbf{r} = y\,\mathbf{T} + b\,\mathbf{U}$. Ese transporte coincide con el continuo a primer orden en $y$ en la
+dirección normal, y difiere en $G_x$ en $-\omega^2 y$. Esa variante haría la manta discontinua entre carros y queda
+pendiente.
+
+Medido en `DemoManta.m` (cuatro carros, tren de 0.52 m, loop de 0.30 m en `ArcoCircular`):
+- **Loop:** el frente entra al loop con el resto del tren todavía abajo, así que entra más rápido que la cola.
+  - La mayor diferencia de $G_z$ entre puntos del tren en un mismo $X$ es de **2.84 G**, en $X = 0.80$ m.
+  - El pico, 6.54 G, lo recibe el paragolpe delantero en $X = 0.53$ m.
+- **$G_x$:** llega a $-1.02$ G en la cola, en $X = 0.31$ m. Ahí la cola está en el llano mientras el tren se
+  frena porque el frente sube.
+- **Escala:** con el tren a un cuarto de la circunferencia del loop, el efecto es grande.
+
+Costo: una integración del tren más un `MagnitudesDinamicas` por columna y por elemento. Con 45 columnas y
+cuatro elementos (7001 nodos) son 1.7 s.

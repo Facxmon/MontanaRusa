@@ -698,6 +698,69 @@ Resultados = Anotar(Resultados, 'Separacion minima entre carros', ...
     abs(Exigida - Esperada) < 1e-12 && abs(EnRecta - Parametros.Holgura) < 1e-12, ...
     sprintf('curva de %.2f m: %.4f m (formula %.4f m); recta: %.4f m (Holgura %.4f m)', Radio, Exigida, Esperada, EnRecta, Parametros.Holgura));
 
+%% --- Test 24: la manta pasa por la linea de cada carro -------------------
+% Tres carros con rodadura y arrastre: en el centro de cada carro, la manta
+% de aceleraciones (tren continuo) tiene que ser exactamente la G que la
+% verificacion del layout calculo para ese carro (SimDelCarro). La manta
+% simula su propio tren con LargoCarro/2 mas de prolongacion, asi que la
+% unica diferencia es donde termina Layout.Tren: ahi el borde del
+% interpolante cambia la derivada de v y con ella la Gx del ultimo carro en
+% los ultimos nodos (medido 6e-4 G). Lejos de ese borde, exacto.
+Parametros = ParametrosBase;
+Parametros.ModoCurvatura = 'ArcoCircular';
+Parametros.NumeroDeCarros = 3;
+Parametros.DisenoDelTren = 'Particula';
+Estado = EstadoDeEnsayo(Parametros);
+Layout = LayoutNuevo(Estado, Parametros);
+[EstadoTren, ElementoTren, ReporteTren] = ElementoLoopVertical(Estado, Parametros, Layout);
+Layout = LayoutAgregarElemento(Layout, ElementoTren, EstadoTren, ReporteTren);
+Manta = MantaDeAceleraciones(Layout, 21);
+SimCarros = Layout.Elementos{1}.Elemento.SimCarros;
+FinDelTren = Layout.Tren.Arco(end);
+DesvioLejos = 0;
+DesvioBorde = 0;
+MismosHuecos = true;
+for i = 1:numel(SimCarros)
+    Columna = Manta.ColumnaDeCarros(i);
+    DeLaManta = [Manta.Gx(:, Columna), Manta.Gy(:, Columna), Manta.Gz(:, Columna)];
+    DelCarro  = [SimCarros{i}.Gx, SimCarros{i}.Gy, SimCarros{i}.Gz];
+    MismosHuecos = MismosHuecos && isequal(isnan(DeLaManta), isnan(DelCarro));
+    Desvio = abs(DeLaManta - DelCarro);
+    Lejos = Manta.Arco + Layout.Tren.Distancias(i) < FinDelTren - 2*Parametros.PasoSimulacion;
+    DesvioLejos = max(DesvioLejos, max(Desvio(Lejos, :), [], 'all', 'omitnan'));
+    DesvioBorde = max(DesvioBorde, max(Desvio, [], 'all', 'omitnan'));
+end
+Resultados = Anotar(Resultados, 'La manta pasa por la linea de cada carro', ...
+    MismosHuecos && DesvioLejos < 1e-9 && DesvioBorde < 1e-3, ...
+    sprintf('desvio en Gx, Gy, Gz %.2e G lejos del final de Layout.Tren (limite 1e-9), %.2e G en el borde (limite 1e-3); %d carros', ...
+            DesvioLejos, DesvioBorde, numel(SimCarros)));
+
+%% --- Test 25: con un carro, el centro de la manta es la particula --------
+% Un carro: la columna y = 0 de la manta (tren de un carro, SimularTren)
+% tiene que dar la G de la particula (SimularSobreTrack), y la manta tiene
+% que ir de paragolpe a paragolpe del carro. Las dos velocidades difieren
+% en 2e-6 relativo (test 20); Gy y Gz lo heredan tal cual, pero Gx sale de
+% la derivada numerica de v y lo amplifica en los extremos del elemento y
+% en los saltos de curvatura de ArcoCircular (medido 2e-3 G en nodos
+% sueltos): por eso lleva su propio limite.
+Parametros = ParametrosBase;
+Parametros.ModoCurvatura = 'ArcoCircular';
+Estado = EstadoDeEnsayo(Parametros);
+Layout = LayoutNuevo(Estado, Parametros);
+[EstadoUno, ElementoUno, ReporteUno] = ElementoLoopVertical(Estado, Parametros, Layout);
+Layout = LayoutAgregarElemento(Layout, ElementoUno, EstadoUno, ReporteUno);
+Manta = MantaDeAceleraciones(Layout, 11);
+SimUno = Layout.Elementos{1}.Elemento.Sim;
+Columna = Manta.ColumnaDelCentro;
+DesvioGyGz = max(abs([Manta.Gy(:, Columna), Manta.Gz(:, Columna)] - [SimUno.Gy, SimUno.Gz]), [], 'all');
+DesvioGx = max(abs(Manta.Gx(:, Columna) - SimUno.Gx));
+Extremos = [Manta.Posicion(1), Manta.Posicion(end)];
+Resultados = Anotar(Resultados, 'Con un carro, el centro de la manta es la particula', ...
+    DesvioGyGz < 1e-4 && DesvioGx < 5e-3 && Manta.Posicion(Columna) == 0 ...
+    && max(abs(Extremos - [-1 1]*Parametros.LargoCarro/2)) < 1e-12, ...
+    sprintf('desvio en Gy, Gz %.2e G (limite 1e-4), en Gx %.2e G (limite 5e-3); y de %+.3f a %+.3f m', ...
+            DesvioGyGz, DesvioGx, Extremos));
+
 %% --- Resumen ----------------------------------------------------------
 fprintf('\n');
 NoPasan = 0;

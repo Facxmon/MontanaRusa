@@ -26,6 +26,7 @@ que las dos piezas de código tienen que respetar.
 | Chequeos de factibilidad e interferencia | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§8](documentacion_generador_elementos.md#8-chequeos-de-factibilidad) |
 | Qué tests corren y qué verifican | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§11](documentacion_generador_elementos.md#11-tests-de-validación) |
 | Hallazgos de ingeniería (loop que se cruza, loop circular imposible, etc.) | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§12](documentacion_generador_elementos.md#12-hallazgos-de-ingeniería) |
+| G en cada punto del tren a lo largo de la vía (la manta $G(X, y)$) | [`documentacion_generador_elementos.md`](documentacion_generador_elementos.md) | [§16.1](documentacion_generador_elementos.md#161-la-manta-de-aceleraciones) |
 | Cómo se calcula energía, velocidad y pérdidas sobre una trayectoria dada | [`documentacion_analisis_energia.md`](documentacion_analisis_energia.md) | [§9](documentacion_analisis_energia.md#9-proceso-iterativo-velocidad-normales-y-pérdidas) |
 | Modelo de resistencia al avance (rodadura + arrastre) | [`documentacion_analisis_energia.md`](documentacion_analisis_energia.md) | [§8](documentacion_analisis_energia.md#8-modelo-de-resistencia-al-avance) |
 | Qué significa cada símbolo o variable, con su unidad | [`NOMENCLATURA.md`](NOMENCLATURA.md) | tabla completa |
@@ -34,7 +35,7 @@ que las dos piezas de código tienen que respetar.
 
 | Carpeta | Qué contiene |
 |---|---|
-| *(raíz)* | `analisis_energia.m`, `DemoElemento.m`, `DemoLayout.m`, `TestsValidacion.m` y los cinco documentos `.md` |
+| *(raíz)* | `analisis_energia.m`, `DemoElemento.m`, `DemoLayout.m`, `DemoManta.m`, `TestsValidacion.m` y los cinco documentos `.md` |
 | `GeneradorDeElementos/` (raíz) | `ParametrosPorDefecto.m` — el único archivo que se edita para configurar, en cuatro bloques (modo de curvatura, geometría de cada elemento, criterios de aceptación, generales); `ParametrosGenerales.m` declara el cuarto bloque con unidades; `AjustarParametros.m` avisa si se carga un valor que la corrida no lee |
 | `GeneradorDeElementos/Nucleo/` | contrato de `Estado`, marco de Bishop, integrador RK4, registro de nodos |
 | `GeneradorDeElementos/Fisica/` | cargas por juego de ruedas, resistencia, modos de curvatura, Froude, simulación |
@@ -54,7 +55,8 @@ Detalle completo en [`documentacion_generador_elementos.md` §2](documentacion_g
 run('analisis_energia.m')     % modelo preliminar sobre una trayectoria de prueba (no es geometría de diseño)
 run('DemoElemento.m')         % un elemento del generador en detalle: reporte y gráficos
 run('DemoLayout.m')           % los cuatro elementos encadenados en un circuito
-run('TestsValidacion.m')      % diecinueve tests del generador, termina con error si alguno falla
+run('DemoManta.m')            % el circuito con un tren de cuatro carros: G en cada punto del tren (manta 3D)
+run('TestsValidacion.m')      % veinticinco tests del generador, termina con error si alguno falla
 run('GenerarGoldenFiles.m')   % regenera golden/*.json y los valida contra el esquema (necesita node)
 ```
 
@@ -75,13 +77,13 @@ Los parámetros del generador de elementos se configuran en un único lugar:
 
 | Área | Estado |
 |---|---|
-| Generador de geometría (loop, hélice, over-banked turn, dive loop) | Implementado y con 23 tests pasando (ver [`documentacion_generador_elementos.md` §11](documentacion_generador_elementos.md#11-tests-de-validación)) |
+| Generador de geometría (loop, hélice, over-banked turn, dive loop) | Implementado y con 25 tests pasando (ver [`documentacion_generador_elementos.md` §11](documentacion_generador_elementos.md#11-tests-de-validación)) |
 | Modelo de heartline (tres curvas: riel, heartline, cabeza) | Implementado; el riel es la curva integrada y el eje de roll, la heartline se deriva y la G se impone en el pasajero por transporte inverso (ver [`documentacion_generador_elementos.md` §14](documentacion_generador_elementos.md#14-el-modelo-de-heartline-tres-curvas)) |
 | Verificación normativa contra ASTM F2291 | Implementada; valores de la norma sin verificar contra el texto original (ver [`memoria_de_calculo.md` §11](memoria_de_calculo.md#11-datos-pendientes-de-verificación)). Diagnósticos de límites, clotoides y peralte en [`Diagnostico/DiagnosticosDeVerificacion.md`](Diagnostico/DiagnosticosDeVerificacion.md) |
 | Análisis energético (`analisis_energia.m`) | Modelo preliminar, corre sobre trayectoria de prueba; falta importar geometría real y pasar a RK4 (ver [`documentacion_analisis_energia.md` §15](documentacion_analisis_energia.md#15-limitaciones-actuales--próximos-pasos)) |
 | Dimensionamiento del carro y del loop | Decisión de similitud tomada (modelo distorsionado); dimensiones definitivas sin cerrar (ver [`memoria_de_calculo.md` §10](memoria_de_calculo.md#10-pendientes-que-bloquean-el-dimensionamiento)) |
 | Visualizador web (`web/`) | Vía 3D coloreada por magnitud, gráficos 2D, carro animado, y parámetros editables que recalculan en el navegador sobre el port de la física a TypeScript, validado contra los golden files (ver [`web/DISENO.md`](web/DISENO.md)) |
-| Tren de varios carros | Implementado: velocidad común, energía del conjunto, G por carro, diseño de cada elemento para un carro elegido y separación con sus criterios (ver [`documentacion_generador_elementos.md` §16](documentacion_generador_elementos.md#16-el-tren-de-varios-carros)) |
+| Tren de varios carros | Implementado: velocidad común, energía del conjunto, G por carro, diseño de cada elemento para un carro elegido y separación con sus criterios (ver [`documentacion_generador_elementos.md` §16](documentacion_generador_elementos.md#16-el-tren-de-varios-carros)). La manta $G(X, y)$ da la G en cualquier punto del tren, no solo en el centro de cada carro (§16.1); solo en MATLAB, sin port a la web |
 | Port de la física a TypeScript (`web/src/nucleo/`) | Completo: los diecinueve golden (dos de tren) se reproducen dentro del redondeo del export; el arnés es `web/test/golden-port.test.ts` |
 | Elemento conector, modo inverso, backend web | Fuera de alcance actual (ver [`documentacion_generador_elementos.md` §15](documentacion_generador_elementos.md#15-otras-limitaciones-y-próximos-pasos)) |
 
