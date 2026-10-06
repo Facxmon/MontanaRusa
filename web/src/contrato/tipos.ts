@@ -139,6 +139,10 @@ export interface Elemento {
   resumen: ResumenElemento;
   criterios: Criterios;
   estadoSalida: Estado;
+  /**
+   * Opcional (desde 1.3.0), solo con numeroDeCarros > 1: un objeto por carro calculado. Las columnas van sobre los mismos nodos del elemento: el nodo k es ESE carro parado en el nodo k, con su propio reloj (arranca en 0 cuando el carro entra al elemento). Las columnas base de nodos son las del carro 1.
+   */
+  carros?: Carro[];
 }
 /**
  * Arrays columnares. TODOS los arrays de este objeto tienen exactamente numeroDeNodos elementos — el consumidor puede asumirlo sin verificar. Formato columnar y no array de objetos porque se mapea directo a Float32Array / BufferAttribute.
@@ -173,6 +177,10 @@ export interface Nodos {
   anguloPeralte: ArrayDeNumeros;
   fuerzaNormal?: ArrayDeNumeros;
   energiaTotal?: ArrayDeNumeros;
+  energiaCinetica?: ArrayDeNumeros;
+  energiaPotencial?: ArrayDeNumeros;
+  energiaDisipadaRodadura?: ArrayDeNumeros;
+  energiaDisipadaArrastre?: ArrayDeNumeros;
   /**
    * Índice base 0 donde el carro se quedó sin energía, o null si completó el elemento.
    */
@@ -224,6 +232,11 @@ export interface ResumenElemento {
   carrosEquivalentes?: Numero;
   onsetMaximoModelo?: Vector3;
   velocidadInicialMinima?: Numero;
+  /**
+   * Desde 1.3.0, solo con varios carros: número del carro (1 = el primero) que sigue exactamente la curva del modo en este elemento.
+   */
+  carroDeDiseno?: number;
+  utilizacionPorCarro?: ArrayDeNumeros;
   [k: string]: unknown;
 }
 export interface Criterios {
@@ -256,6 +269,37 @@ export interface Criterio {
    */
   detalle?: string;
 }
+export interface Carro {
+  /**
+   * 1 = el primero (el de adelante).
+   */
+  numero: number;
+  nodos: {
+    tiempo: ArrayDeNumeros;
+    velocidad: ArrayDeNumeros;
+    velocidadRiel: ArrayDeNumeros;
+    aceleracionTangencial: ArrayDeNumeros;
+    gx: ArrayDeNumeros;
+    gy: ArrayDeNumeros;
+    gz: ArrayDeNumeros;
+    jerkGx: ArrayDeNumeros;
+    jerkGy: ArrayDeNumeros;
+    jerkGz: ArrayDeNumeros;
+    gyCabeza: ArrayDeNumeros;
+    gzCabeza: ArrayDeNumeros;
+    fuerzaNormal: ArrayDeNumeros;
+    puntoDeParada?: number | null;
+  };
+  /**
+   * Las líneas de criterio que dependen de la dinámica, para este carro. En criterios.posteriores del elemento cada una de esas líneas es la del peor carro.
+   */
+  criterios: {
+    posteriores: Criterio[];
+    normativo?: {
+      [k: string]: unknown;
+    } | null;
+  };
+}
 export interface ResumenLayout {
   numeroDeElementos: number;
   longitudTotal: Numero;
@@ -274,4 +318,15 @@ export interface ResumenLayout {
    */
   boundingBox: [[number, number], [number, number], [number, number]];
   todosLosCriteriosPasan: boolean;
+  /**
+   * Opcional (desde 1.3.0), solo con numeroDeCarros > 1.
+   */
+  tren?: {
+    numeroDeCarros: number;
+    longitudDelTren: Numero;
+    distancias: ArrayDeNumeros;
+    desfasesDeTiempo: ArrayDeNumeros;
+    tiempoDeSalida: Numero;
+    carrosCalculados: number[];
+  };
 }

@@ -8,7 +8,12 @@ import { GenerarGeometria, type DiagnosticoDeGeometria } from './generarGeometri
 import { EPS, interpolantePchip, maximo, minimo, norma, rad2deg, resta, sprintfF } from './matematica';
 import { limiteDeDiseno, limiteNormativo } from './norma';
 import { EvaluarObjetivoNormativo } from './objetivoNormativo';
+import { EscalasDeFroude } from './basicos';
 import { SimularSobreTrack } from './simular';
+import {
+  ConEnergiaDelTren, CriteriosDelCarro, DisenarParaElTren, DistanciasDelTren, EvaluarEnArco, esTren, PeorCarroPorCriterio, ResumenDelTren,
+  VerificarTrenDelLayout, type EstadoDelTren, type InfoDelTren, type ReporteDelCarro, type TrenSimulado,
+} from './tren';
 import type {
   BusquedaVelocidad, Criterio, Diagnostico, Elemento, Estado, Layout, NombreDeElemento, Parametros, Receta, RegistroDeLayout, Reporte, Resumen, Sim, Track,
 } from './tipos';
@@ -204,12 +209,47 @@ export function ConstruirElemento(EstadoEntrada: Estado, Parametros: Parametros,
       throw new Error(`Metodo de acoplamiento no reconocido: ${Parametros.MetodoDeAcoplamiento}. Las opciones son 'A', 'B' o 'Ambos'.`);
   }
 
-  const Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros);
-  const [Posteriores, Normativo] = ChequeosPosteriores(Track, Sim, Parametros, Layout);
+  // ---------------- Tren de varios carros ---------------------------------
+  // Con un carro, la masa puntual de siempre. Con varios, el elemento se
+  // disena para el carro elegido (DisenarParaElTren) y se calcula lo que
+  // vive cada carro; el Sim del elemento es el del carro 1, con la energia
+  // del tren entero.
+  const EsTren = esTren(Parametros);
+  let SimsCarros: (Sim | null)[] = [];
+  let Tren: TrenSimulado | null = null;
+  let InfoTren: InfoDelTren | null = null;
+  let Carros: (ReporteDelCarro | null)[] = [];
+  let Sim: Sim;
+  let SimDeDiseno: Sim;
+  if (EsTren) {
+    [Track, D, Tren, SimsCarros, InfoTren] = DisenarParaElTren(EstadoEntrada, Parametros, Receta, Layout, Track, D);
+    Sim = ConEnergiaDelTren(SimsCarros[0]!, Track, Tren);
+    // Sin carro de diseno (DisenoDelTren = 'Particula') el objetivo se mide en el carro 1.
+    SimDeDiseno = SimsCarros[Math.max(InfoTren.CarroDeDiseno, 1) - 1]!;
+  } else {
+    Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros);
+    SimDeDiseno = Sim;
+  }
+
+  let [Posteriores, Normativo] = ChequeosPosteriores(Track, Sim, Parametros, Layout);
+
+  // Con varios carros calculados, cada linea dinamica es la del peor carro y
+  // cada carro guarda las suyas. Provisorio hasta VerificarTrenDelLayout.
+  if (EsTren && InfoTren) {
+    const EscalaDelTren = EscalasDeFroude(Parametros);
+    Carros = new Array(DistanciasDelTren(Parametros).length).fill(null);
+    for (const i of InfoTren.Calculados) {
+      const [Lineas, NormativoDelCarro] = CriteriosDelCarro(SimsCarros[i - 1]!, EscalaDelTren, Parametros);
+      Carros[i - 1] = { Posteriores: Lineas, Normativo: NormativoDelCarro };
+    }
+    Posteriores = PeorCarroPorCriterio(Posteriores, InfoTren.Calculados.map((i) => Carros[i - 1]!.Posteriores), InfoTren.Calculados, Carros.length);
+  }
 
   AgregarCriterio(Posteriores, 'Giro objetivo alcanzado', 'MenorOIgual', Math.abs(D.ResidualCierrePitch), Parametros.TolCierrePitch, 'rad',
     'Si falla, las transiciones consumen mas giro que el que pide el elemento: hay que agrandar el radio o entrar mas lento.');
-  CriterioDeObjetivoDeG(Posteriores, Track, Sim, D, Receta, Parametros);
+  // El objetivo del modo lo persigue el carro de diseno: es el que se mide.
+  CriterioDeObjetivoDeG(Posteriores, Track, SimDeDiseno, D, Receta, Parametros);
+  if (EsTren && InfoTren) ConCarroDeDiseno(Posteriores, InfoTren.CarroDeDiseno);
 
   // ---------------- Estado de salida -------------------------------------
   const Ultimo = Track.PuntosRiel.length - 1;
@@ -227,6 +267,8 @@ export function ConstruirElemento(EstadoEntrada: Estado, Parametros: Parametros,
     Velocidad: Sim.VelocidadCentroDeMasa[Ultimo]!,
     EnergiaTotal: Sim.EnergiaTotal[Ultimo]!,
   };
+  // Tren: velocidad del riel y reloj con el carro 1 en el final; de ahi arranca el tren en el elemento siguiente.
+  if (EsTren && Tren) EstadoSalida.Tren = EstadoDelTrenEn(Tren, Track.LongitudArco[Ultimo]!);
 
   // ---------------- Numeros de salida ------------------------------------
   const Escala = D.Escala;
@@ -239,7 +281,7 @@ export function ConstruirElemento(EstadoEntrada: Estado, Parametros: Parametros,
     [VelocidadInicialMinima, BusquedaVelocidad] = VelocidadInicialMinimaDe(EstadoEntrada, Parametros, Receta);
   }
 
-  const R: Resumen = {
+  let R: Resumen = {
     Metodo: D.Metodo,
     LongitudRecorrida: Track.LongitudArco[n - 1]! - Track.LongitudArco[0]!,
     LongitudDeMaterial: LongitudDePolilinea(Track.PuntosRiel),
@@ -277,11 +319,50 @@ export function ConstruirElemento(EstadoEntrada: Estado, Parametros: Parametros,
     BusquedaVelocidad,
   };
 
-  const Reporte: Reporte = { Previos, Posteriores, Normativo, Resumen: R };
+  // Tren: los extremos son los de todos los carros calculados y se agrega el
+  // carro de diseno, en el mismo lugar del struct que en MATLAB (despues de
+  // PeralteMaximo): el orden de las claves del JSON es el de alla.
+  if (EsTren && InfoTren) {
+    R = ResumenDelTren(R, InfoTren.Calculados.map((i) => SimsCarros[i - 1]!));
+    const DelTren: Partial<Resumen> = InfoTren.CarroDeDiseno > 0
+      ? { CarroDeDiseno: InfoTren.CarroDeDiseno, UtilizacionPorCarro: InfoTren.Utilizacion }
+      : { UtilizacionPorCarro: InfoTren.Utilizacion };
+    const Entradas = Object.entries(R);
+    const Despues = Entradas.findIndex(([clave]) => clave === 'PeralteMaximo') + 1;
+    R = Object.fromEntries([...Entradas.slice(0, Despues), ...Object.entries(DelTren), ...Entradas.slice(Despues)]) as unknown as Resumen;
+  }
+
+  const Reporte: Reporte = { Previos, Posteriores, Normativo, Resumen: R, Tren: InfoTren, Carros };
   const Elemento: Elemento = {
     Nombre: Receta.Nombre, Track, Sim, SubTramos: Track.SubTramos, Diagnostico: D, Parametros, Receta, EstadoEntrada, EstadoSalida,
+    SimCarros: SimsCarros, Tren,
   };
   return [EstadoSalida, Elemento, Reporte];
+}
+
+/** ConCarroDeDiseno (ConstruirElemento.m): las lineas del objetivo del modo dicen que carro lo sigue. */
+function ConCarroDeDiseno(Criterios: Criterio[], Carro: number): void {
+  const Prefijo = Carro > 0
+    ? `Carro de diseno: ${Carro} (el que sigue la curva del modo en este elemento). `
+    : 'Sin carro de diseno (via disenada con la masa puntual); medido en el carro 1. ';
+  for (const c of Criterios) {
+    if (c.Nombre.startsWith('Gz objetivo del modo') || c.Nombre.startsWith('Gy objetivo del modo')) c.Detalle = Prefijo + c.Detalle;
+  }
+}
+
+/** EstadoDelTrenEn (ConstruirElemento.m): velocidad del riel y reloj del tren con el carro 1 en ese arco. */
+function EstadoDelTrenEn(Tren: TrenSimulado, Arco: number): EstadoDelTren {
+  const ArcoTren: number[] = [];
+  const w: number[] = [];
+  const t: number[] = [];
+  for (let k = 0; k < Tren.Arco.length; k++) {
+    if (Number.isNaN(Tren.VelocidadRielCuadrado[k]!)) continue;
+    if (k > 0 && !(Tren.Arco[k]! - Tren.Arco[k - 1]! > 1e-9)) continue;
+    ArcoTren.push(Tren.Arco[k]!);
+    w.push(Tren.VelocidadRielCuadrado[k]!);
+    t.push(Tren.Tiempo[k]!);
+  }
+  return { VelocidadRielCuadrado: EvaluarEnArco(ArcoTren, w, [Arco])[0]!, Tiempo: EvaluarEnArco(ArcoTren, t, [Arco])[0]! };
 }
 
 function LongitudDePolilinea(Puntos: Track['PuntosRiel']): number {
@@ -407,8 +488,11 @@ export function LayoutAgregarElemento(Layout: Layout, Elemento: Elemento, Estado
   const desde = Layout.PuntosRiel.length === 0 ? 0 : 1;
   // Los eventos sostenidos de la norma se miden de corrido en todo el
   // circuito: el elemento nuevo puede alargar un evento del anterior, asi que
-  // se vuelve a verificar el layout entero (VerificarLayoutNormativo.m).
-  return VerificarLayoutNormativo({
+  // se vuelve a verificar el layout entero (VerificarLayoutNormativo.m). Con
+  // un tren de varios carros se simula el tren sobre la via completa y se
+  // verifica cada carro (VerificarTrenDelLayout.m).
+  const Verificar = esTren(Elemento.Parametros) ? VerificarTrenDelLayout : VerificarLayoutNormativo;
+  return Verificar({
     ...Layout,
     Elementos: [...Layout.Elementos, Registro],
     EstadoActual: EstadoSalida,

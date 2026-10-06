@@ -22,13 +22,18 @@
 //   que el resultado final es el mismo;
 // - la concatenacion del riel y la exportacion al contrato.
 //
-// La dinamica del carro no necesita trato aparte: el modelo es de particula
-// (documentacion_generador_elementos.md, limitaciones: el tren de varios
-// carros no esta implementado) y la velocidad y la energia de
-// entrada viajan en el Estado, que es parte de la clave. Si una edicion
+// La dinamica de un carro no necesita trato aparte: la velocidad y la
+// energia de entrada viajan en el Estado, que es parte de la clave. Si una edicion
 // cambia la velocidad a la salida del elemento k, los siguientes cambian de
 // clave y se recalculan; si no la cambia, sus resultados son exactamente los
 // mismos. No hay ninguna aproximacion.
+//
+// Tren de varios carros (NumeroDeCarros > 1): un elemento depende ademas de
+// la via anterior, por donde van los carros de atras (DisenarParaElTren), y
+// del estado del tren al entrar (Estado.Tren, que ya esta en la clave). La
+// clave lleva entonces tambien la firma de la via previa: solo se reutiliza
+// un elemento si todo lo anterior es identico. Y al final se corre
+// VerificarTrenDelLayout en vez de VerificarLayoutNormativo.
 //
 // Invalidacion: si cambian los parametros generales (entrada.parametros) se
 // vacia la cache entera. La cache vive en el worker (worker.ts), pero cada
@@ -44,6 +49,7 @@ import { exportarLayout, type InstanciaExportada } from './exportar';
 import type { Vec3 } from './matematica';
 import { AjustarParametros } from './parametros';
 import type { Elemento, Estado, Layout, RegistroDeLayout, Reporte, Track } from './tipos';
+import { esTren, VerificarTrenDelLayout } from './tren';
 import { CriterioDeInterferenciaConLaVia, NOMBRE_INTERFERENCIA_CON_LA_VIA, SeparacionExigidaEntreVias, VerificarLayoutNormativo } from './verificacion';
 
 /**
@@ -144,7 +150,7 @@ export class CalculadorIncremental {
       if (!constructor) throw new Error(`Elemento desconocido: ${String(inst.tipo)}`);
       try {
         const { Parametros: P, Inertes } = AjustarParametros(entrada.parametros, inst.ajustes, inst.tipo);
-        const clave = `${inst.tipo}|${claveExacta(P)}|${claveExacta(Estado)}`;
+        const clave = `${inst.tipo}|${claveExacta(P)}|${claveExacta(Estado)}${esTren(P) ? `|via:${prefijo}` : ''}`;
         let registro = this.cache.get(clave);
         let nueva = true;
         if (registro) {
@@ -184,7 +190,8 @@ export class CalculadorIncremental {
       alAvanzar?.(i + 1, total, inst.tipo);
     });
 
-    const Layout = VerificarLayoutNormativo({
+    const Verificar = esTren(entrada.parametros) ? VerificarTrenDelLayout : VerificarLayoutNormativo;
+    const Layout = Verificar({
       EstadoInicial: EstadoInicialDelLayout, EstadoActual: Estado, Parametros: entrada.parametros, Elementos, PuntosRiel, LongitudArcoRiel,
     });
     this.ultimaCorrida = corrida;

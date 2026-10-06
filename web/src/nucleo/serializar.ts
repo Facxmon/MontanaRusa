@@ -25,7 +25,7 @@
 import { deflateSync, inflateSync, strFromU8, strToU8 } from 'fflate';
 import type { EntradaDeDiseno, InstanciaDeElemento } from './calcular';
 import type { Vec3 } from './matematica';
-import { CATALOGO_DE_ELEMENTOS, OPCIONES_DE_PARAMETRO, PARAMETROS_ANULABLES, ParametrosPorDefecto } from './parametros';
+import { PARAMETROS_SOLO_GLOBALES, CATALOGO_DE_ELEMENTOS, OPCIONES_DE_PARAMETRO, PARAMETROS_ANULABLES, ParametrosPorDefecto } from './parametros';
 import type { NombreDeElemento, NombreDeParametro, Parametros } from './tipos';
 
 export interface DisenoSerializado {
@@ -214,7 +214,12 @@ function analizar(entrada: unknown): Analizado {
     if (typeof inst.t !== 'string' || !CATALOGO_DE_ELEMENTOS.includes(inst.t as NombreDeElemento)) {
       throw new Error(`s[${i}].t vale ${describir(inst.t)} y tiene que ser un tipo de CATALOGO_DE_ELEMENTOS: ${CATALOGO_DE_ELEMENTOS.join(', ')}.`);
     }
-    return { tipo: inst.t as NombreDeElemento, ajustes: validarBloque(inst.a, `s[${i}].a`, defaults) };
+    const ajustes = validarBloque(inst.a, `s[${i}].a`, defaults);
+    const global = Object.keys(ajustes).find((nombre) => PARAMETROS_SOLO_GLOBALES.includes(nombre as NombreDeParametro));
+    if (global) {
+      throw new Error(`s[${i}].a.${global} no se puede pisar por instancia: vale para toda la via (la masa y la gravedad no cambian en una misma via y el tren es uno solo). Ponerlo en p.`);
+    }
+    return { tipo: inst.t as NombreDeElemento, ajustes };
   });
   return { p, ei: { pos, tan, arr, vel }, s };
 }

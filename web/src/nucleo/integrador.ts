@@ -16,6 +16,11 @@ export interface Contexto {
   Parametros: Parametros;
   FuncionRoll: (Arco: number, AnguloGiradoRelativo: number) => [number, number, number];
   PerfilVelocidad: ((Arco: number) => number) | null;
+  /**
+   * Tren: d(v_cm^2)/ds impuesta (la del carro para el que se disena el
+   * elemento, DisenarParaElTren); reemplaza a la energia de la particula.
+   */
+  DerivadaImpuesta?: ((Arco: number) => number) | null;
   VelocidadMinimaDeSeguridad: number;
   InclinacionHelicoidal: number;
   AnguloGiradoDeReferencia: number;
@@ -193,7 +198,10 @@ export function DerivadaDeVia(Arco: number, y: VectorDeEstado, Contexto: Context
   }
 
   const DerivadaAlturaCentroDeMasa = (1 - d * CurvaturaArribaCarro) * P.VersorTangente[2] + d * VelocidadRoll * P.VersorLateral[2];
-  const DerivadaVelocidadCuadrado = -2 * g * DerivadaAlturaCentroDeMasa - (2 * FuerzaResistencia) / Parametros.Masa;
+  let DerivadaVelocidadCuadrado = -2 * g * DerivadaAlturaCentroDeMasa - (2 * FuerzaResistencia) / Parametros.Masa;
+  // Tren: la velocidad no es la de una particula sino la del carro para el
+  // que se disena el elemento, que sale de la simulacion del tren completo.
+  if (Contexto.DerivadaImpuesta) DerivadaVelocidadCuadrado = Contexto.DerivadaImpuesta(Arco);
 
   P.CurvaturaArriba = CurvaturaArriba;
   P.CurvaturaLateral = CurvaturaLateral;

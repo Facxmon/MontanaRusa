@@ -130,3 +130,18 @@ describe('deserializarDiseno rechaza con un mensaje que dice que campo y que se 
     expect(() => desdeTextoCompacto(aTextoCompacto({ v: 3, p: {}, ei, s: [] } as never))).toThrowError(/v = 3/);
   });
 });
+
+describe('parametros que valen para toda la via', () => {
+  const ei = { pos: [0, 0, 1], tan: [1, 0, 0], arr: [0, 0, 1], vel: 4.5 };
+  it('la masa, la gravedad y los del tren no se pisan por instancia', () => {
+    for (const nombre of ['Masa', 'Gravedad', 'NumeroDeCarros', 'SeparacionEntreCarros', 'DisenoDelTren']) {
+      const valor = nombre === 'DisenoDelTren' ? 'CarroCritico' : 2;
+      expect(() => deserializarDiseno({ v: 2, p: {}, ei, s: [{ t: 'LoopVertical', a: { [nombre]: valor } }] })).toThrowError(new RegExp(`s\\[0\\]\\.a\\.${nombre} no se puede pisar por instancia`));
+    }
+  });
+  it('como globales se aceptan', () => {
+    const d = deserializarDiseno({ v: 2, p: { Masa: 0.2, NumeroDeCarros: 3, SeparacionEntreCarros: 0.05 }, ei, s: [{ t: 'LoopVertical', a: { RadioDelLoop: 0.3 } }] });
+    expect(d.parametros.NumeroDeCarros).toBe(3);
+    expect(d.parametros.SeparacionEntreCarros).toBe(0.05);
+  });
+});

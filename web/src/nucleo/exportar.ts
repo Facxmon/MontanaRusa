@@ -8,6 +8,7 @@ import type * as Contrato from '../contrato/tipos';
 import type { Vec3 } from './matematica';
 import { CATALOGO_DE_ELEMENTOS, DECLARACIONES_DE_ELEMENTOS, MODOS_DE_CURVATURA, ParametrosDeAceptacion, ParametrosDelModo, ParametrosGenerales, ParametrosPorDefecto } from './parametros';
 import type { Criterio, Declaracion, Estado, Layout, NombreDeParametro, Parametros, RegistroDeLayout } from './tipos';
+import { esTren, EvaluarEnArco } from './tren';
 
 /** Lo que una instancia de elemento piso sobre los globales y que de eso no consumio (AjustarParametros). */
 export interface InstanciaExportada {
@@ -29,7 +30,8 @@ export interface OpcionesDeExportacion {
 
 // 1.1.0: elementos[].ajustes e inertes, opcionales (solo los emite JS; MATLAB sigue en 1.0.0).
 // 1.2.0: modo 'ArcoCircular' (ex 'Clotoide') y 'Clotoide' de verdad; bloque normativo sobre el layout.
-const VERSION_DEL_CONTRATO = '1.2.0';
+// 1.3.0: tren de varios carros (elementos[].carros, resumenLayout.tren, resumen.carroDeDiseno) y energia por nodo.
+const VERSION_DEL_CONTRATO = '1.3.0';
 
 function camel(Nombre: string): string {
   return Nombre[0]!.toLowerCase() + Nombre.slice(1);
@@ -62,7 +64,10 @@ function declaraciones(lista: Declaracion[]): Contrato.DeclaracionDeParametro[] 
 }
 
 function estadoAJson(E: Estado): Contrato.Estado {
-  return aCamelCase(E) as Contrato.Estado;
+  // Estado.Tren (para encadenar el elemento siguiente) es interno del calculo y no se exporta.
+  const { Tren: _tren, ...sinTren } = E;
+  void _tren;
+  return aCamelCase(sinTren) as Contrato.Estado;
 }
 
 function columna(valores: ArrayLike<number>): Contrato.ArrayDeNumeros {
@@ -110,6 +115,11 @@ function elementoAJson(R: RegistroDeLayout, indice: number, instancia?: Instanci
     anguloPeralte: columna(T.AnguloPeralte),
     fuerzaNormal: columna(S.FuerzaNormal),
     energiaTotal: columna(S.EnergiaTotal),
+    // Desde 1.3.0. Con varios carros, las del tren entero con el carro 1 en el nodo.
+    energiaCinetica: columna(S.EnergiaCinetica),
+    energiaPotencial: columna(S.EnergiaPotencial),
+    energiaDisipadaRodadura: columna(S.EnergiaDisipadaRodadura),
+    energiaDisipadaArrastre: columna(S.EnergiaDisipadaArrastre),
     puntoDeParada: S.PuntoDeParada,
   };
 
@@ -147,6 +157,73 @@ function elementoAJson(R: RegistroDeLayout, indice: number, instancia?: Instanci
       todosPasan: R.Reporte.Previos.every((c) => c.Pasa) && R.Reporte.Posteriores.every((c) => c.Pasa),
     },
     estadoSalida: estadoAJson(R.EstadoSalida),
+    // Tren de varios carros (desde 1.3.0): lo que vive cada carro calculado.
+    ...(esTren(E.Parametros) && E.SimCarros ? { carros: carrosAJson(R, criterios) } : {}),
+  };
+}
+
+function carrosAJson(R: RegistroDeLayout, criterios: (lista: Criterio[]) => Contrato.Criterio[]): Contrato.Carro[] {
+  const lista: Contrato.Carro[] = [];
+  (R.Elemento.SimCarros ?? []).forEach((S, i) => {
+    if (!S) return;
+    const propio = R.Reporte.Carros?.[i];
+    lista.push({
+      numero: i + 1,
+      nodos: {
+        tiempo: columna(S.Tiempo),
+        velocidad: columna(S.VelocidadCentroDeMasa),
+        velocidadRiel: columna(S.Velocidad),
+        aceleracionTangencial: columna(S.AceleracionTangencial),
+        gx: columna(S.Gx),
+        gy: columna(S.Gy),
+        gz: columna(S.Gz),
+        jerkGx: columna(S.JerkGx),
+        jerkGy: columna(S.JerkGy),
+        jerkGz: columna(S.JerkGz),
+        gyCabeza: columna(S.GyCabeza),
+        gzCabeza: columna(S.GzCabeza),
+        fuerzaNormal: columna(S.FuerzaNormal),
+        puntoDeParada: S.PuntoDeParada,
+      },
+      criterios: {
+        posteriores: criterios(propio?.Posteriores ?? []),
+        normativo: propio ? (aCamelCase(propio.Normativo) as Record<string, unknown>) : null,
+      },
+    });
+  });
+  return lista;
+}
+
+/** TrenAJson (LayoutAJson.m): distancias, desfases de tiempo de cada carro y cuando sale el ultimo. */
+function trenAJson(L: Layout): NonNullable<Contrato.ResumenLayout['tren']> {
+  const T = L.Tren!;
+  const P = L.Parametros;
+  const Arco: number[] = [];
+  const Tiempo: number[] = [];
+  for (let k = 0; k < T.Arco.length; k++) {
+    if (Number.isNaN(T.VelocidadRielCuadrado[k]!)) continue;
+    if (k > 0 && !(T.Arco[k]! - T.Arco[k - 1]! > 1e-9)) continue;
+    Arco.push(T.Arco[k]!);
+    Tiempo.push(T.Tiempo[k]!);
+  }
+  const reloj = (consulta: number[]) => Array.from(EvaluarEnArco(Arco, Tiempo, consulta));
+  const primero = L.Elementos[0]!.Elemento.Track.LongitudArco;
+  const ultimo = L.Elementos[L.Elementos.length - 1]!.Elemento.Track.LongitudArco;
+  const Inicio = primero[0]!;
+  const Fin = ultimo[ultimo.length - 1]!;
+  const [Cero] = reloj([Inicio]);
+  const N = T.Distancias.length;
+  const calculados: number[] = [];
+  (L.Elementos[0]!.Elemento.SimCarros ?? []).forEach((S, i) => {
+    if (S) calculados.push(i + 1);
+  });
+  return {
+    numeroDeCarros: N,
+    longitudDelTren: numero(N * P.LargoCarro + (N - 1) * P.SeparacionEntreCarros),
+    distancias: T.Distancias.map((d) => numero(d)),
+    desfasesDeTiempo: reloj(T.Distancias.map((d) => Inicio + d)).map((t) => numero(t - Cero!)),
+    tiempoDeSalida: numero(reloj([Fin + T.Distancias[N - 1]!])[0]! - Cero!),
+    carrosCalculados: calculados,
   };
 }
 
@@ -172,6 +249,7 @@ function resumenLayoutAJson(L: Layout): Contrato.ResumenLayout {
       [min(2, todos), max(2, todos)],
     ],
     todosLosCriteriosPasan: L.Elementos.every((r) => r.Reporte.Previos.every((c) => c.Pasa) && r.Reporte.Posteriores.every((c) => c.Pasa)),
+    ...(L.Tren ? { tren: trenAJson(L) } : {}),
   };
 }
 

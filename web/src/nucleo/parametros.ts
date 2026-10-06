@@ -54,6 +54,7 @@ export function ParametrosPorDefecto(): Parametros {
     AlturaMinimaSuelo: 0.05,
     ArcoMinimoAutointerferencia: 0.3,
     DistanciaMinimaEntreVias: 0.02,
+    AnguloMaximoDeAcople: Math.PI / 4,
     // 4. generales
     Gravedad: 9.81,
     RhoAire: 1.2,
@@ -71,10 +72,13 @@ export function ParametrosPorDefecto(): Parametros {
     Holgura: 0.01,
     DiametroRueda: 0.0136,
     AreaFrontal: 0.0036,
+    SeparacionEntreCarros: 0.04,
     DistanciaHeartline: 0.03,
     DistanciaHeartlineACabeza: 0.03,
     MetodoDeAcoplamiento: 'A',
     CalcularVelocidadMinima: false,
+    CalcularTodosLosCarros: true,
+    DisenoDelTren: 'PrimerCarro',
     RadioDeReferenciaReal: 8.0,
     LargoCarroReal: 2.2,
     PasoGeneracion: 0.002,
@@ -85,6 +89,7 @@ export function ParametrosPorDefecto(): Parametros {
     TolNorma: 1e-12,
     TolPuntoFijo: 1e-8,
     MaxIteracionesPuntoFijo: 60,
+    TolVelocidadDelTren: 5e-3,
     MaxIteracionesCierre: 6,
     MaxIteracionesAjuste: 8,
     MargenDeOnset: 0.002,
@@ -153,6 +158,7 @@ export function ParametrosDeAceptacion(): Declaracion[] {
     ['BoundingBoxDisponible', 'm', 'huella disponible, filas x, y, z'],
     ['DistanciaMinimaEntreVias', 'm', 'separacion libre exigida entre rieles'],
     ['ArcoMinimoAutointerferencia', 'm', 'vecinos por arco que la autointerferencia ignora'],
+    ['AnguloMaximoDeAcople', 'rad', 'angulo maximo entre la barra del acople y el eje de cada carro (con mas de un carro)'],
   );
 }
 
@@ -174,10 +180,13 @@ export function ParametrosGenerales(): Declaracion[] {
     ['Holgura', 'm', 'margen sobre la envolvente del carro para el chequeo de interferencia'],
     ['DiametroRueda', 'm', 'diametro de rueda; piso impuesto por el rodamiento minimo. No entra en ningun calculo: la rodadura va en los Crr y la inercia de las ruedas no se modela'],
     ['AreaFrontal', 'm^2', 'area frontal proyectada de un carro'],
+    ['SeparacionEntreCarros', 'm', 'separacion entre carros consecutivos, de paragolpe a paragolpe, como arco sobre el riel'],
     ['DistanciaHeartline', 'm', 'del riel al centro de masa del pasajero (heartline), medida sobre U; define la via'],
     ['DistanciaHeartlineACabeza', 'm', 'de la heartline a la cabeza del pasajero, medida sobre U; solo informativa salvo verificacion en Cabeza'],
     ['MetodoDeAcoplamiento', '-', "acoplamiento geometria-dinamica: 'A' marcha acoplada, 'B' punto fijo, 'Ambos' compara"],
     ['CalcularVelocidadMinima', '-', 'logico: si se corre la biseccion de la velocidad inicial minima (cuesta decenas de generaciones)'],
+    ['CalcularTodosLosCarros', '-', 'logico: con varios carros, simular y verificar todos; si no, solo el primero'],
+    ['DisenoDelTren', '-', "con varios carros, para que carro se disena cada elemento: 'Particula' (masa puntual, sin redisenar; lo mas rapido), 'PrimerCarro' o 'CarroCritico' (el que deja el menor pico de G entre todos; un diseno por carro)"],
     ['InclinacionHelicoidalImpuesta', '-', 'override de tan(alfa), la inclinacion de la tangente respecto del plano del giro; vacio = se resuelve por Newton'],
     ['RadioDeReferenciaReal', 'm', 'radio de la atraccion real que ancla lambda del loop'],
     ['LargoCarroReal', 'm', 'largo del carro real que ancla lambda del carro'],
@@ -188,7 +197,8 @@ export function ParametrosGenerales(): Declaracion[] {
     ['PasoBusquedaVelocidad', 'm', 'paso de generacion grueso dentro de la biseccion de la velocidad minima'],
     ['TolNorma', 'm', 'norma por debajo de la cual un vector se considera nulo'],
     ['TolPuntoFijo', 'm/s', 'cambio maximo de velocidad entre iteraciones del punto fijo del metodo B'],
-    ['MaxIteracionesPuntoFijo', '-', 'tope de iteraciones del punto fijo del metodo B'],
+    ['MaxIteracionesPuntoFijo', '-', 'tope de iteraciones del punto fijo del metodo B y del diseno para un carro del tren'],
+    ['TolVelocidadDelTren', 'm/s', 'diferencia maxima entre la velocidad impuesta y la obtenida del carro de diseno del tren'],
     ['MaxIteracionesCierre', '-', 'tope de iteraciones de la correccion de cierre del giro'],
     ['MaxIteracionesAjuste', '-', 'tope de iteraciones del ajuste de longitud de las transiciones'],
     ['MargenDeOnset', '-', 'margen relativo que se agrega sobre la longitud justa de las transiciones en cada iteracion'],
@@ -264,7 +274,18 @@ export const OPCIONES_DE_PARAMETRO: Partial<Record<NombreDeParametro, readonly s
   PuntoDeVerificacionNormativa: ['Heartline', 'Cabeza'],
   MetodoDeAcoplamiento: ['A', 'B', 'Ambos'],
   ModoDePeralteDelGiro: ['Constante', 'RelativoAlCentroDeCurvatura', 'RelativoALaFuerza'],
+  DisenoDelTren: ['Particula', 'PrimerCarro', 'CarroCritico'],
 };
+
+/**
+ * Los que valen para toda la via y no se pisan por instancia: en una misma
+ * via la masa y la gravedad no cambian, y el tren es uno solo (sus carros
+ * recorren todos los elementos). El formulario no los ofrece en la ficha de
+ * una instancia y la deserializacion los rechaza si vienen en sus ajustes.
+ */
+export const PARAMETROS_SOLO_GLOBALES: readonly NombreDeParametro[] = [
+  'Masa', 'Gravedad', 'NumeroDeCarros', 'LargoCarro', 'SeparacionEntreCarros', 'CalcularTodosLosCarros', 'DisenoDelTren',
+];
 
 /** Los que en MATLAB admiten [] (vacio = derivar): aca valen null, y el contrato los escribe como []. */
 export const PARAMETROS_ANULABLES: readonly NombreDeParametro[] = ['OnsetMaximoModelo', 'InclinacionHelicoidalImpuesta'];
