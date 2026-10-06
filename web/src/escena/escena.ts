@@ -106,6 +106,38 @@ export class Escena {
     }
   }
 
+  /**
+   * Rayo desde la camara por un punto del lienzo (coordenadas de cliente):
+   * para saber que hay bajo un clic (el carro que se quiere analizar).
+   */
+  rayoDesde(clienteX: number, clienteY: number): THREE.Raycaster {
+    const caja = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((clienteX - caja.left) / caja.width) * 2 - 1, -(((clienteY - caja.top) / caja.height) * 2 - 1));
+    const rayo = new THREE.Raycaster();
+    rayo.setFromCamera(ndc, this.camara);
+    return rayo;
+  }
+
+  /**
+   * Un clic sobre la vista que no fue un arrastre de la camara (menos de 5 px
+   * entre apretar y soltar). Devuelve como sacarlo.
+   */
+  alHacerClic(fn: (evento: PointerEvent) => void): () => void {
+    const lienzo = this.renderer.domElement;
+    let desde: { x: number; y: number } | null = null;
+    const abajo = (e: PointerEvent) => (desde = { x: e.clientX, y: e.clientY });
+    const arriba = (e: PointerEvent) => {
+      if (desde && Math.hypot(e.clientX - desde.x, e.clientY - desde.y) < 5 && e.button === 0) fn(e);
+      desde = null;
+    };
+    lienzo.addEventListener('pointerdown', abajo);
+    lienzo.addEventListener('pointerup', arriba);
+    return () => {
+      lienzo.removeEventListener('pointerdown', abajo);
+      lienzo.removeEventListener('pointerup', arriba);
+    };
+  }
+
   /** Registra algo que se actualiza en cada cuadro (dt en segundos); devuelve como sacarlo. */
   enCadaCuadro(fn: (dt: number) => void): () => void {
     this.porCuadro.push(fn);

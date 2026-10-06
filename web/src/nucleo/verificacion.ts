@@ -78,6 +78,12 @@ export function ChequeosPrevios(EstadoEntrada: Estado, Parametros: Parametros, R
     'Estimacion con el radio nominal; la altura real sale de la geometria.');
   AgregarCriterio(Criterios, 'Radio nominal fabricable', 'MayorOIgual', RadioNominal, Parametros.RadioMinimoFabricable, 'm',
     'En los modos que dependen de v el radio real puede ser menor: ver el chequeo posterior.');
+
+  // Tren: el tope duro de la separacion es un largo de carro; el minimo depende de la curvatura (posteriores).
+  if (Math.round(Parametros.NumeroDeCarros) > 1) {
+    AgregarCriterio(Criterios, 'Separacion entre carros no mayor que un carro', 'MenorOIgual', Parametros.SeparacionEntreCarros, Parametros.LargoCarro, 'm',
+      'Tope duro de la separacion; el minimo lo fija la interferencia en la curva mas cerrada.');
+  }
   return Criterios;
 }
 
@@ -94,15 +100,10 @@ export function ChequeosPosteriores(Track: Track, Sim: Sim, Parametros: Parametr
   const Criterios: Criterio[] = [];
   const Escala = EscalasDeFroude(Parametros);
   const n = Track.LongitudArco.length;
-  const Valido = Array.from(Sim.Velocidad, (v) => !Number.isNaN(v));
   const AlturaRelativa = Track.PuntosHeartline.map((p) => p[2] - Track.PuntosHeartline[0]![2]);
-  const validos = (valores: ArrayLike<number>) => Array.from({ length: n }, (_, i) => (Valido[i] ? valores[i]! : NaN));
+  void n;
 
-  AgregarCriterio(Criterios, 'El carro completa el elemento', 'MayorOIgual', Sim.PuntoDeParada === null ? 1 : 0, 1, '-',
-    'Si falla, el carro se queda sin energia antes del final.');
-  AgregarCriterio(Criterios, 'G minima sobre el eje vertical del carro', 'MayorOIgual', minimo(validos(Sim.Gz)), Parametros.GMinimaCuspide, 'G',
-    `Margen en la cuspide, en el punto de verificacion (${Parametros.PuntoDeVerificacionNormativa}, brazo ${sprintfF(Sim.BrazoDeVerificacion, 3)} m). ` +
-      'N = 0 no sirve como criterio: no tolera variacion de friccion.');
+  Criterios.push(...CriteriosDeMarcha(Sim, Parametros));
 
   const RadioMinimoRiel = 1 / Math.max(maximo(Track.Curvatura), Number.EPSILON);
   const RadioMinimo = 1 / Math.max(maximo(Track.CurvaturaHeartline), Number.EPSILON);
@@ -143,7 +144,41 @@ export function ChequeosPosteriores(Track: Track, Sim: Sim, Parametros: Parametr
 
   Criterios.push(CriterioDeInterferenciaConLaVia(Track, Parametros, Layout, SeparacionExigida));
 
+  // Tren: interferencia entre carros y angulo del acople (solo con mas de un carro).
+  if (Math.round(Parametros.NumeroDeCarros) > 1) Criterios.push(...CriteriosDelTren(Track, Parametros));
+
   const Normativo = VerificarLimitesNormativos(Sim, Escala, Parametros);
+  Criterios.push(...CriteriosDeOnset(Normativo, Escala, Parametros));
+
+  // Para el elemento suelto. Si el elemento entra a un layout,
+  // VerificarLayoutNormativo recalcula este bloque sobre la linea de tiempo
+  // continua del circuito y reemplaza estas mismas lineas.
+  Criterios.push(...CriteriosNormativos(Normativo));
+
+  Criterios.push(...CriteriosDeCabeza(Sim, Parametros));
+
+  return [Criterios, Normativo];
+}
+
+/** Valores de una columna solo donde hay velocidad (NaN en los demas), como Sim.X(Valido) de MATLAB. */
+function soloValidos(Sim: Sim, valores: ArrayLike<number>): number[] {
+  return Array.from({ length: valores.length }, (_, i) => (Number.isNaN(Sim.Velocidad[i]!) ? NaN : valores[i]!));
+}
+
+/** Port de CriteriosDeMarcha.m: el carro completa el elemento y no se despega. */
+export function CriteriosDeMarcha(Sim: Sim, Parametros: Parametros): Criterio[] {
+  const Criterios: Criterio[] = [];
+  AgregarCriterio(Criterios, 'El carro completa el elemento', 'MayorOIgual', Sim.PuntoDeParada === null ? 1 : 0, 1, '-',
+    'Si falla, el carro se queda sin energia antes del final.');
+  AgregarCriterio(Criterios, 'G minima sobre el eje vertical del carro', 'MayorOIgual', minimo(soloValidos(Sim, Sim.Gz)), Parametros.GMinimaCuspide, 'G',
+    `Margen en la cuspide, en el punto de verificacion (${Parametros.PuntoDeVerificacionNormativa}, brazo ${sprintfF(Sim.BrazoDeVerificacion, 3)} m). ` +
+      'N = 0 no sirve como criterio: no tolera variacion de friccion.');
+  return Criterios;
+}
+
+/** Port de CriteriosDeOnset.m: presupuesto de onset por eje y onset de carga (7.1.7.2). */
+export function CriteriosDeOnset(Normativo: Normativo, Escala: Escala, Parametros: Parametros): Criterio[] {
+  const Criterios: Criterio[] = [];
   const Ejes = ['Gx', 'Gy', 'Gz'] as const;
   for (let i = 0; i < 3; i++) {
     AgregarCriterio(Criterios, `Onset maximo de ${Ejes[i]}`, 'MenorOIgual', Normativo.OnsetMaximoPorEje[i]!, Escala.OnsetMaximo[i]!, 'G/s',
@@ -151,17 +186,58 @@ export function ChequeosPosteriores(Track: Track, Sim: Sim, Parametros: Parametr
   }
   AgregarCriterio(Criterios, 'Onset de 0 G a 2 G (7.1.7.2)', 'MenorOIgual', Normativo.OnsetDeCarga, Escala.OnsetMaximo[2], 'G/s',
     'Alcance literal de la clausula: solo transiciones desde 0 G o menos hacia 2 G o mas.');
+  return Criterios;
+}
 
-  // Para el elemento suelto. Si el elemento entra a un layout,
-  // VerificarLayoutNormativo recalcula este bloque sobre la linea de tiempo
-  // continua del circuito y reemplaza estas mismas lineas.
-  Criterios.push(...CriteriosNormativos(Normativo));
-
-  AgregarCriterio(Criterios, 'Gz maxima en la cabeza', 'Informativo', maximo(validos(Sim.GzCabeza)), NaN, 'G',
+/** Port de CriteriosDeCabeza.m: G en la cabeza, informativas. */
+export function CriteriosDeCabeza(Sim: Sim, Parametros: Parametros): Criterio[] {
+  const Criterios: Criterio[] = [];
+  AgregarCriterio(Criterios, 'Gz maxima en la cabeza', 'Informativo', maximo(soloValidos(Sim, Sim.GzCabeza)), NaN, 'G',
     `A ${sprintfF(Parametros.DistanciaHeartline + Parametros.DistanciaHeartlineACabeza, 3)} m del riel (d + e). Las verificadas arriba estan a ${sprintfF(Sim.BrazoDeVerificacion, 3)} m.`);
-  AgregarCriterio(Criterios, '|Gy| maxima en la cabeza', 'Informativo', maximo(validos(Sim.GyCabeza).map(Math.abs)), NaN, 'G', '');
+  AgregarCriterio(Criterios, '|Gy| maxima en la cabeza', 'Informativo', maximo(soloValidos(Sim, Sim.GyCabeza).map(Math.abs)), NaN, 'G', '');
+  return Criterios;
+}
 
-  return [Criterios, Normativo];
+/**
+ * Port de CriteriosDelTren.m: lo que limita la separacion entre carros sobre
+ * el riel del elemento. Minimo: interferencia entre cajas en la curva
+ * (p >= 2R*atan((l + Holgura)/(2(R - h))), con h la funcion soporte de la
+ * seccion en la direccion de la curvatura); maximo: angulo del acople,
+ * (l + g)*kappa/2 en la curva mas cerrada.
+ */
+export function CriteriosDelTren(Track: Pick<Track, 'VectorCurvatura' | 'VersorArribaCarro' | 'VersorLateral'>, Parametros: Parametros): Criterio[] {
+  const l = Parametros.LargoCarro;
+  const g = Parametros.SeparacionEntreCarros;
+  const p = l + g;
+  const n = Track.VectorCurvatura.length;
+  const Curvatura = new Float64Array(n);
+  const Altura = new Float64Array(n);
+  const Radio = new Float64Array(n);
+  const Exigida = new Float64Array(n);
+  for (let k = 0; k < n; k++) {
+    const kv = Track.VectorCurvatura[k]!;
+    Curvatura[k] = norma(kv);
+    const divisor = Math.max(Curvatura[k]!, Number.EPSILON);
+    const Direccion: Vec3 = [kv[0] / divisor, kv[1] / divisor, kv[2] / divisor];
+    const HaciaArriba = productoPunto(Direccion, Track.VersorArribaCarro[k]!);
+    const HaciaLateral = productoPunto(Direccion, Track.VersorLateral[k]!);
+    Altura[k] = Parametros.AltoCarro * Math.max(HaciaArriba, 0) + (Parametros.AnchoVia / 2) * Math.abs(HaciaLateral);
+    Radio[k] = 1 / Math.max(Curvatura[k]!, Number.EPSILON);
+    let PasoExigido = 2 * Radio[k]! * Math.atan((l + Parametros.Holgura) / (2 * (Radio[k]! - Altura[k]!)));
+    if (Radio[k]! <= Altura[k]!) PasoExigido = Infinity;
+    if (Curvatura[k]! < 1e-9) PasoExigido = l + Parametros.Holgura;
+    Exigida[k] = PasoExigido - l;
+  }
+  const [SeparacionExigida, Critico] = maximoConIndice(Exigida);
+  const Criterios: Criterio[] = [];
+  AgregarCriterio(Criterios, 'Separacion entre carros sin interferencia', 'MayorOIgual', g, SeparacionExigida, 'm',
+    `Peor nodo: radio del riel ${sprintfF(Radio[Critico]!, 4)} m, saliente hacia el centro ${sprintfF(Altura[Critico]!, 4)} m. Cajas de ${sprintfF(l, 3)} m de ` +
+      `largo con ${sprintfF(Parametros.Holgura, 3)} m de luz entre ellas (Holgura); curvatura local como arco de circunferencia.`);
+  const CurvaturaMaxima = maximo(Curvatura);
+  AgregarCriterio(Criterios, 'Angulo del acople entre carros', 'MenorOIgual', (p * CurvaturaMaxima) / 2, Parametros.AnguloMaximoDeAcople, 'rad',
+    `(LargoCarro + Separacion) x kappa / 2 en la curva mas cerrada del riel (radio ${sprintfF(1 / Math.max(CurvaturaMaxima, Number.EPSILON), 4)} m). ` +
+      'AnguloMaximoDeAcople es provisorio: falta el dato del acople real.');
+  return Criterios;
 }
 
 /** Nombre de la unica linea de los posteriores que depende de la via ya construida (y no solo del elemento). */

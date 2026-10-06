@@ -221,6 +221,7 @@ describe('secciones del formulario global (A6)', () => {
       [
         'ArcoMinimoAutointerferencia', 'Gravedad', 'MargenDeOnset', 'MaxIteracionesAjuste', 'MaxIteracionesCierre', 'MaxIteracionesPuntoFijo',
         'PasoGeneracion', 'PasoSimulacion', 'PasosEntreOrtonormalizaciones', 'TolCierrePitch', 'TolNorma', 'TolPuntoFijo', 'ToleranciaVelocidadDeDiseno',
+        'TolVelocidadDelTren',
       ].sort(),
     );
     expect(etiquetaDe('RadioDelLoop').seccion).toBeUndefined();

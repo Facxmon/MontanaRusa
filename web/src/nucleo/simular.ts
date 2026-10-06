@@ -70,10 +70,48 @@ export function SimularSobreTrack(Track: Track, EstadoEntrada: Estado, Parametro
   }
 
   // ------------- magnitudes derivadas, ya vectorizadas -----------------
+  // G, jerk, energia: lo mismo que se le calcula a cada carro del tren.
+  const Derivadas = MagnitudesDinamicas(Track, { VelocidadCentroDeMasa, Tiempo, FuerzaRodadura, FuerzaArrastre, PuntoDeParada }, Parametros);
+
+  let AvisoVelocidadDeDiseno = '';
+  if (Math.abs(EstadoEntrada.Velocidad - Track.VelocidadDeDiseno) > Parametros.ToleranciaVelocidadDeDiseno) {
+    AvisoVelocidadDeDiseno =
+      `La velocidad de entrada (${EstadoEntrada.Velocidad.toFixed(3)} m/s) difiere de la de diseno (${Track.VelocidadDeDiseno.toFixed(3)} m/s) en mas de ` +
+      `${Parametros.ToleranciaVelocidadDeDiseno.toFixed(3)} m/s. La geometria no cambia, pero conviene regenerar el elemento.`;
+  }
+
+  return { ...Derivadas, VelocidadDeDiseno: Track.VelocidadDeDiseno, AvisoVelocidadDeDiseno };
+}
+
+/** Lo que entra a MagnitudesDinamicas: velocidad, reloj y resistencias ya integrados sobre los nodos. */
+export interface SimBase {
+  VelocidadCentroDeMasa: Float64Array;
+  Tiempo: Float64Array;
+  FuerzaRodadura: Float64Array;
+  FuerzaArrastre: Float64Array;
+  PuntoDeParada: number | null;
+}
+
+/**
+ * Port de Fisica/MagnitudesDinamicas.m: todo lo que sale de la velocidad y
+ * el tiempo ya integrados (velocidad del riel, aceleracion tangencial, G a
+ * los tres brazos, fuerza normal, energia, jerk). Lo comparten la particula
+ * (SimularSobreTrack) y cada carro del tren (SimDelCarro). La energia
+ * disipada acumula con la fuerza del nodo de PARTIDA de cada paso: en el
+ * nodo k vale lo disipado entre el primero y el k.
+ */
+export function MagnitudesDinamicas(Track: Track, Base: SimBase, Parametros: Parametros): Omit<Sim, 'VelocidadDeDiseno' | 'AvisoVelocidadDeDiseno'> {
+  const g = Parametros.Gravedad;
+  const d = Parametros.DistanciaHeartline;
+  const Arco = Track.LongitudArco;
+  const NumeroDeNodos = Arco.length;
+  const { VelocidadCentroDeMasa, FuerzaRodadura, FuerzaArrastre } = Base;
+
   const FactorVelocidadHeartline = new Float64Array(NumeroDeNodos);
   const Velocidad = new Float64Array(NumeroDeNodos);
   for (let k = 0; k < NumeroDeNodos; k++) {
-    FactorVelocidadHeartline[k] = Math.hypot(1 - d * CurvaturaArribaCarro[k]!, d * Track.VelocidadRoll[k]!);
+    const CurvaturaArribaCarro = productoPunto(Track.VectorCurvatura[k]!, Track.VersorArribaCarro[k]!);
+    FactorVelocidadHeartline[k] = Math.hypot(1 - d * CurvaturaArribaCarro, d * Track.VelocidadRoll[k]!);
     Velocidad[k] = VelocidadCentroDeMasa[k]! / FactorVelocidadHeartline[k]!;
   }
 
@@ -82,9 +120,9 @@ export function SimularSobreTrack(Track: Track, EstadoEntrada: Estado, Parametro
   let acumuladaR = 0;
   let acumuladaA = 0;
   for (let k = 0; k < NumeroDeNodos; k++) {
-    const PasoEntreNodos = k < NumeroDeNodos - 1 ? Arco[k + 1]! - Arco[k]! : 0;
-    acumuladaR += FuerzaRodadura[k]! * PasoEntreNodos;
-    acumuladaA += FuerzaArrastre[k]! * PasoEntreNodos;
+    const PasoDesdeElAnterior = k > 0 ? Arco[k]! - Arco[k - 1]! : 0;
+    acumuladaR += (k > 0 ? FuerzaRodadura[k - 1]! : 0) * PasoDesdeElAnterior;
+    acumuladaA += (k > 0 ? FuerzaArrastre[k - 1]! : 0) * PasoDesdeElAnterior;
     EnergiaDisipadaRodadura[k] = acumuladaR;
     EnergiaDisipadaArrastre[k] = acumuladaA;
   }
@@ -128,19 +166,11 @@ export function SimularSobreTrack(Track: Track, EstadoEntrada: Estado, Parametro
     JerkGz[k] = dGz[k]! * Velocidad[k]!;
   }
 
-  let AvisoVelocidadDeDiseno = '';
-  if (Math.abs(EstadoEntrada.Velocidad - Track.VelocidadDeDiseno) > Parametros.ToleranciaVelocidadDeDiseno) {
-    AvisoVelocidadDeDiseno =
-      `La velocidad de entrada (${EstadoEntrada.Velocidad.toFixed(3)} m/s) difiere de la de diseno (${Track.VelocidadDeDiseno.toFixed(3)} m/s) en mas de ` +
-      `${Parametros.ToleranciaVelocidadDeDiseno.toFixed(3)} m/s. La geometria no cambia, pero conviene regenerar el elemento.`;
-  }
-
   return {
-    VelocidadCentroDeMasa, Tiempo, FuerzaRodadura, FuerzaArrastre, PuntoDeParada, FactorVelocidadHeartline, Velocidad,
+    VelocidadCentroDeMasa, Tiempo: Base.Tiempo, FuerzaRodadura, FuerzaArrastre, PuntoDeParada: Base.PuntoDeParada, FactorVelocidadHeartline, Velocidad,
     EnergiaDisipadaRodadura, EnergiaDisipadaArrastre, AceleracionTangencial, GLateralHeartline, GArribaHeartline,
     Gx, Gy, Gz, GxCabeza, GyCabeza, GzCabeza, BrazoDeVerificacion: BrazoVerificacion, FuerzaNormal,
     EnergiaCinetica, EnergiaPotencial, EnergiaTotal, JerkGx, JerkGy, JerkGz,
-    VelocidadDeDiseno: Track.VelocidadDeDiseno, AvisoVelocidadDeDiseno,
   };
 }
 
@@ -243,7 +273,7 @@ function ResistenciaEnArco(Arco: number, VelocidadCuadrado: number, Geometria: G
 }
 
 /** Interpolante pchip precompilado sobre los nodos distintos (diff > 1e-9), con extrapolacion lineal. */
-function Interpolante(Arco: Float64Array, Valores: ArrayLike<number>): (s: number) => number {
+export function Interpolante(Arco: Float64Array, Valores: ArrayLike<number>): (s: number) => number {
   const conservar: number[] = [];
   for (let i = 0; i < Arco.length; i++) if (i === 0 || Arco[i]! - Arco[i - 1]! > 1e-9) conservar.push(i);
   return interpolantePchip(

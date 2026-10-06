@@ -76,6 +76,39 @@ export function reconstruirCircuito(): Contrato.Layout {
   return exportarLayout(Layout, { versionGenerador: 'port' });
 }
 
+/** Los dos golden de tren de GenerarGoldenFiles.m (tres carros). */
+export const TRENES = ['tren-loop-gconstante', 'tren-circuito'] as const;
+
+/** Reconstruye un golden de tren con el setup de GenerarGoldenFiles.m. */
+export function reconstruirTren(caso: (typeof TRENES)[number]): Contrato.Layout {
+  const Parametros = ParametrosPorDefecto();
+  Parametros.RadioDelLoop = 0.3;
+  Parametros.MetodoDeAcoplamiento = 'A';
+  Parametros.CalcularVelocidadMinima = false;
+  Parametros.NumeroDeCarros = 3;
+  let Secuencia: NombreDeElemento[];
+  let Estado: ReturnType<typeof EstadoInicial>;
+  if (caso === 'tren-loop-gconstante') {
+    Parametros.ModoCurvatura = 'FuerzaGConstante';
+    Parametros.DisenoDelTren = 'PrimerCarro';
+    Secuencia = ['LoopVertical'];
+    Estado = EstadoInicial([0, 0, 1.0], [1, 0, 0], [0, 0, 1], 5.0, Parametros);
+  } else {
+    Parametros.ModoCurvatura = 'ArcoCircular';
+    Parametros.RadioDelGiro = 0.8;
+    Parametros.DisenoDelTren = 'CarroCritico';
+    Secuencia = ['LoopVertical', 'OverBankedTurn'];
+    Estado = EstadoInicial([0, 0, 1.0], [1, 0, 0], [0, 0, 1], 4.5, Parametros);
+  }
+  let Layout = LayoutNuevo(Estado, Parametros);
+  for (const nombre of Secuencia) {
+    const [Salida, Elemento, Reporte] = CONSTRUCTORES[nombre](Estado, Parametros, Layout);
+    Estado = Salida;
+    Layout = LayoutAgregarElemento(Layout, Elemento, Estado, Reporte);
+  }
+  return exportarLayout(Layout, { versionGenerador: 'port' });
+}
+
 export interface Diferencia {
   campo: string;
   maxAbs: number;
@@ -158,13 +191,38 @@ export function compararLayouts(golden: Contrato.Layout, port: Contrato.Layout):
       const otro = hojasNumericas(ep.criterios.normativo, `${prefijo}criterios.normativo`).get(ruta);
       diferencias.push(compararColumnas(ruta, [valor], [otro === undefined ? null : otro]));
     }
+    // Tren: las columnas de cada carro y sus lineas de criterio.
+    (eg.carros ?? []).forEach((cg, k) => {
+      const cp = ep.carros?.[k];
+      const ruta = `${prefijo}carros[${k}]`;
+      if (!cp || cp.numero !== cg.numero) {
+        diferencias.push({ campo: `${ruta}.numero`, maxAbs: Infinity, maxRel: Infinity, indice: k, golden: cg.numero, port: cp ? cp.numero : null });
+        return;
+      }
+      for (const [clave, g] of Object.entries(cg.nodos)) {
+        if (!Array.isArray(g)) continue;
+        diferencias.push(compararColumnas(`${ruta}.nodos.${clave}`, g as (number | null)[], (cp.nodos as Record<string, unknown>)[clave] as (number | null)[]));
+      }
+      cg.criterios.posteriores.forEach((lg, j) => {
+        const lp = cp.criterios.posteriores[j];
+        if (!lp || lp.nombre !== lg.nombre || lp.pasa !== lg.pasa) {
+          diferencias.push({ campo: `${ruta}.criterios[${j}].pasa (${lg.nombre})`, maxAbs: Infinity, maxRel: Infinity, indice: j, golden: lg.pasa ? 1 : 0, port: lp ? (lp.pasa ? 1 : 0) : null });
+        } else {
+          diferencias.push(compararColumnas(`${ruta}.criterios[${j}].valor (${lg.nombre})`, [lg.valor, lg.margen], [lp.valor, lp.margen]));
+        }
+      });
+    });
     for (const [clave, valor] of Object.entries(eg.estadoSalida)) {
       const otro = (ep.estadoSalida as unknown as Record<string, unknown>)[clave];
       diferencias.push(compararColumnas(`${prefijo}estadoSalida.${clave}`, ([] as (number | null)[]).concat(valor as number), ([] as (number | null)[]).concat(otro as number)));
     }
   });
+  for (const [clave, valor] of Object.entries(golden.resumenLayout.tren ?? {})) {
+    const otro = (port.resumenLayout.tren as Record<string, unknown> | undefined)?.[clave];
+    diferencias.push(compararColumnas(`resumenLayout.tren.${clave}`, ([] as (number | null)[]).concat(valor as number), ([] as (number | null)[]).concat((otro ?? null) as number)));
+  }
   for (const [clave, valor] of Object.entries(golden.resumenLayout)) {
-    if (typeof valor === 'boolean') continue;
+    if (typeof valor === 'boolean' || clave === 'tren') continue;
     const otro = (port.resumenLayout as unknown as Record<string, unknown>)[clave];
     diferencias.push(compararColumnas(`resumenLayout.${clave}`, ([] as (number | null)[]).concat(valor as number), ([] as (number | null)[]).concat(otro as number)));
   }

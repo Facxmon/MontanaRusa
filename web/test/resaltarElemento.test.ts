@@ -12,7 +12,7 @@ function estadoCon(parcial: Partial<DatosDeEstado>) {
   return crearEstado({
     casos: [], caso: null, layout: circuito, magnitud: 'gz', elemento: null, error: null, diagnostico: null, cargando: false,
     vista: 'via3d', pestana: 'g', ejeX: 'arco', fuente: 'diseno', diseno: null, instancia: null, origen: null, disenoCalculado: null,
-    calculando: false, progreso: null, ultimoCalculoMs: null, autoGenerar: false, panel: 'diseno', nodo: null, reproduciendo: false, carro: null, comparacion: null,
+    calculando: false, progreso: null, ultimoCalculoMs: null, autoGenerar: false, panel: 'diseno', nodo: null, reproduciendo: false, carro: null, carroAnalizado: null, comparacion: null,
     ...parcial,
   });
 }

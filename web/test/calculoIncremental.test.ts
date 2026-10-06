@@ -157,6 +157,24 @@ describe('recalculo incremental', () => {
     expect(sinFecha(incremental)).toStrictEqual(sinFecha(calcularLayout(editada, 'test')));
   }, 120000);
 
+  it('con un tren, un elemento solo se reutiliza si toda la via anterior es la misma, y el resultado es identico', () => {
+    const calculador = new CalculadorIncremental();
+    const entrada = demoLayout();
+    entrada.parametros.NumeroDeCarros = 3;
+    entrada.parametros.DisenoDelTren = 'PrimerCarro';
+    entrada.secuencia = instanciasDesdeTipos(['LoopVertical', 'OverBankedTurn']);
+    calculador.calcular(entrada, 'test');
+    // Editar el ultimo: el primero sale de la cache (su via previa no cambio).
+    const ultimo = conAjustes(entrada, 1, { RadioDelGiro: 0.82 });
+    const incremental = calculador.calcular(ultimo, 'test');
+    expect(calculador.estadistica).toEqual({ reutilizados: 1, recalculados: 1, interferenciasRehechas: 0 });
+    expect(sinFecha(incremental)).toStrictEqual(sinFecha(calcularLayout(ultimo, 'test')));
+    // Editar el primero: el segundo depende de la via del primero (los carros de atras van por ahi) y se rehace.
+    const primero = conAjustes(entrada, 0, { RadioDelLoop: 0.31 });
+    calculador.calcular(primero, 'test');
+    expect(calculador.estadistica.recalculados).toBe(2);
+  }, 300000);
+
   it('si la edicion no cambia la salida del elemento, los siguientes salen enteros de la cache', () => {
     const calculador = new CalculadorIncremental();
     const entrada = demoLayout();

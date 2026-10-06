@@ -50,6 +50,7 @@ import { montarSelectorDeTema } from './paneles/selectorDeTema';
 import { montarVeredicto } from './paneles/veredicto';
 import { resaltarElemento } from './paneles/resaltarElemento';
 import { nodoGlobalDe } from './graficos/series';
+import { cambioElCarroAnalizado, layoutAnalizado } from './estado';
 
 const BASE = import.meta.env.BASE_URL;
 /** Al ubicar un punto en el 3D, la camara encuadra un cubo de este medio lado (m) alrededor. */
@@ -170,6 +171,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     nodo: null,
     reproduciendo: false,
     carro: null,
+    carroAnalizado: null,
     comparacion: null,
   });
 
@@ -187,6 +189,13 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     mostrarCaja: (visible) => entorno.mostrarCaja(visible),
     mostrarProyeccion: (visible) => entorno.mostrarProyeccion(visible),
     mostrarLimites: (visible) => via.mostrarLimites(visible),
+    cambiarApariencia: (apariencia) => carro.cambiarApariencia(apariencia),
+  });
+  // Clic sobre un carro del tren: pasa a ser el que se analiza (graficos, HUD, color de la via).
+  const sacarClicDelCarro = escena.alHacerClic((evento) => {
+    const numero = carro.carroEn(escena.rayoDesde(evento.clientX, evento.clientY));
+    const { layout } = estado.get();
+    if (numero !== null && layout && carro.cantidadDeCarros > 1) estado.set({ carroAnalizado: { layout, numero } });
   });
 
   const zonas = montarBarra(dom.barra);
@@ -386,13 +395,16 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
     if (nuevo.layout !== anterior.layout) {
       if (nuevo.layout) {
         entorno.construir(nuevo.layout);
-        via.construir(nuevo.layout, nuevo.magnitud, nuevo.elemento);
+        via.construir(layoutAnalizado(nuevo)!, nuevo.magnitud, nuevo.elemento);
         escena.encuadrar(nuevo.layout.resumenLayout.boundingBox);
       }
       return;
     }
     if (!nuevo.layout) return;
-    if (nuevo.magnitud !== anterior.magnitud || nuevo.elemento !== anterior.elemento) {
+    // El color de la via es el del carro que se analiza.
+    const otroCarro = cambioElCarroAnalizado(nuevo, anterior);
+    if (otroCarro) via.usarColumnasDe(layoutAnalizado(nuevo)!);
+    if (otroCarro || nuevo.magnitud !== anterior.magnitud || nuevo.elemento !== anterior.elemento) {
       via.recolorear(nuevo.magnitud, nuevo.elemento);
     }
     if (nuevo.elemento !== anterior.elemento) {
@@ -565,6 +577,7 @@ export function montarVisualizador(raiz: HTMLElement): Visualizador {
       cliente.terminar();
       reproductor.destruir();
       destruirGraficos();
+      sacarClicDelCarro();
       carro.destruir();
       via.destruir();
       entorno.destruir();

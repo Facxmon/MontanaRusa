@@ -8,15 +8,16 @@
 // veredictos `pasa` y el numero de nodos se comparan exactos.
 
 import { describe, expect, it } from 'vitest';
-import { CASOS, cargarGolden, compararLayouts, reconstruirCaso, reconstruirCircuito } from './arnes';
+import { CASOS, cargarGolden, compararLayouts, reconstruirCaso, reconstruirCircuito, reconstruirTren, TRENES } from './arnes';
 
 const TOLERANCIA_RELATIVA = 6e-6;
 const TOLERANCIA_ABSOLUTA = 1e-9;
 
 describe('el port reproduce los golden files', () => {
-  for (const caso of [...Object.keys(CASOS), 'circuito-demolayout']) {
+  for (const caso of [...Object.keys(CASOS), 'circuito-demolayout', ...TRENES]) {
     it(caso, () => {
-      const port = caso === 'circuito-demolayout' ? reconstruirCircuito() : reconstruirCaso(caso);
+      const port =
+        caso === 'circuito-demolayout' ? reconstruirCircuito() : (TRENES as readonly string[]).includes(caso) ? reconstruirTren(caso as (typeof TRENES)[number]) : reconstruirCaso(caso);
       const golden = cargarGolden(caso);
 
       expect(port.elementos.map((e) => e.nodos.numeroDeNodos)).toEqual(golden.elementos.map((e) => e.nodos.numeroDeNodos));
@@ -39,6 +40,9 @@ describe('el port reproduce los golden files', () => {
           expect((normativoP[lado] as { curva: string }).curva).toBe((normativoG[lado] as { curva: string }).curva);
         }
         expect(ep.nodos.puntoDeParada ?? null).toBe(eg.nodos.puntoDeParada ?? null);
+        // Tren: el mismo carro de diseno y los mismos veredictos por carro.
+        expect(ep.resumen.carroDeDiseno ?? null).toBe(eg.resumen.carroDeDiseno ?? null);
+        expect((ep.carros ?? []).map((c) => [c.numero, c.criterios.posteriores.map((l) => l.pasa)])).toEqual((eg.carros ?? []).map((c) => [c.numero, c.criterios.posteriores.map((l) => l.pasa)]));
       });
       expect(port.resumenLayout.todosLosCriteriosPasan).toBe(golden.resumenLayout.todosLosCriteriosPasan);
 
@@ -49,6 +53,6 @@ describe('el port reproduce los golden files', () => {
       expect(
         fuera.map((d) => `${d.campo} en ${d.indice}: golden ${d.golden} port ${d.port} (abs ${d.maxAbs.toExponential(2)})`),
       ).toEqual([]);
-    }, 120000);
+    }, 900000);
   }
 });

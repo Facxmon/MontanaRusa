@@ -13,6 +13,9 @@ export type SentidoDelGiro = 'Derecha' | 'Izquierda';
 export type PuntoDeVerificacion = 'Heartline' | 'Cabeza';
 
 /** ParametrosPorDefecto.m, campo por campo. */
+/** Para que carro del tren se disena cada elemento (DisenarParaElTren.m). */
+export type DisenoDelTren = 'Particula' | 'PrimerCarro' | 'CarroCritico';
+
 export interface Parametros {
   // 1. modo de curvatura
   ModoCurvatura: ModoCurvatura;
@@ -53,6 +56,7 @@ export interface Parametros {
   AlturaMinimaSuelo: number;
   ArcoMinimoAutointerferencia: number;
   DistanciaMinimaEntreVias: number;
+  AnguloMaximoDeAcople: number;
   // 4. generales
   Gravedad: number;
   RhoAire: number;
@@ -70,10 +74,13 @@ export interface Parametros {
   Holgura: number;
   DiametroRueda: number;
   AreaFrontal: number;
+  SeparacionEntreCarros: number;
   DistanciaHeartline: number;
   DistanciaHeartlineACabeza: number;
   MetodoDeAcoplamiento: MetodoDeAcoplamiento;
   CalcularVelocidadMinima: boolean;
+  CalcularTodosLosCarros: boolean;
+  DisenoDelTren: DisenoDelTren;
   RadioDeReferenciaReal: number;
   LargoCarroReal: number;
   PasoGeneracion: number;
@@ -84,6 +91,7 @@ export interface Parametros {
   TolNorma: number;
   TolPuntoFijo: number;
   MaxIteracionesPuntoFijo: number;
+  TolVelocidadDelTren: number;
   MaxIteracionesCierre: number;
   MaxIteracionesAjuste: number;
   MargenDeOnset: number;
@@ -132,6 +140,8 @@ export interface Estado {
   LongitudAcumulada: number;
   Velocidad: number;
   EnergiaTotal: number;
+  /** Tren: estado con el carro 1 en este punto (EstadoSalida.Tren de ConstruirElemento.m). */
+  Tren?: EstadoDelTren;
 }
 
 export interface Escala {
@@ -334,6 +344,10 @@ export interface Sim {
   JerkGz: Float64Array;
   VelocidadDeDiseno: number;
   AvisoVelocidadDeDiseno: string;
+  /** Tren: numero del carro (SimDelCarro). */
+  Carro?: number;
+  /** Tren: las columnas de energia son las del tren entero (ConEnergiaDelTren). */
+  EnergiaDelTren?: boolean;
 }
 
 export type SentidoDeCriterio = 'MenorOIgual' | 'MayorOIgual' | 'Informativo';
@@ -455,6 +469,10 @@ export interface Resumen {
   OnsetMaximoModelo: Vec3;
   VelocidadInicialMinima: number;
   BusquedaVelocidad: BusquedaVelocidad;
+  /** Tren: numero del carro que sigue la curva del modo (ausente sin carro de diseno). */
+  CarroDeDiseno?: number;
+  /** Tren: pico de G sobre el limite de 200 ms de cada carro (NaN si no se calculo). */
+  UtilizacionPorCarro?: number[];
 }
 
 export interface Reporte {
@@ -462,6 +480,10 @@ export interface Reporte {
   Posteriores: Criterio[];
   Normativo: Normativo;
   Resumen: Resumen;
+  /** Tren: como se diseno el elemento (DisenarParaElTren). */
+  Tren?: InfoDelTren | null;
+  /** Tren: las lineas dinamicas de cada carro calculado (null los no calculados). */
+  Carros?: (ReporteDelCarro | null)[];
 }
 
 export interface Elemento {
@@ -474,6 +496,9 @@ export interface Elemento {
   Receta: Receta;
   EstadoEntrada: Estado;
   EstadoSalida: Estado;
+  /** Tren: lo que vive cada carro (null los no calculados). Elemento.Sim es el del carro 1. */
+  SimCarros?: (Sim | null)[];
+  Tren?: TrenSimulado | null;
 }
 
 export interface RegistroDeLayout {
@@ -491,4 +516,46 @@ export interface Layout {
   Elementos: RegistroDeLayout[];
   PuntosRiel: Vec3[];
   LongitudArcoRiel: number[];
+  /** Tren: la simulacion sobre la via completa (VerificarTrenDelLayout). */
+  Tren?: TrenSimulado | null;
+}
+
+// ------------------------------------------------------------ tren (Tren/*.m)
+/** El tren integrado con el arco del PRIMER carro (SimularTren.m). */
+export interface TrenSimulado {
+  Arco: Float64Array;
+  Distancias: number[];
+  VelocidadRielCuadrado: Float64Array;
+  Tiempo: Float64Array;
+  FuerzaRodadura: Float64Array;
+  FuerzaArrastre: Float64Array;
+  EnergiaCinetica: Float64Array;
+  EnergiaPotencial: Float64Array;
+  EnergiaDisipadaRodadura: Float64Array;
+  EnergiaDisipadaArrastre: Float64Array;
+  PuntoDeParada: number | null;
+}
+
+/** Estado del tren con el primer carro en un punto: lo que se encadena entre elementos. */
+export interface EstadoDelTren {
+  VelocidadRielCuadrado: number;
+  Tiempo: number;
+}
+
+/** Lo que devuelve DisenarParaElTren de como se diseno el elemento. */
+export interface InfoDelTren {
+  /** Numero del carro (1 = el primero) que sigue la curva del modo; 0 = ninguno (masa puntual). */
+  CarroDeDiseno: number;
+  Iteraciones: number;
+  Residuo: number;
+  Convergio: boolean;
+  Utilizacion: number[];
+  PeorUtilizacionPorCandidato: number[];
+  /** Numeros de los carros calculados. */
+  Calculados: number[];
+}
+
+export interface ReporteDelCarro {
+  Posteriores: Criterio[];
+  Normativo: Normativo;
 }

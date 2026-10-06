@@ -592,6 +592,101 @@ elemento se construye con sus propios `Parametros`. Lo que faltaba era la interf
   Safari abren sin animar.
 - Contenido de la portada (textos, video, contacto): lo escribe el autor.
 
+# Tren de varios carros, separación y diseños del carro (2026-10-06)
+
+Hasta ahora `NumeroDeCarros` solo agrandaba el área del arrastre: la dinámica era la de una masa puntual
+y la web dibujaba los carros de atrás a una separación visual. Ahora el tren está modelado en MATLAB
+(referencia normativa) y porteado al núcleo en TypeScript, con paridad contra dos golden nuevos.
+
+## Modelo (MATLAB, `GeneradorDeElementos/Tren/`; port en `web/src/nucleo/tren.ts`)
+
+- **Dinámica.** Los carros van rígidamente unidos sobre el riel, a `LargoCarro + SeparacionEntreCarros`
+  de arco uno del otro, con la velocidad del riel común; la energía es la de todos los carros, cada uno
+  con su altura y su factor de heartline (`SimularTren`). Con un carro es exactamente la ecuación de la
+  partícula (test 20). Antes del inicio los carros esperan en una recta por la tangente del primer nodo
+  (la estación) y la simulación sigue por una recta por la tangente del final hasta que sale el último.
+- **Cada carro.** Sobre los mismos nodos del elemento: el nodo k es ese carro parado en el nodo k, con
+  su velocidad y su reloj (`SimDelCarro`); las G, el jerk y la fuerza normal salen de las mismas cuentas
+  que la partícula (`MagnitudesDinamicas`, separada de `SimularSobreTrack` sin cambio numérico).
+- **Diseño para un carro.** El modo de curvatura persigue su objetivo con UNA velocidad y cada carro pasa
+  por cada punto a otra: solo un carro puede seguir exactamente la curva pedida. El elemento se genera
+  como siempre (partícula) y después se regenera con la velocidad del carro elegido impuesta en la marcha
+  (`GenerarGeometria` con `DerivadaImpuesta`), en punto fijo hasta `TolVelocidadDelTren`
+  (`DisenarParaElTren`). `DisenoDelTren` elige el carro: `'PrimerCarro'` (por defecto), `'CarroCritico'`
+  o `'Particula'` (sin rediseñar, lo más rápido). El carro asignado queda en `resumen.carroDeDiseno` y en
+  el detalle del criterio "Gz objetivo del modo alcanzado" de cada elemento.
+- **Carro crítico.** Medido: diseñar para el carro de mayor G no sirve, porque el ranking se invierte al
+  rediseñar (el carro de diseño pasa a ir exacto y otro queda arriba) y la iteración cicla. Por eso el
+  crítico es el que, al asignarle la curva, deja el **menor pico de G entre todos** (`UtilizacionNormativa`:
+  pico de cada eje sobre su límite de 200 ms): se diseña para cada carro y se queda el mejor. En el loop
+  de prueba (FuerzaGConstante 3 G, R 0,30 m, 3 carros) el pico del peor carro fue 4,17 G diseñando para el
+  primero, 3,81 G para el segundo y 4,50 G para el tercero: el crítico resultó el del medio. **Ninguna
+  asignación evita que otros carros superen el objetivo** (ver decisiones abiertas).
+- **Verificación.** Tras cada elemento se simula el tren sobre la vía completa (`VerificarTrenDelLayout`)
+  y se verifica cada carro sobre su propia línea de tiempo; cada línea dinámica del elemento es la del
+  peor carro, así que el veredicto es el de todo el tren.
+
+## Separación entre carros
+
+- Parámetro `SeparacionEntreCarros` (0,04 m por defecto), de paragolpe a paragolpe, como arco de riel.
+- **Mínimo** (criterio posterior "Separación entre carros sin interferencia"): dos cajas en una curva de
+  radio R se tocan del lado del centro; sin interferencia, `p ≥ 2R·atan((l + Holgura)/(2(R − h)))` con
+  `h` la función soporte de la sección (AltoCarro sobre U, AnchoVia/2 sobre L) en la dirección de la
+  curvatura y `Holgura` de luz. En recta queda `Separación ≥ Holgura`; el loop por defecto (R 0,33 m en el
+  riel) pide 3,3 cm, por eso el default es 4 cm y no los 2,5 cm que se estimaron sin la holgura.
+- **Máximo**: tope duro de un largo de carro (criterio previo) y ángulo del acople
+  `(LargoCarro + Separación)·κ/2 ≤ AnguloMaximoDeAcople` (45°, provisorio y laxo: falta el dato real).
+- En la web: campo en "Tren y carro" (cm), visible con más de un carro, y los carros del 3D a esa
+  separación (la constante visual de la tarea 4 desapareció).
+
+## Costo medido (MATLAB R2026a)
+
+| Caso | 1 carro | 3 carros, diseño p/ el primero | 3 carros, solo el primero calculado | 3 carros, búsqueda del crítico |
+|---|---|---|---|---|
+| Loop FuerzaGConstante | 7,2 s | 83,5 s | 83,6 s | 190 s |
+| Circuito DemoLayout (ArcoCircular, 4 elementos) | 29,8 s | 149,5 s | — | — |
+
+Calcular todos los carros es insignificante (≈0,01 s por carro y elemento, más 0,4 s de simulación del
+tren por layout): `CalcularTodosLosCarros` queda activado por defecto. Lo caro es rediseñar la vía para
+un carro (de 3 a 7 regeneraciones por elemento), y eso es lo que elige `DisenoDelTren`.
+
+## Contrato 1.3.0
+
+Energía por nodo (cinética, potencial, disipada por rodadura y arrastre), `elementos[].carros`,
+`resumen.carroDeDiseno` y `utilizacionPorCarro`, `resumenLayout.tren` (CONTRATO_VISUALIZADOR.md §3, §6.1,
+§6.3, §6.5 y §7). La energía disipada por nodo dejó de ir un paso adelantada; el total no cambió.
+
+## Web
+
+| Qué | Cómo |
+|---|---|
+| Carro analizado | `estado.carroAnalizado`; por defecto el peor entre el primero y el último (`carroPorDefecto`, por la mayor utilización de la norma). Se elige con un clic sobre el carro en el 3D o con el selector "carro" del reproductor. Los gráficos, los valores en el cursor, el color de la vía y el HUD son los de ese carro (`layoutDelCarro`: el mismo layout con las columnas y los criterios de ese carro); el veredicto global sigue siendo el de todo el tren. Los demás carros se dibujan atenuados. |
+| Reloj del tren | El reproductor corre desde que el primer carro entra hasta que sale el último (`resumenLayout.tren.tiempoDeSalida`); cada carro se ubica por arco detrás del primero. |
+| Energía | Usa la exportada (cinética, potencial y disipada) cuando el contrato la trae; con varios carros es la del tren y E₀ la del primer nodo (los carros de atrás en la estación). La pérdida acumulada es la disipada por rodadura y arrastre. |
+| Diseños del carro | Clásico, Aerodinámico y Vagoneta (`escena/disenosDeCarro.ts`). Cada uno se modela una sola vez en unidades normalizadas y se **escala**: la carrocería se estira a LargoCarro × AnchoVia × AltoCarro, y las piezas redondas (ruedas de DiametroRueda, nariz, remaches) conservan la forma y se ubican en anclajes que sí se estiran. Las geometrías se comparten entre carros y layouts. |
+| Color | Seis colores de `tokens.css` (`--carro-color-N`) y un selector libre, en los controles de la vista 3D. La marca del frente cambia a magenta si el color elegido se parece al verde. Diseño y color son preferencias de la vista (localStorage), no del contrato. |
+| Solo globales | `Masa`, `Gravedad` y los parámetros del tren no se pisan por instancia: el importador los rechaza (en una vía no cambian y el tren es uno solo). |
+
+## Decisiones abiertas
+
+- **Un carro por elemento no garantiza que los demás respeten el objetivo.** Con el tren de prueba,
+  cualquier asignación deja algún carro entre 20 y 50 % por encima de la G pedida. Si el objetivo es que
+  ningún carro la supere, la alternativa es diseñar con la envolvente (en cada punto, la velocidad del
+  carro más rápido): ningún carro sigue la curva exacta, pero ninguno la supera. No se implementó porque
+  contradice el pedido (un carro por elemento); queda para decidir.
+- **Carros de adelante durante el diseño.** Al diseñar un elemento para el carro c, los carros que van
+  delante pueden estar más allá del final del elemento, sobre vía que todavía no existe: se los supone en
+  recta por la tangente de salida. La verificación del layout lo corrige, pero el carro de diseño puede
+  apartarse unas centésimas de G del objetivo cerca del final cuando se agrega el elemento siguiente.
+- **Arco constante entre carros.** Los carros van a arco constante sobre el riel (barra de acople de
+  largo variable); un acople real de largo fijo acorta un poco el arco en las curvas (orden (p·κ)²).
+- **Ángulo del acople** provisorio (45°) y la caja envolvente del carro para la interferencia (los
+  diseños con trompa redondeada tienen margen extra).
+- **Energía del tren a 3 ppm.** La ecuación del tren usa dJ²/ds numérica; la conservación sin pérdidas
+  queda en 2,8e-6 relativo (la partícula, 1e-9). Físicamente despreciable (≈1e-5 m/s).
+
+---
+
 # Gráficos nuevos y tren de carros (2026-10-05)
 
 Cinco cambios de visualización, sin tocar el núcleo, el MATLAB, los golden ni el contrato: todo sale de
@@ -610,7 +705,7 @@ campos que el JSON ya trae (`nodos.arco`, `tiempo`, `z`, `zRiel`, `velocidad`, `
 
 ## Decisiones abiertas
 
-- **Separación entre carros**: el modelo no tiene ese parámetro (`ParametrosPorDefecto.m` declara
+- ~~**Separación entre carros**~~ **Resuelto el 2026-10-06** (sección de arriba): el modelo no tenía ese parámetro (`ParametrosPorDefecto.m` declara
   `NumeroDeCarros` y `LargoCarro`, nada más) y agregarlo es un cambio del MATLAB. Mientras tanto es una
   constante visual, `SEPARACION_ENTRE_CARROS_RELATIVA` = 0,15 × largo, que no entra en ningún cálculo
   (TODO en `escena/carro.ts`).

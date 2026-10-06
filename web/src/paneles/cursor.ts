@@ -9,7 +9,7 @@
 // tirar trabajo a la basura sesenta veces por segundo.
 
 import { MAGNITUDES } from '../contrato/magnitudes';
-import type { Estado } from '../estado';
+import { cambioElCarroAnalizado, layoutAnalizado, type Estado } from '../estado';
 import { ubicacionDeNodo } from '../graficos/series';
 import { el, resumirTarjeta, tarjeta, vaciar } from './dom';
 import { formatearMagnitud, SIN_DATO } from './formato';
@@ -21,7 +21,7 @@ export function montarValoresDelCursor(contenedor: HTMLElement, estado: Estado):
   let caja: HTMLDetailsElement | null = null;
 
   const armar = () => {
-    const { layout } = estado.get();
+    const layout = layoutAnalizado(estado.get());
     vaciar(contenedor);
     celdas = [];
     donde = null;
@@ -39,7 +39,8 @@ export function montarValoresDelCursor(contenedor: HTMLElement, estado: Estado):
   };
 
   const escribir = () => {
-    const { layout, nodo } = estado.get();
+    const { nodo } = estado.get();
+    const layout = layoutAnalizado(estado.get());
     if (!layout || celdas.length === 0) return;
     const ubicacion = nodo === null ? null : ubicacionDeNodo(layout, nodo);
     const elemento = ubicacion ? layout.elementos[ubicacion.elemento] : undefined;
@@ -61,7 +62,7 @@ export function montarValoresDelCursor(contenedor: HTMLElement, estado: Estado):
   const limitador = new LimitadorDeRefresco();
   armar();
   estado.suscribir((nuevo, anterior) => {
-    if (nuevo.layout !== anterior.layout) armar();
+    if (nuevo.layout !== anterior.layout || cambioElCarroAnalizado(nuevo, anterior)) armar();
     else if (nuevo.reproduciendo !== anterior.reproduciendo) {
       limitador.reiniciar();
       escribir();

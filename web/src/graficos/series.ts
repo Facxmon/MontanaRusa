@@ -82,6 +82,8 @@ interface Tramo {
    */
   masa: number;
   gravedad: number;
+  /** Energia disipada (rodadura + arrastre) acumulada al entrar al elemento, J. */
+  desfaseDisipada: number;
 }
 
 export interface Columnas {
@@ -108,6 +110,8 @@ export interface Columnas {
    * perdida acumulada se cuenta desde ahi. null si el contrato no la trae.
    */
   energiaInicial: number | null;
+  /** true con un tren de varios carros: la energia es la del tren entero. */
+  deTren: boolean;
 }
 
 /**
@@ -310,6 +314,7 @@ export function extraerColumnas(layout: Layout, elementoElegido: number | null):
   const tramos: Tramo[] = [];
   let desfaseTiempo = 0;
   let desfaseTiempoPrototipo = 0;
+  let desfaseDisipada = 0;
   layout.elementos.forEach((elemento, indice) => {
     const normativo = (elemento.criterios.normativo ?? {}) as Record<string, unknown>;
     const factorTiempo = factorTiempoDe(elemento);
@@ -326,11 +331,13 @@ export function extraerColumnas(layout: Layout, elementoElegido: number | null):
         desfaseTiempoPrototipo: elementoElegido === null ? desfaseTiempoPrototipo : 0,
         masa: parametroDelElemento(layout, elemento, 'masa'),
         gravedad: parametroDelElemento(layout, elemento, 'gravedad'),
+        desfaseDisipada,
       });
     }
     const duracion = elemento.resumen.tiempoDeRecorrido ?? 0;
     desfaseTiempo += duracion;
     desfaseTiempoPrototipo += duracion * factorTiempo;
+    desfaseDisipada += (elemento.resumen.energiaDisipadaRodadura ?? 0) + (elemento.resumen.energiaDisipadaArrastre ?? 0);
   });
 
   const arco: (number | null)[] = [];
@@ -382,7 +389,9 @@ export function extraerColumnas(layout: Layout, elementoElegido: number | null):
     nodos: Int32Array.from(nodos),
     linea: lineaNormativa(layout),
     elemento: elementoElegido,
-    energiaInicial: numero(layout.estadoInicial.energiaTotal) ?? numero(layout.elementos[0]?.nodos.energiaTotal?.[0]),
+    // E0 es la del primer nodo: con varios carros, la del tren entero (los de atras en la estacion).
+    energiaInicial: numero(layout.elementos[0]?.nodos.energiaTotal?.[0]) ?? numero(layout.estadoInicial.energiaTotal),
+    deTren: Number(layout.resumenLayout.tren?.numeroDeCarros ?? layout.parametros.valores.numeroDeCarros ?? 1) > 1,
   };
 }
 
@@ -558,49 +567,66 @@ export interface ColumnasDeEnergia {
 }
 
 /**
- * La particion de SimularSobreTrack.m: Ec = m v^2 / 2 con la velocidad del
- * centro de masa y Ep = m g z con la z de la heartline; la mecanica es la
- * energiaTotal del contrato (Ec + Ep del modelo). La perdida acumulada es
- * E0 - E: el contrato no exporta la energia disipada por nodo (el resumen
- * del MATLAB la tiene, Sim.EnergiaDisipadaRodadura/Arrastre, pero el
- * exportador no la emite), y E0 - E es esa energia, la que se llevaron la
- * rodadura y el arrastre desde el inicio (salvo el error de integracion y
- * el redondeo a 6 cifras del contrato).
+ * Desde el contrato 1.3.0 la energia viene por nodo: cinetica, potencial y
+ * disipada por rodadura y arrastre (acumulada desde el inicio de cada
+ * elemento, como el tiempo; aca se acumula sobre el recorrido). Con varios
+ * carros son las del tren entero con el carro 1 en el nodo. Para los golden
+ * anteriores se reconstruye la particion de SimularSobreTrack.m (Ec = m v^2/2
+ * con la velocidad del centro de masa, Ep = m g z de la heartline) y la
+ * perdida como E0 - E, que es la misma energia salvo el error de
+ * integracion y el redondeo a 6 cifras.
  */
 export function columnasDeEnergia(columnas: Columnas): ColumnasDeEnergia {
   const cinetica: (number | null)[] = [];
   const potencial: (number | null)[] = [];
+  const perdida: (number | null)[] = [];
+  const mecanica = columna(columnas, 'energiaTotal');
+  const e0 = columnas.energiaInicial;
   for (const tramo of columnas.tramos) {
     const n = tramo.elemento.nodos;
     for (let i = tramo.desde; i < n.numeroDeNodos; i++) {
-      const v = numero(n.velocidad[i]);
-      const z = numero(n.z[i]);
-      const ec = v === null ? null : 0.5 * tramo.masa * v * v;
-      const ep = z === null ? null : tramo.masa * tramo.gravedad * z;
-      cinetica.push(ec !== null && Number.isFinite(ec) ? ec : null);
-      potencial.push(ep !== null && Number.isFinite(ep) ? ep : null);
+      if (n.energiaCinetica && n.energiaPotencial) {
+        cinetica.push(numero(n.energiaCinetica[i]));
+        potencial.push(numero(n.energiaPotencial[i]));
+      } else {
+        const v = numero(n.velocidad[i]);
+        const z = numero(n.z[i]);
+        const ec = v === null ? null : 0.5 * tramo.masa * v * v;
+        const ep = z === null ? null : tramo.masa * tramo.gravedad * z;
+        cinetica.push(ec !== null && Number.isFinite(ec) ? ec : null);
+        potencial.push(ep !== null && Number.isFinite(ep) ? ep : null);
+      }
+      if (n.energiaDisipadaRodadura && n.energiaDisipadaArrastre) {
+        const r = numero(n.energiaDisipadaRodadura[i]);
+        const a = numero(n.energiaDisipadaArrastre[i]);
+        perdida.push(r === null || a === null ? null : tramo.desfaseDisipada + r + a);
+      } else {
+        const e = mecanica[perdida.length];
+        perdida.push(e === null || e === undefined || e0 === null ? null : e0 - e);
+      }
     }
   }
-  const mecanica = columna(columnas, 'energiaTotal');
-  const e0 = columnas.energiaInicial;
-  const perdida = mecanica.map((e) => (e === null || e0 === null ? null : e0 - e));
   return { cinetica, potencial, mecanica, perdida };
 }
 
 function figuraDeEnergia(columnas: Columnas, ejeX: EjeX): DatosDeFigura {
   const { cinetica, potencial, mecanica, perdida } = columnasDeEnergia(columnas);
   const e0 = columnas.energiaInicial;
+  const exportada = columnas.tramos.every((t) => t.elemento.nodos.energiaDisipadaRodadura !== undefined);
+  const delTren = columnas.deTren ? ' del tren' : '';
   const series: SerieDeFigura[] = [
-    { etiqueta: 'Mecánica (cinética + potencial)', valores: mecanica, color: SERIE[0], ancho: 2 },
-    { etiqueta: 'Cinética (½·m·v²)', valores: cinetica, color: SERIE[1], ancho: 1.4 },
-    { etiqueta: 'Potencial (m·g·z de la heartline)', valores: potencial, color: SERIE[2], ancho: 1.4 },
+    { etiqueta: `Mecánica${delTren} (cinética + potencial)`, valores: mecanica, color: SERIE[0], ancho: 2 },
+    { etiqueta: columnas.deTren ? 'Cinética del tren (Σ ½·m·v² de los carros)' : 'Cinética (½·m·v²)', valores: cinetica, color: SERIE[1], ancho: 1.4 },
+    { etiqueta: columnas.deTren ? 'Potencial del tren (Σ m·g·z de los carros)' : 'Potencial (m·g·z de la heartline)', valores: potencial, color: SERIE[2], ancho: 1.4 },
     {
-      etiqueta: 'Pérdida acumulada (E₀ − mecánica)',
+      etiqueta: exportada ? 'Pérdida acumulada (rodadura + arrastre)' : 'Pérdida acumulada (E₀ − mecánica)',
       valores: perdida,
       color: SERIE[0],
       ancho: 1.4,
       trazos: [6, 3],
-      ayuda: 'Lo que la rodadura y el arrastre se llevaron desde el inicio del recorrido: E₀ menos la energía mecánica en ese punto.',
+      ayuda: exportada
+        ? 'Energía disipada por la rodadura y el arrastre desde el inicio del recorrido, tal como la calcula el modelo.'
+        : 'Lo que la rodadura y el arrastre se llevaron desde el inicio del recorrido: E₀ menos la energía mecánica en ese punto.',
     },
   ];
   if (e0 !== null) {
@@ -616,7 +642,7 @@ function figuraDeEnergia(columnas: Columnas, ejeX: EjeX): DatosDeFigura {
   }
   return {
     clave: 'energia',
-    titulo: 'Energía del centro de masa — cinética, potencial, mecánica y pérdida',
+    titulo: columnas.deTren ? 'Energía del tren — cinética, potencial, mecánica y pérdida' : 'Energía del centro de masa — cinética, potencial, mecánica y pérdida',
     etiquetaX: ETIQUETA_DE_EJE[ejeX],
     etiquetaY: 'E [J]',
     x: columnas.x[ejeX] as number[],

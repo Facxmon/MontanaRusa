@@ -14,19 +14,10 @@ function [Criterios, Normativo] = ChequeosPosteriores(Track, Sim, Parametros, La
     Criterios = CriteriosVacios();
     Escala = EscalasDeFroude(Parametros);
 
-    Valido = ~isnan(Sim.Velocidad);
     AlturaRelativa = Track.PuntosHeartline(:,3) - Track.PuntosHeartline(1,3);
 
     %% --- El carro completa el elemento -------------------------------------
-    Criterios = AgregarCriterio(Criterios, 'El carro completa el elemento', 'MayorOIgual', ...
-        double(isempty(Sim.PuntoDeParada)), 1, '-', ...
-        'Si falla, el carro se queda sin energia antes del final.');
-
-    Criterios = AgregarCriterio(Criterios, 'G minima sobre el eje vertical del carro', 'MayorOIgual', ...
-        min(Sim.Gz(Valido)), Parametros.GMinimaCuspide, 'G', ...
-        sprintf(['Margen en la cuspide, en el punto de verificacion (%s, brazo %.3f m). ' ...
-                 'N = 0 no sirve como criterio: no tolera variacion de friccion.'], ...
-                Parametros.PuntoDeVerificacionNormativa, Sim.BrazoDeVerificacion));
+    Criterios = [Criterios, CriteriosDeMarcha(Sim, Parametros)];
 
     %% --- Fabricacion y espacio ---------------------------------------------
     % El radio que limita la impresora es el DEL RIEL, que no es el de la
@@ -111,19 +102,15 @@ function [Criterios, Normativo] = ChequeosPosteriores(Track, Sim, Parametros, La
                  'salteando la junta (pares a menos de %.2f m de arco).'], ...
                 Parametros.ArcoMinimoAutointerferencia));
 
-    %% --- Presupuesto de onset por eje --------------------------------------
-    Normativo = VerificarLimitesNormativos(Sim, Escala, Parametros);
-    Ejes = {'Gx', 'Gy', 'Gz'};
-    for i = 1:3
-        Criterios = AgregarCriterio(Criterios, sprintf('Onset maximo de %s', Ejes{i}), 'MenorOIgual', ...
-            Normativo.OnsetMaximoPorEje(i), Escala.OnsetMaximo(i), 'G/s', ...
-            sprintf('Presupuesto del modelo = sqrt(lambda_loop) x %.1f G/s de la norma.', ...
-                    Parametros.OnsetNormativoPorEje(i)));
+    %% --- Tren: interferencia entre carros y angulo del acople --------------
+    % Solo con mas de un carro. Dependen de la geometria, no de la dinamica.
+    if round(Parametros.NumeroDeCarros) > 1
+        Criterios = [Criterios, CriteriosDelTren(Track, Parametros)];
     end
 
-    Criterios = AgregarCriterio(Criterios, 'Onset de 0 G a 2 G (7.1.7.2)', 'MenorOIgual', ...
-        Normativo.OnsetDeCarga, Escala.OnsetMaximo(3), 'G/s', ...
-        'Alcance literal de la clausula: solo transiciones desde 0 G o menos hacia 2 G o mas.');
+    %% --- Presupuesto de onset por eje --------------------------------------
+    Normativo = VerificarLimitesNormativos(Sim, Escala, Parametros);
+    Criterios = [Criterios, CriteriosDeOnset(Normativo, Escala, Parametros)];
 
     %% --- Limites normativos: duracion, reversiones y elipses ---------------
     % Para el elemento suelto. Si el elemento entra a un layout,
@@ -132,15 +119,7 @@ function [Criterios, Normativo] = ChequeosPosteriores(Track, Sim, Parametros, La
     Criterios = [Criterios, CriteriosNormativos(Normativo)];
 
     %% --- Cabeza: informativo -----------------------------------------------
-    % La norma no se aplica en la cabeza, pero es la parte mas sensible a las
-    % rotaciones y el disenador debe incluirlas (Rohde 2024, 7.6.2). Si
-    % PuntoDeVerificacionNormativa es 'Cabeza' estas son las mismas que arriba.
-    Criterios = AgregarCriterio(Criterios, 'Gz maxima en la cabeza', 'Informativo', ...
-        max(Sim.GzCabeza(Valido)), NaN, 'G', ...
-        sprintf('A %.3f m del riel (d + e). Las verificadas arriba estan a %.3f m.', ...
-                Parametros.DistanciaHeartline + Parametros.DistanciaHeartlineACabeza, Sim.BrazoDeVerificacion));
-    Criterios = AgregarCriterio(Criterios, '|Gy| maxima en la cabeza', 'Informativo', ...
-        max(abs(Sim.GyCabeza(Valido))), NaN, 'G', '');
+    Criterios = [Criterios, CriteriosDeCabeza(Sim, Parametros)];
 end
 
 %% ========================= auxiliares =====================================

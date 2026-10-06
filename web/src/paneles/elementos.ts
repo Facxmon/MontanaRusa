@@ -38,7 +38,8 @@ export function montarElementos(contenedor: HTMLElement, estado: Estado): void {
         el(
           'span',
           { class: 'elemento-datos', 'data-clave': `elemento-${i}` },
-          `${e.nodos.numeroDeNodos} nodos · Gz máx ${formatear(e.resumen.gzMaxima, 'G')} · ${formatear(e.resumen.longitudRecorrida, 'm')}`,
+          `${e.nodos.numeroDeNodos} nodos · Gz máx ${formatear(e.resumen.gzMaxima, 'G')} · ${formatear(e.resumen.longitudRecorrida, 'm')}` +
+            (e.resumen.carroDeDiseno ? ` · diseñado para el carro ${e.resumen.carroDeDiseno}` : ''),
         ),
       ),
     );

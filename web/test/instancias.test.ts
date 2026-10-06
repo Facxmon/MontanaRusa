@@ -38,8 +38,8 @@ describe('dos helices distintas en la misma secuencia', () => {
     expect(a!.nodos.numeroDeNodos).not.toBe(b!.nodos.numeroDeNodos);
   });
 
-  it('el contrato lleva ajustes solo en la instancia que piso algo, y version 1.2.0', () => {
-    expect(layout.meta.versionContrato).toBe('1.2.0');
+  it('el contrato lleva ajustes solo en la instancia que piso algo, y version 1.3.0', () => {
+    expect(layout.meta.versionContrato).toBe('1.3.0');
     expect(layout.elementos[0]!.ajustes).toEqual({ radioDeLaHelice: 0.5 });
     expect(layout.elementos[0]!.inertes).toBeUndefined();
     expect(layout.elementos[1]!.ajustes).toBeUndefined();

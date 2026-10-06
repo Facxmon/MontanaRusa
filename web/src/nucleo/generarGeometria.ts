@@ -29,6 +29,7 @@ interface Plan {
   Onset: Vec3;
   EstadoEntrada: Estado;
   PerfilVelocidad: ((Arco: number) => number) | null;
+  DerivadaImpuesta: ((Arco: number) => number) | null;
   NormalEnPlano: Vec3;
   Beta: number;
   CurvaturaParalela: number;
@@ -68,6 +69,7 @@ export function GenerarGeometria(
   Parametros: Parametros,
   Receta: Receta,
   PerfilVelocidad: ((Arco: number) => number) | null = null,
+  DerivadaImpuesta: ((Arco: number) => number) | null = null,
 ): [Track, DiagnosticoDeGeometria] {
   const Escala = EscalasDeFroude(Parametros);
 
@@ -101,6 +103,7 @@ export function GenerarGeometria(
     Onset: Escala.OnsetMaximo,
     EstadoEntrada,
     PerfilVelocidad,
+    DerivadaImpuesta,
     NormalEnPlano,
     Beta,
     CurvaturaParalela: productoPunto(EstadoEntrada.VectorCurvatura, DireccionDeCurvatura),
@@ -312,6 +315,7 @@ function RecorrerElemento(Plan: Plan, AjusteCierre: number): Recorrido {
     Parametros,
     FuncionRoll: Plan.FuncionRoll,
     PerfilVelocidad: Plan.PerfilVelocidad,
+    DerivadaImpuesta: Plan.DerivadaImpuesta,
     VelocidadMinimaDeSeguridad: 1e-3,
     InclinacionHelicoidal: 0,
     AnguloGiradoDeReferencia: 0,

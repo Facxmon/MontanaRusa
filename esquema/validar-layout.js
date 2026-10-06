@@ -158,6 +158,23 @@ function chequeosDeConsistencia(doc) {
       }
     }
 
+    // carros (opcional, 1.3.0): mismos nodos que el elemento, numeros distintos dentro del tren
+    if (elemento.carros !== undefined) {
+      const cantidad = doc.parametros.valores.numeroDeCarros;
+      if (!(cantidad > 1)) falla(`${ruta}.carros con numeroDeCarros = ${cantidad}: solo va con varios carros`);
+      const vistos = new Set();
+      elemento.carros.forEach((carro, k) => {
+        if (carro.numero < 1 || carro.numero > cantidad) falla(`${ruta}.carros[${k}].numero ${carro.numero} fuera de [1, ${cantidad}]`);
+        if (vistos.has(carro.numero)) falla(`${ruta}.carros[${k}].numero ${carro.numero} repetido`);
+        vistos.add(carro.numero);
+        for (const [clave, valor] of Object.entries(carro.nodos)) {
+          if (Array.isArray(valor) && valor.length !== n) {
+            falla(`${ruta}.carros[${k}].nodos.${clave} tiene ${valor.length} elementos y numeroDeNodos es ${n}`);
+          }
+        }
+      });
+    }
+
     // sub-tramos en rango (un sub-tramo vacio tiene indiceFin = indiceInicio - 1)
     elemento.subtramos.forEach((tramo, k) => {
       if (tramo.indiceInicio > n - 1 || tramo.indiceFin > n - 1) {
@@ -207,6 +224,15 @@ function chequeosDeConsistencia(doc) {
   }
   if (resumenLayout.todosLosCriteriosPasan !== todosLosElementosPasan) {
     falla(`resumenLayout.todosLosCriteriosPasan vale ${resumenLayout.todosLosCriteriosPasan} pero el AND de los elementos da ${todosLosElementosPasan}`);
+  }
+  if (resumenLayout.tren !== undefined) {
+    const { tren } = resumenLayout;
+    if (tren.numeroDeCarros !== doc.parametros.valores.numeroDeCarros) {
+      falla(`resumenLayout.tren.numeroDeCarros vale ${tren.numeroDeCarros} y parametros.valores.numeroDeCarros ${doc.parametros.valores.numeroDeCarros}`);
+    }
+    for (const clave of ['distancias', 'desfasesDeTiempo']) {
+      if (tren[clave].length !== tren.numeroDeCarros) falla(`resumenLayout.tren.${clave} tiene ${tren[clave].length} elementos y el tren ${tren.numeroDeCarros} carros`);
+    }
   }
   for (const [eje, [minimo, maximo]] of resumenLayout.boundingBox.entries()) {
     if (minimo > maximo) falla(`resumenLayout.boundingBox[${eje}] tiene min ${minimo} > max ${maximo}`);

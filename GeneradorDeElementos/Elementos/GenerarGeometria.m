@@ -1,8 +1,14 @@
-function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Receta, PerfilVelocidad)
+function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Receta, PerfilVelocidad, DerivadaImpuesta)
 %GENERARGEOMETRIA Motor de generacion, comun a todos los elementos de via.
 %   Lo usan los dos metodos de acoplamiento: el metodo A no pasa perfil de
 %   velocidad (la curvatura se evalua con la v que lleva la marcha) y el
 %   metodo B pasa el perfil supuesto de la iteracion anterior.
+%
+%   DerivadaImpuesta (opcional, el tren de varios carros): interpolante de
+%   d(v_cm^2)/ds sobre el arco del riel. Si viene, la marcha no integra la
+%   energia de la particula sino esa velocidad, la del carro para el que se
+%   disena el elemento (DisenarParaElTren): curvatura, transiciones y reloj
+%   del objetivo normativo siguen a ese carro.
 %
 %   Sub-tramos, en orden:
 %     AcondicionamientoEntrada  lleva a cero la curvatura fuera del plano de
@@ -79,6 +85,9 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
     if nargin < 4
         PerfilVelocidad = [];
     end
+    if nargin < 5
+        DerivadaImpuesta = [];
+    end
 
     Escala = EscalasDeFroude(Parametros);
 
@@ -110,6 +119,7 @@ function [Track, Diagnostico] = GenerarGeometria(EstadoEntrada, Parametros, Rece
     Plan.Onset               = Escala.OnsetMaximo;
     Plan.EstadoEntrada       = EstadoEntrada;
     Plan.PerfilVelocidad     = PerfilVelocidad;
+    Plan.DerivadaImpuesta    = DerivadaImpuesta;
     Plan.NormalEnPlano       = NormalEnPlano;
     Plan.Beta                = Beta;
     Plan.CurvaturaParalela      = dot(EstadoEntrada.VectorCurvatura, DireccionDeCurvatura);
@@ -384,6 +394,7 @@ function Recorrido = RecorrerElemento(Plan, AjusteCierre)
     Contexto.Parametros                 = Parametros;
     Contexto.FuncionRoll                = Plan.FuncionRoll;
     Contexto.PerfilVelocidad            = Plan.PerfilVelocidad;
+    Contexto.DerivadaImpuesta           = Plan.DerivadaImpuesta;
     Contexto.VelocidadMinimaDeSeguridad = 1e-3;
     Contexto.InclinacionHelicoidal      = 0;   % la fija el arco, no el acondicionamiento
     Contexto.AnguloGiradoDeReferencia   = 0;

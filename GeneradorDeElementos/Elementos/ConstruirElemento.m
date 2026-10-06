@@ -43,9 +43,42 @@ function [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Pa
                   'Las opciones son ''A'', ''B'' o ''Ambos''.'], Parametros.MetodoDeAcoplamiento);
     end
 
-    Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros);
+    %% ---------------- Tren de varios carros ---------------------------------
+    % Con un carro, la masa puntual de siempre. Con varios, el elemento se
+    % disena para el carro mas critico (DisenarParaElTren) y se calcula lo
+    % que vive cada carro; el Sim del elemento es el del carro 1, con la
+    % energia del tren entero.
+    EsTren = round(Parametros.NumeroDeCarros) > 1;
+    SimsCarros = {};
+    Tren = [];
+    Reporte.Tren = [];
+    Reporte.Carros = {};
+    if EsTren
+        [Track, Diagnostico, Tren, SimsCarros, Reporte.Tren] = DisenarParaElTren( ...
+            EstadoEntrada, Parametros, Receta, Layout, Track, Diagnostico);
+        Sim = ConEnergiaDelTren(SimsCarros{1}, Track, Tren);
+        % Sin carro de diseno (DisenoDelTren = 'Particula') el objetivo se
+        % mide en el carro 1.
+        SimDeDiseno = SimsCarros{max(Reporte.Tren.CarroDeDiseno, 1)};
+    else
+        Sim = SimularSobreTrack(Track, EstadoEntrada, Parametros);
+        SimDeDiseno = Sim;
+    end
 
     [Reporte.Posteriores, Reporte.Normativo] = ChequeosPosteriores(Track, Sim, Parametros, Layout);
+
+    % Con varios carros calculados, cada linea que depende de la dinamica
+    % es la del peor carro (el elemento pasa solo si pasan todos), y cada
+    % carro guarda las suyas. Provisorio hasta VerificarTrenDelLayout.
+    if EsTren
+        Escala = EscalasDeFroude(Parametros);
+        for i = Reporte.Tren.Calculados
+            [Reporte.Carros{i}.Posteriores, Reporte.Carros{i}.Normativo] = CriteriosDelCarro(SimsCarros{i}, Escala, Parametros);
+        end
+        Reporte.Posteriores = PeorCarroPorCriterio(Reporte.Posteriores, ...
+            cellfun(@(C) C.Posteriores, Reporte.Carros(Reporte.Tren.Calculados), 'UniformOutput', false), ...
+            Reporte.Tren.Calculados, numel(DistanciasDelTren(Parametros)));
+    end
 
     % Si las dos clotoides juntas giran mas que el objetivo del elemento, el
     % arco principal queda de longitud nula y el giro se pasa haga lo que haga
@@ -57,7 +90,11 @@ function [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Pa
         ['Si falla, las transiciones consumen mas giro que el que pide el elemento: ' ...
          'hay que agrandar el radio o entrar mas lento.']);
 
-    Reporte.Posteriores = CriterioDeObjetivoDeG(Reporte.Posteriores, Track, Sim, Diagnostico, Receta, Parametros);
+    % El objetivo del modo lo persigue el carro de diseno: es el que se mide.
+    Reporte.Posteriores = CriterioDeObjetivoDeG(Reporte.Posteriores, Track, SimDeDiseno, Diagnostico, Receta, Parametros);
+    if EsTren
+        Reporte.Posteriores = ConCarroDeDiseno(Reporte.Posteriores, Reporte.Tren.CarroDeDiseno);
+    end
 
     %% ---------------- Estado de salida -------------------------------------
     % El estado que se encadena viaja sobre el RIEL: es la curva que integra
@@ -76,6 +113,12 @@ function [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Pa
     EstadoSalida.LongitudAcumulada = Track.LongitudArco(Ultimo);
     EstadoSalida.Velocidad         = Sim.VelocidadCentroDeMasa(Ultimo);
     EstadoSalida.EnergiaTotal      = Sim.EnergiaTotal(Ultimo);
+    % Tren: velocidad del riel y reloj con el carro 1 en el final. Es exacto
+    % (todos los demas estan detras, sobre via terminada) y es de donde
+    % arranca el tren en el elemento siguiente.
+    if EsTren
+        EstadoSalida.Tren = EstadoDelTrenEn(Tren, Track.LongitudArco(Ultimo));
+    end
 
     %% ---------------- Numeros de salida ------------------------------------
     Escala = Diagnostico.Escala;
@@ -103,6 +146,16 @@ function [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Pa
     Resumen.BrazoDeVerificacion    = Sim.BrazoDeVerificacion;
     Resumen.PeralteFinal           = Track.AnguloPeralte(end);
     Resumen.PeralteMaximo          = max(abs(Track.AnguloPeralte));
+
+    % Tren: los extremos de G, fuerza y velocidad son los de todos los carros
+    % calculados; el tiempo de recorrido sigue siendo el del carro 1.
+    if EsTren
+        Resumen = ResumenDelTren(Resumen, SimsCarros(Reporte.Tren.Calculados));
+        if Reporte.Tren.CarroDeDiseno > 0
+            Resumen.CarroDeDiseno   = Reporte.Tren.CarroDeDiseno;
+        end
+        Resumen.UtilizacionPorCarro = Reporte.Tren.Utilizacion;
+    end
 
     % Residual del endpoint. El punto de entrada NO es el endpoint esperado:
     % un loop con clotoides de entrada y salida de distinta longitud no vuelve
@@ -154,6 +207,27 @@ function [EstadoSalida, Elemento, Reporte] = ConstruirElemento(EstadoEntrada, Pa
     Elemento.EstadoEntrada = EstadoEntrada;
     Elemento.EstadoSalida  = EstadoSalida;
     Elemento.Resultados   = TablaDeResultados(Track, Sim);
+    Elemento.SimCarros    = SimsCarros;
+    Elemento.Tren         = Tren;
+end
+
+function Criterios = ConCarroDeDiseno(Criterios, Carro)
+%CONCARRODEDISENO Deja dicho en las lineas del objetivo del modo que carro lo sigue.
+    if Carro > 0
+        Prefijo = sprintf('Carro de diseno: %d (el que sigue la curva del modo en este elemento). ', Carro);
+    else
+        Prefijo = 'Sin carro de diseno (via disenada con la masa puntual); medido en el carro 1. ';
+    end
+    for k = find(startsWith({Criterios.Nombre}, {'Gz objetivo del modo', 'Gy objetivo del modo'}))
+        Criterios(k).Detalle = [Prefijo, Criterios(k).Detalle];
+    end
+end
+
+function Estado = EstadoDelTrenEn(Tren, Arco)
+    Valido = ~isnan(Tren.VelocidadRielCuadrado);
+    Conservar = Valido & [true; diff(Tren.Arco) > 1e-9];
+    Estado.VelocidadRielCuadrado = EvaluarEnArco(Tren.Arco(Conservar), Tren.VelocidadRielCuadrado(Conservar), Arco);
+    Estado.Tiempo                = EvaluarEnArco(Tren.Arco(Conservar), Tren.Tiempo(Conservar),                Arco);
 end
 
 %% ========================= auxiliares =====================================

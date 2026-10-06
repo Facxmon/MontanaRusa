@@ -56,6 +56,9 @@
   --naranja-500: #d95926;
   --ambar-500: #ffb454;
   --ambar-800: #8a5300;
+  --magenta-500: #e24fd4;
+  --violeta-400: #a78bfa;
+  --plata-300: #c7ced9;
 
   /* Tripletes para transparencias: rgba(var(--gris-400-rgb), 0.14). */
   --gris-950-rgb: 15, 17, 21;
@@ -143,8 +146,20 @@
   --escena-rotulo: var(--gris-500);
   --escena-uniones: var(--gris-500);
   --escena-carro: var(--ambar-500);
-  /* Placa del frente de cada carro: dice hacia donde apunta (contrasta con el ambar). */
+  /* Marca del frente de cada carro: dice hacia donde apunta. Si el color
+     elegido para el carro se parece al verde, se usa el alterno. */
   --escena-frente-carro: var(--verde-500);
+  --escena-frente-carro-alterno: var(--magenta-500);
+  /* Piezas del carro que no llevan el color elegido: asientos, barra, bastidor, ruedas. */
+  --escena-carro-detalle: var(--gris-650);
+  --escena-carro-rueda: var(--gris-900);
+  /* Colores ofrecidos para el carro (el primero es el de siempre). */
+  --carro-color-1: var(--ambar-500);
+  --carro-color-2: var(--rojo-500);
+  --carro-color-3: var(--azul-400);
+  --carro-color-4: var(--violeta-400);
+  --carro-color-5: var(--naranja-500);
+  --carro-color-6: var(--plata-300);
   --escena-pasajero: var(--rojo-500);
   --escena-pasajero-brillo: var(--rojo-800);
   /* Marcador del nodo bajo el cursor de los graficos. */

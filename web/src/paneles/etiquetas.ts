@@ -140,6 +140,7 @@ const DECLARADAS: Record<NombreDeParametro, Declarada> = {
   BoundingBoxDisponible: { nombre: 'Caja disponible', unidadDePresentacion: cm(1, 5), seccion: 'fabricacion' },
   ArcoMinimoAutointerferencia: { nombre: 'Arco mínimo de autointerferencia', unidadDePresentacion: cm(1, 1), rangoSugerido: [5, 100], seccion: 'numerico' },
   DistanciaMinimaEntreVias: { nombre: 'Distancia mínima entre vías', unidadDePresentacion: mm(1, 1), rangoSugerido: [1, 200], seccion: 'fabricacion' },
+  AnguloMaximoDeAcople: { nombre: 'Ángulo máximo del acople entre carros', unidadDePresentacion: grados(1, 1), rangoSugerido: [5, 90], seccion: 'fabricacion' },
 
   // ---------- generales ----------
   Gravedad: { nombre: 'Gravedad', unidadDePresentacion: tal('m/s²', 3, 0.01), rangoSugerido: [9, 10], seccion: 'numerico' },
@@ -157,11 +158,14 @@ const DECLARADAS: Record<NombreDeParametro, Declarada> = {
   AnchoVia: { nombre: 'Ancho de vía (trocha)', unidadDePresentacion: cm(1, 0.5), rangoSugerido: [2, 30], seccion: 'carro' },
   Holgura: { nombre: 'Holgura', unidadDePresentacion: mm(1, 1), rangoSugerido: [0, 100], seccion: 'carro' },
   DiametroRueda: { nombre: 'Diámetro de rueda', unidadDePresentacion: mm(1, 0.1), rangoSugerido: [3, 60], seccion: 'carro' },
+  SeparacionEntreCarros: { nombre: 'Separación entre carros', unidadDePresentacion: cm(1, 0.1), rangoSugerido: [0.5, 10], seccion: 'carro' },
   AreaFrontal: { nombre: 'Área frontal', unidadDePresentacion: { simbolo: 'cm²', factor: 1e4, decimales: 1, paso: 0.5 }, rangoSugerido: [1, 500], seccion: 'resistencia' },
   DistanciaHeartline: { nombre: 'Distancia del riel a la heartline', unidadDePresentacion: cm(1, 0.1), rangoSugerido: [0.5, 20], seccion: 'carro' },
   DistanciaHeartlineACabeza: { nombre: 'Distancia de la heartline a la cabeza', unidadDePresentacion: cm(1, 0.1), rangoSugerido: [0.5, 20], seccion: 'carro' },
   MetodoDeAcoplamiento: { nombre: 'Método de acoplamiento', seccion: 'resolucion' },
   CalcularVelocidadMinima: { nombre: 'Calcular la velocidad inicial mínima', seccion: 'resolucion' },
+  CalcularTodosLosCarros: { nombre: 'Calcular todos los carros del tren', seccion: 'carro' },
+  DisenoDelTren: { nombre: 'Diseño del tren (para qué carro se diseña cada elemento)', seccion: 'carro' },
   // Los dos del prototipo: en METROS a proposito (ver la cabecera de este archivo).
   RadioDeReferenciaReal: { nombre: 'Radio de referencia real (prototipo)', unidadDePresentacion: tal('m', 2, 0.1), rangoSugerido: [1, 50], seccion: 'escala' },
   LargoCarroReal: { nombre: 'Largo del carro real (prototipo)', unidadDePresentacion: tal('m', 2, 0.1), rangoSugerido: [1, 20], seccion: 'escala' },
@@ -174,6 +178,7 @@ const DECLARADAS: Record<NombreDeParametro, Declarada> = {
   TolNorma: { nombre: 'Tolerancia de norma nula', unidadDePresentacion: tal('m', 2, 1e-12), seccion: 'numerico' },
   TolPuntoFijo: { nombre: 'Tolerancia del punto fijo', unidadDePresentacion: tal('m/s', 2, 1e-9), seccion: 'numerico' },
   MaxIteracionesPuntoFijo: { nombre: 'Máximo de iteraciones del punto fijo', unidadDePresentacion: tal('-', 0, 1), rangoSugerido: [5, 500], seccion: 'numerico' },
+  TolVelocidadDelTren: { nombre: 'Tolerancia de velocidad del diseño del tren', unidadDePresentacion: tal('m/s', 4, 0.001), rangoSugerido: [0.0001, 0.05], seccion: 'numerico' },
   MaxIteracionesCierre: { nombre: 'Máximo de iteraciones de cierre', unidadDePresentacion: tal('-', 0, 1), rangoSugerido: [1, 50], seccion: 'numerico' },
   MaxIteracionesAjuste: { nombre: 'Máximo de iteraciones de ajuste', unidadDePresentacion: tal('-', 0, 1), rangoSugerido: [1, 50], seccion: 'numerico' },
   MargenDeOnset: { nombre: 'Margen de onset', unidadDePresentacion: tal('-', 4, 0.001), rangoSugerido: [0, 0.1], seccion: 'numerico' },
@@ -243,6 +248,12 @@ const SOLO_SI: Partial<Record<NombreDeParametro, (p: Parametros) => boolean>> = 
   CoefArrastre: (p) => p.ModelarArrastre,
   AreaFrontal: (p) => p.ModelarArrastre,
   FactorTren: (p) => p.ModelarArrastre && p.NumeroDeCarros > 1,
+  // Lo del tren solo con mas de un carro.
+  SeparacionEntreCarros: (p) => p.NumeroDeCarros > 1,
+  CalcularTodosLosCarros: (p) => p.NumeroDeCarros > 1,
+  DisenoDelTren: (p) => p.NumeroDeCarros > 1,
+  AnguloMaximoDeAcople: (p) => p.NumeroDeCarros > 1,
+  TolVelocidadDelTren: (p) => p.NumeroDeCarros > 1 && p.DisenoDelTren !== 'Particula',
   PasoBusquedaVelocidad: (p) => p.CalcularVelocidadMinima,
   // Con el peralte alineado al CIR, el peralte propio del elemento no se usa.
   PeralteDelGiro: (p) => !alineado(p) && p.ModoDePeralteDelGiro === 'Constante',
@@ -254,7 +265,7 @@ const SOLO_SI: Partial<Record<NombreDeParametro, (p: Parametros) => boolean>> = 
 
 /** Parametros cuyo cambio cambia que se muestra: el formulario se redibuja al editarlos. */
 export const CAMBIAN_LA_VISTA: readonly NombreDeParametro[] = [
-  'ModoCurvatura', 'ModelarArrastre', 'NumeroDeCarros', 'CalcularVelocidadMinima',
+  'ModoCurvatura', 'ModelarArrastre', 'NumeroDeCarros', 'CalcularVelocidadMinima', 'DisenoDelTren',
   'ModoDePeralteDelGiro', 'PeralteAlineadoAlCentroDeCurvatura', 'PeralteAlineadoALaFuerza',
 ];
 

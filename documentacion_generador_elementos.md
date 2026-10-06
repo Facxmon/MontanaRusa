@@ -454,7 +454,7 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 
 ## 11. Tests de validación
 
-`TestsValidacion.m` implementa **diecinueve** tests y termina con error si alguno falla. Todos pasan por la API pública de los elementos, para que lo que se verifica sea el mismo camino que usa el usuario.
+`TestsValidacion.m` implementa **veintitrés** tests y termina con error si alguno falla. Todos pasan por la API pública de los elementos, para que lo que se verifica sea el mismo camino que usa el usuario.
 
 | # | Test | Resultado típico |
 |---|---|---|
@@ -477,8 +477,12 @@ Los gráficos de G llevan la banda de límite superpuesta, evaluada punto a punt
 | 17 | El modo `Clotoide` es una clotoide de verdad: $\kappa$ lineal en el arco en cada mitad, pico $1/(R+d\cos\psi)$ y cierre con curvatura cero (loop de 0.30 m a 5 m/s) | residuo contra la recta $9.9\cdot10^{-5}$ 1/m; curvatura final 0; cierre $1.1\cdot10^{-9}$ rad; pico 3.0303 contra 3.0303 1/m |
 | 18 | Peralte alineado al centro de curvatura (OBT de 240° a nivel): $\psi$ nulo | $\lvert\psi\rvert$ máximo $6\cdot10^{-32}$ rad; peralte 90.0000° |
 | 19 | Peralte alineado a la fuerza (OBT de 240° a 5 m/s): $G_y$ de balance nula y onset dentro del presupuesto | desalineo de diseño $6.2\cdot10^{-8}$ rad; onset lateral 10.9 de 15.8 G/s, vertical 11.9 de 47.4 G/s; $\lvert G_y\rvert$ máxima en el pasajero 0.329 G (dinámica del roll, §5.3) |
+| 20 | El tren de un carro es la masa puntual: `SimularTren` + `SimDelCarro` con un carro reproducen `SimularSobreTrack` ([§16](#16-el-tren-de-varios-carros)) | error relativo en $v$ de $2\cdot10^{-6}$ (límite $10^{-4}$) |
+| 21 | La energía del tren se conserva sin pérdidas (tres carros, rodadura y arrastre nulos) | variación relativa $2.8\cdot10^{-6}$ (límite $10^{-5}$: la ecuación del tren usa $dJ^2/ds$ numérica) |
+| 22 | El carro de diseño sigue la curva del modo (dos carros, `FuerzaGConstante`, `DisenoDelTren = 'PrimerCarro'`) | desvío de $G_z$ en el arco: carro 1 0.008 G (límite 0.05), carro 2 0.72 G; 6 iteraciones |
+| 23 | Separación mínima entre carros: en recta, la `Holgura`; en curva, $2R\arctan\frac{\ell + H}{2(R - h)} - \ell$ | curva de 0.33 m: 0.0326 m; recta: 0.0100 m |
 
-**Nota de discrepancia doc↔código corregida.** Una versión anterior de este documento decía en prosa "los ocho son ejecutables" pero la tabla sólo listaba siete filas, sin el test de encadenamiento. Se corrigió agregando la fila que faltaba. Hoy son **diecinueve**: los tests 9 y 10 se agregaron junto con el modelo de heartline de [§14](#14-el-modelo-de-heartline-tres-curvas), el 11 fija la hipótesis del eje de roll, el 12 es el que hubiera cazado el error de proyección de la hélice y el 13 cubre el $G_y$ del dive loop; el 14 verifica que `FactorDeSeguridadNormativo` escala el objetivo del modo y no la verificación; el 15 fija que el diseño es $C^2$ en roll (rampas $C^2$ y objetivo $C^1$, onset lateral independiente del paso); el 16 es el caso de referencia de los dos bugs del reloj único y del signo del peralte en la cúspide ([§5](#5-los-modos-de-curvatura) y [§12.3](#123-dos-ángulos-de-roll-distintos-y-sólo-uno-se-ve-en-la-vía)); el 17 fija la ley lineal del modo `Clotoide` (§5.2), y el 18 y el 19 las dos definiciones del peralte alineado al CIR (§5.3).
+**Nota de discrepancia doc↔código corregida.** Una versión anterior de este documento decía en prosa "los ocho son ejecutables" pero la tabla sólo listaba siete filas, sin el test de encadenamiento. Se corrigió agregando la fila que faltaba. Hoy son **veintitrés**: los tests 9 y 10 se agregaron junto con el modelo de heartline de [§14](#14-el-modelo-de-heartline-tres-curvas), el 11 fija la hipótesis del eje de roll, el 12 es el que hubiera cazado el error de proyección de la hélice y el 13 cubre el $G_y$ del dive loop; el 14 verifica que `FactorDeSeguridadNormativo` escala el objetivo del modo y no la verificación; el 15 fija que el diseño es $C^2$ en roll (rampas $C^2$ y objetivo $C^1$, onset lateral independiente del paso); el 16 es el caso de referencia de los dos bugs del reloj único y del signo del peralte en la cúspide ([§5](#5-los-modos-de-curvatura) y [§12.3](#123-dos-ángulos-de-roll-distintos-y-sólo-uno-se-ve-en-la-vía)); el 17 fija la ley lineal del modo `Clotoide` (§5.2), el 18 y el 19 las dos definiciones del peralte alineado al CIR (§5.3), y del 20 al 23 cubren el tren de varios carros ([§16](#16-el-tren-de-varios-carros)).
 
 **Test 2 excluye los nodos cuyo esquema de tres puntos cruza una frontera de sub-tramo.** Ahí $d\kappa/ds$ salta y la circunferencia por tres puntos devuelve un promedio de dos curvaturas distintas: el error sube a $4.6\times10^{-3}$. Es una limitación del estimador discreto, no de la geometría generada — y es exactamente la fragilidad que ya documenta [`documentacion_analisis_energia.md` §4](documentacion_analisis_energia.md#4-radio-de-giro-curvatura-local).
 
@@ -599,10 +603,63 @@ Para la rotación pura, el criterio normativo propio es un límite de **velocida
 ## 15. Otras limitaciones y próximos pasos
 
 - **§7.1.7.1 simplificada.** Si aparece un evento de $-G_z$ de más de 3 s, se aplica la columna reducida de $+G_z$ a todo el elemento en vez de arrastrar el reloj de los 6 s. Es conservador y evita que el reloj cruce entre elementos.
-- **Modelo de partícula.** El tren se trata como un punto. Con $n_{carros}$ carros la velocidad es común y la altura relevante es la del conjunto; la arquitectura está preparada para $n_{carros}>1$ pero el reparto no está.
+- **Tren de varios carros: implementado** ([§16](#16-el-tren-de-varios-carros)). Con un carro sigue siendo la masa puntual de siempre.
 - **Centro de masa supuesto en la heartline.** Las fuerzas (rodadura, `FuerzaNormal`) y la energía se calculan con el centro de masa a $d$ del riel, sobre la heartline. El centro de masa real del conjunto carro más pasajero está más abajo, porque el chasis y las ruedas pesan. El error que mete es de orden $d/R$ sobre la rodadura — pocos por ciento — muy por debajo de la incertidumbre de los $C_{rr}$, que están sin calibrar. Sobre la G del pasajero **no** aplica esa disculpa, y por eso ahí sí se hace el transporte completo ([§14.3](#143-la-velocidad-angular-tiene-dos-aportes-no-uno)).
 - **Aceleración tangencial aproximada dentro del paso.** El término de Euler del roll, $b\,a_t\phi'/g$, se evalúa dentro del paso con $a_t \approx -g\,T_z$ (sin la resistencia al avance, que es ~0.1 g). Sólo pesa en las transiciones de roll, donde el modo de curvatura no actúa; la verificación posterior usa la $a_t$ numérica completa.
 - **Criterio de rotación por offset equivalente.** La rotación entra en la G del pasajero y en la longitud de transición de roll a través del brazo $b$. El criterio normativo propio de la rotación pura es un límite de velocidad angular (ASTM F2291 §7.1.6). Ver [§14.5](#145-lo-que-queda-abierto).
 - **Reparto entre juegos de ruedas — específico de este script.** En el generador de elementos (`Fisica/CargasEnLaVia.m` y `Fisica/ResistenciaAlAvance.m`) el reparto **ya se hace correctamente**, proyectando la normal sobre $\mathbf{U}$ y $\mathbf{L}$ del marco del carro: la componente sobre $\mathbf{U}$ va a las portantes si es positiva y a las de retención si es negativa, y la componente sobre $\mathbf{L}$ va a las de guía (código verificado: `ResistenciaAlAvance.m` líneas 10–12). Esto es distinto de lo que hace el script `analisis_energia.m` de la raíz del repo, que todavía asume peralte perfecto (ver [`documentacion_analisis_energia.md` §8](documentacion_analisis_energia.md#8-modelo-de-resistencia-al-avance)) — son dos scripts separados y esta sección se refiere únicamente al generador. Los tres $C_{rr}$ y el $C_d$ siguen siendo provisorios y **requieren calibración experimental**.
-- **Modo inverso**, elemento conector y tren de $n_{carros}>1$ quedan fuera de alcance, igual que el backend web.
+- **Modo inverso** y elemento conector quedan fuera de alcance, igual que el backend web.
 - **Modo `GNormativaMaxima`**: el reloj de cada nivel arranca donde la G registrada en este elemento cruzó el nivel. Si el elemento anterior ya venía por encima de un nivel, ese evento empezó antes y ni el modo ni la verificación (que es por elemento) lo ven: el encadenado normativo de varios elementos sostenidos no está cubierto. La curva de  dive loop sigue con el reloj único desde el arco ([§5](#5-los-modos-de-curvatura)).
+
+---
+
+## 16. El tren de varios carros
+
+Con `NumeroDeCarros > 1` (código en `GeneradorDeElementos/Tren/`). Hasta 2026-10 ese parámetro solo
+agrandaba el área frontal del arrastre y la dinámica era la de una masa puntual.
+
+**Dinámica (`SimularTren`).** Los carros van rígidamente unidos sobre el riel: el carro $i$ está
+$d_i = (i-1)(\ell + g)$ de arco detrás del primero ($\ell$ = `LargoCarro`, $g$ =
+`SeparacionEntreCarros`) y todos comparten la velocidad del riel $v$. La energía es la de todos:
+
+$$E = m\sum_i\left(\tfrac12 v^2 J_i^2 + g\,z_{cm,i}\right), \qquad \frac{dE}{ds} = -F_{res}$$
+
+con $s$ el arco del primer carro, $J_i$ el factor de la heartline (§14.4) y $z_{cm,i}$ la altura del centro de
+masa del carro $i$, los dos en $s - d_i$. Con $w = v^2$:
+
+$$\frac{dw}{ds} = -\frac{w\sum_i dJ_i^2/ds + 2g\sum_i dz_{cm,i}/ds + 2F_{res}/m}{\sum_i J_i^2}$$
+
+Con un carro es exactamente la ecuación de la partícula (test 20). La resistencia es la rodadura de cada
+carro con sus propias cargas más el arrastre del tren una vez. Antes del inicio los carros esperan en una
+recta por la tangente del primer nodo (la estación); la simulación sigue por una recta por la tangente del
+final hasta que el último carro termina de salir. Es causal: con el primer carro en $s$, los demás están
+detrás, sobre vía que ya existe.
+
+**Cada carro (`SimDelCarro`).** Sobre los mismos nodos del elemento: el nodo $k$ es ese carro parado en el
+nodo $k$, cuando el primero está $d_i$ más adelante. La geometría no cambia; cambian la velocidad, el reloj y
+todo lo que sale de ellos (`MagnitudesDinamicas`, la segunda mitad de `SimularSobreTrack`).
+
+**Diseño para un carro (`DisenarParaElTren`).** El modo de curvatura persigue su objetivo con una sola
+velocidad y cada carro pasa por cada punto a otra: un solo carro puede seguir la curva pedida. El elemento se
+genera como siempre y después se regenera imponiendo en la marcha la velocidad del carro elegido
+(`GenerarGeometria` con `DerivadaImpuesta`, que reemplaza la ecuación de energía de la partícula), en punto
+fijo hasta `TolVelocidadDelTren`. `DisenoDelTren` elige el carro: `'PrimerCarro'` (por defecto),
+`'CarroCritico'` o `'Particula'` (sin rediseñar). Medido en el loop de prueba (`FuerzaGConstante` 3 G,
+$R$ 0.30 m, 3 carros): diseñar para el carro de mayor $G$ no converge, porque el ranking se invierte al
+rediseñar; por eso el crítico es el que, al asignarle la curva, deja el **menor pico de G entre todos**
+(`UtilizacionNormativa`): diseñando para el primero el peor carro llegó a 4.17 G, para el segundo a 3.81 G y
+para el tercero a 4.50 G. Ninguna asignación evita que otros carros superen el objetivo. Mientras se diseña
+un elemento, los carros que van delante del de diseño pueden estar más allá de su final: se los supone en
+recta por la tangente de salida; la verificación del layout lo corrige.
+
+**Verificación (`VerificarTrenDelLayout`).** Tras cada elemento se simula el tren sobre la vía completa y se
+verifica cada carro sobre su propia línea de tiempo; cada línea dinámica del reporte del elemento es la del
+peor carro (`PeorCarroPorCriterio`). Criterios propios: separación máxima de un carro (previo), separación
+mínima sin interferencia entre cajas en la curva más cerrada con la `Holgura` de luz, y ángulo del acople
+$(\ell + g)\kappa/2 \le$ `AnguloMaximoDeAcople` (posteriores).
+
+**Costo.** Calcular las G de cada carro es barato (≈0.01 s por carro y elemento); lo caro es rediseñar para
+un carro: de 3 a 7 regeneraciones por elemento. Loop `FuerzaGConstante`: 7.2 s con un carro, 83.5 s con tres
+diseñando para el primero, 190 s buscando el crítico; circuito de `DemoLayout` en `ArcoCircular`: 29.8 s
+contra 149.5 s. Detalle de la interfaz y decisiones abiertas en [`web/DISENO.md`](web/DISENO.md); el
+contrato en [`CONTRATO_VISUALIZADOR.md`](CONTRATO_VISUALIZADOR.md) §6.5.
