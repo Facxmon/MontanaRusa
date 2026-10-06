@@ -107,6 +107,14 @@ Qué consume cada modo lo declara `ParametrosDelModo`; qué consume cada element
 | — | `Parametros.AltoCarro` | alto del carro del modelo | m | memoria §9.2 | 0.06 m, **SIN CERRAR** |
 | — | `Parametros.AnchoVia` | trocha (ancho de vía) del modelo | m | generador §8 | 0.06 m, **SIN CERRAR** |
 | — | `Parametros.Holgura` | margen sobre la envolvente del carro para el chequeo de interferencia | m | generador §8 | 0.010 m |
+| $g_{carros}$ | `Parametros.SeparacionEntreCarros` | separación entre carros consecutivos, de paragolpe a paragolpe, como arco sobre el riel | m | generador §16 | 0.040 m; los carros van a $L_{carro}+g_{carros}$ de arco |
+| — | `Parametros.AnguloMaximoDeAcople` | ángulo máximo entre la barra del acople y el eje de cada carro | rad | generador §16 | $\pi/4$, **provisorio y laxo** (falta el dato del acople real) |
+| — | `Parametros.CalcularTodosLosCarros` | booleano: simular y verificar todos los carros o solo el primero | — (lógico) | generador §16 | `true` |
+| — | `Parametros.DisenoDelTren` | para qué carro se diseña cada elemento: `Particula`, `PrimerCarro` o `CarroCritico` | — (texto) | generador §16 | `PrimerCarro` |
+| — | `Parametros.TolVelocidadDelTren` | diferencia máxima entre la velocidad impuesta y la obtenida del carro de diseño | m/s | generador §16 | 5e-3 |
+| $d_i$ | `DistanciasDelTren` | arco del riel del carro $i$ detrás del primero, $(i-1)(L_{carro}+g_{carros})$ | m | generador §16 | — |
+| $J_i$ | — | factor de la heartline del carro $i$ en su posición (§14.4) | adimensional | generador §16 | — |
+| $w$ | `Tren.VelocidadRielCuadrado` | velocidad del riel del tren al cuadrado, común a todos los carros | m²/s² | generador §16 | — |
 | $D_{rueda}$ | `Parametros.DiametroRueda` | diámetro de rueda, piso impuesto por el rodamiento mínimo | m | memoria §9.2 | 0.0136 m, **SIN CERRAR** |
 | $d$ | `Parametros.DistanciaHeartline` | ver bloque 2 | m | memoria §3.1 | 0.030 m; offset físico riel → heartline |
 | $e$ | `Parametros.DistanciaHeartlineACabeza` | ver bloque 2 | m | memoria §3.1 | 0.030 m, **SIN CERRAR** — no es una medida antropométrica. A $\lambda\approx22$ un offset corazón-cabeza real de ~0.25 m daría ~0.011 m |

@@ -181,6 +181,18 @@ MAJOR ≠ 1 y los golden de `1.0.0`, que no los traen, cargan igual. Solo el nú
 **MATLAB sigue emitiendo `1.0.0` sin esos campos y eso es válido**: MATLAB construye con parámetros
 globales y no tiene nada que poner ahí (§8, "MATLAB es la referencia normativa").
 
+**`1.3.0`** (2026-10-06, la emiten MATLAB y JS): el tren de varios carros y la energía por nodo, todo
+**opcional o agregado**, así que los golden anteriores cargan igual:
+
+- `nodos.energiaCinetica`, `energiaPotencial`, `energiaDisipadaRodadura` y `energiaDisipadaArrastre`
+  (§6.1);
+- `elementos[].carros` (§6.5), `resumen.carroDeDiseno` y `resumen.utilizacionPorCarro` (§6.3), solo
+  con `numeroDeCarros > 1`;
+- `resumenLayout.tren` (§7), también solo con varios carros;
+- parámetros nuevos (los trae el esquema autodescriptivo, no hacen falta en el consumidor):
+  `separacionEntreCarros`, `anguloMaximoDeAcople`, `calcularTodosLosCarros`, `disenoDelTren` y
+  `tolVelocidadDelTren`.
+
 ---
 
 ## 4. `parametros`
@@ -337,7 +349,17 @@ Todos los arrays de este bloque tienen exactamente `numeroDeNodos` elementos.
 | `anguloRoll` | **rad** | `Track.AnguloRoll` | contra el marco de transporte paralelo |
 | `anguloPeralte` | **rad** | `Track.AnguloPeralte` | |
 | `fuerzaNormal` | N | `Sim.FuerzaNormal` | |
-| `energiaTotal` | J | `Sim.EnergiaTotal` | |
+| `energiaTotal` | J | `Sim.EnergiaTotal` | con varios carros, la del **tren entero** cuando el carro 1 está en el nodo |
+| `energiaCinetica` | J | `Sim.EnergiaCinetica` | desde 1.3.0; con varios carros, del tren entero |
+| `energiaPotencial` | J | `Sim.EnergiaPotencial` | desde 1.3.0; con varios carros, del tren entero |
+| `energiaDisipadaRodadura` | J | `Sim.EnergiaDisipadaRodadura` | desde 1.3.0; acumulada desde el inicio **del elemento** (arranca en 0, como el tiempo) |
+| `energiaDisipadaArrastre` | J | `Sim.EnergiaDisipadaArrastre` | ídem |
+
+**Con varios carros** (`numeroDeCarros > 1`) las columnas dinámicas de `nodos` (tiempo, velocidades,
+aceleración, G, jerk, fuerza normal) son las del **carro 1**; las de cada carro van en
+`elementos[].carros` (§6.5). La energía, en cambio, es la del tren entero: es la cantidad que se conserva.
+La energía disipada acumula con la fuerza del nodo de partida de cada paso (en el nodo k, lo disipado
+entre el primero y el k); su último valor es `resumen.energiaDisipadaRodadura/Arrastre`.
 
 Los vectoriales van como `[[x,y,z], [x,y,z], ...]` — array de tripletes, no tres arrays sueltos. Es
 lo que `BufferAttribute` con `itemSize: 3` espera después de aplanar.
@@ -378,6 +400,14 @@ Dos campos que no son escalares: `posicionFinal` es un `[x,y,z]` y **`onsetMaxim
 `[Gx,Gy,Gz]`** (copia de `Escala.OnsetMaximo`, el presupuesto de onset por eje del modelo, en G/s).
 `busquedaVelocidad` es un objeto (`convergio`, `evaluaciones`, `motivo`) que documenta la bisección de
 `velocidadInicialMinima`; llega también cuando el cálculo no se pidió.
+
+**Con varios carros** (desde 1.3.0): `carroDeDiseno` es el **número** del carro (1 = el primero) que sigue
+exactamente la curva que pidió el modo en este elemento (ausente si `disenoDelTren = 'Particula'`: la vía
+se diseñó con la masa puntual), y `utilizacionPorCarro` el pico de G de cada carro sobre el límite de
+200 ms de su eje (la medida de "carro crítico", `UtilizacionNormativa.m`; `null` si el carro no se
+calculó). Los extremos (`gzMaxima`, `gzMinima`, `gyMaximaAbsoluta`, `fuerzaNormalMaxima`,
+`velocidadMinima` y los de la cabeza) son los de **todos** los carros calculados; `tiempoDeRecorrido` y
+la energía disipada siguen siendo los del carro 1 y del tren.
 
 ### 6.4 `criterios`
 
@@ -461,6 +491,34 @@ para el panel de detalle normativo y para el arnés de golden files.
 
 ---
 
+### 6.5 `carros` (desde 1.3.0, solo con `numeroDeCarros > 1`)
+
+```jsonc
+[
+  { "numero": 1,
+    "nodos": { "tiempo": [...], "velocidad": [...], "velocidadRiel": [...], "aceleracionTangencial": [...],
+               "gx": [...], "gy": [...], "gz": [...], "jerkGx": [...], "jerkGy": [...], "jerkGz": [...],
+               "gyCabeza": [...], "gzCabeza": [...], "fuerzaNormal": [...], "puntoDeParada": null },
+    "criterios": { "posteriores": [ ... ], "normativo": { ... } } },
+  { "numero": 2, ... }
+]
+```
+
+Un objeto por carro **calculado** (todos con `calcularTodosLosCarros`, solo el 1 si no). Las columnas van
+sobre los **mismos nodos** del elemento: el nodo k es **ese carro parado en el nodo k**, con su propio reloj
+(`tiempo` arranca en 0 cuando el carro entra al elemento). La geometría no cambia de carro a carro; cambian
+la velocidad, el reloj y todo lo que sale de ellos. `criterios.posteriores` trae solo las líneas que
+dependen de la dinámica (completa el elemento, G mínima, onsets, límites normativos, elipses, cabeza),
+evaluadas para ese carro sobre su propia línea de tiempo del layout; en `criterios.posteriores` del
+elemento cada una de esas líneas es la del **peor** carro (su detalle empieza con "Peor carro: k de N"),
+así que `todosPasan` y `todosLosCriteriosPasan` son los de todo el tren.
+
+Cómo se calcula (`GeneradorDeElementos/Tren/`): los carros van rígidamente unidos sobre el riel, a
+`largoCarro + separacionEntreCarros` de arco uno del otro, con la velocidad del riel común y la energía de
+todos (`SimularTren.m`); antes del inicio esperan en una recta por la tangente del primer nodo (la
+estación) y la simulación sigue, por una recta por la tangente del final, hasta que sale el último.
+Cada elemento se rediseña con la velocidad del carro elegido (`DisenarParaElTren.m`, `disenoDelTren`).
+
 ## 7. `resumenLayout`
 
 ```jsonc
@@ -479,6 +537,22 @@ para el panel de detalle normativo y para el arnés de golden files.
 ```
 
 `boundingBox` le ahorra al frontend recorrer todos los nodos para encuadrar la cámara al abrir.
+
+**`tren`** (desde 1.3.0, solo con varios carros):
+
+```jsonc
+"tren": {
+  "numeroDeCarros": 3,
+  "longitudDelTren": 0.38,               // m: N × largoCarro + (N − 1) × separacionEntreCarros
+  "distancias": [0, 0.14, 0.28],         // m de arco de riel detrás del primero
+  "desfasesDeTiempo": [0, 0.05, 0.10],   // s: cuándo llega cada carro al inicio de la vía
+  "tiempoDeSalida": 1.27,                // s: cuándo el último termina de recorrerla
+  "carrosCalculados": [1, 2, 3]
+}
+```
+
+El reloj del carro i en el layout es `desfasesDeTiempo[i]` más la suma de sus `tiempo` por elemento; el
+del tren (el del reproductor) arranca cuando el primer carro entra a la vía y termina en `tiempoDeSalida`.
 
 Qué curva mide cada cosa (lo fija el exportador, `LayoutAJson.m`): `alturaMaxima` y `alturaMinima` son
 el z **del riel**, absoluto — es la pieza que se fabrica y la que compara `AlturaMinimaSuelo`;
@@ -515,6 +589,8 @@ física?" es una opinión; con esto, es un test que corre solo.
 | `obt-alineado-fuerza` | OverBankedTurn | ArcoCircular, peralte alineado a la fuerza |
 | `obt-relativo-fuerza` | OverBankedTurn | ArcoCircular, peralte relativo a la fuerza con 10° de desvío |
 | `helice-alineado-fuerza` | Helice | ArcoCircular, peralte alineado a la fuerza |
+| `tren-loop-gconstante` | LoopVertical, 3 carros | FuerzaGConstante, diseñado para el primer carro |
+| `tren-circuito` | LoopVertical + OverBankedTurn, 3 carros | ArcoCircular, búsqueda del carro crítico |
 
 Hasta la 1.2.0 del contrato los casos en `ArcoCircular` se llamaban `*-clotoide` y el modo, `Clotoide`;
 los nombres `loop-clotoide` y `obt-clotoide` son ahora los de la clotoide nueva.
